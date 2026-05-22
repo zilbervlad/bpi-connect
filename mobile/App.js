@@ -9,9 +9,17 @@ import {
   ScrollView,
 } from "react-native";
 
+const currentUser = {
+  name: "Vlad",
+  role: "Admin",
+  store: "Boston Pie",
+  area: "Company",
+};
+
 const starterMessages = [
   {
     id: 1,
+    type: "message",
     priority: "HIGH",
     title: "Weekend Load & Go Focus",
     from: "Operations Team",
@@ -23,6 +31,7 @@ const starterMessages = [
   },
   {
     id: 2,
+    type: "announcement",
     priority: "ACK",
     title: "Image Standards Reminder",
     from: "Training Team",
@@ -34,6 +43,7 @@ const starterMessages = [
   },
   {
     id: 3,
+    type: "message",
     priority: "STORE",
     title: "Maintenance Follow-Up",
     from: "Facilities",
@@ -45,6 +55,7 @@ const starterMessages = [
   },
   {
     id: 4,
+    type: "announcement",
     priority: "TRAINING",
     title: "MIT Checklist Update",
     from: "Academy",
@@ -57,16 +68,15 @@ const starterMessages = [
 ];
 
 export default function App() {
-  const [screen, setScreen] = useState("home");
+  const [activeTab, setActiveTab] = useState("Home");
   const [messages, setMessages] = useState(starterMessages);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
-
-  function openInbox() {
-    setScreen("inbox");
-    setSelectedMessageId(null);
-  }
+  const unreadCount = messages.filter((message) => message.unread).length;
+  const ackCount = messages.filter(
+    (message) => message.requiresAck && !message.acknowledged
+  ).length;
 
   function openMessage(message) {
     setMessages((currentMessages) =>
@@ -76,155 +86,206 @@ export default function App() {
     );
 
     setSelectedMessageId(message.id);
-    setScreen("message");
+  }
+
+  function closeMessage() {
+    setSelectedMessageId(null);
   }
 
   function acknowledgeMessage(messageId) {
     setMessages((currentMessages) =>
       currentMessages.map((item) =>
-        item.id === messageId ? { ...item, acknowledged: true, unread: false } : item
+        item.id === messageId
+          ? { ...item, acknowledged: true, unread: false }
+          : item
       )
     );
   }
 
-  function goBack() {
-    if (screen === "message") {
-      setScreen("inbox");
-      setSelectedMessageId(null);
-      return;
-    }
-
-    setScreen("home");
+  function changeTab(tab) {
+    setSelectedMessageId(null);
+    setActiveTab(tab);
   }
 
-  if (screen === "inbox") {
-    return (
-      <InboxScreen
-        messages={messages}
-        onBack={goBack}
-        onOpenMessage={openMessage}
-      />
-    );
-  }
-
-  if (screen === "message" && selectedMessage) {
+  if (selectedMessage) {
     return (
       <MessageScreen
         message={selectedMessage}
-        onBack={goBack}
+        onBack={closeMessage}
         onAcknowledge={acknowledgeMessage}
       />
     );
   }
 
-  return <HomeScreen onOpenInbox={openInbox} />;
-}
-
-function HomeScreen({ onOpenInbox }) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
 
-      <View style={styles.container}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>BPI</Text>
-        </View>
+      <View style={styles.appShell}>
+        {activeTab === "Home" && (
+          <HomeScreen
+            user={currentUser}
+            unreadCount={unreadCount}
+            ackCount={ackCount}
+            messages={messages}
+            onOpenMessage={openMessage}
+            onGoInbox={() => changeTab("Inbox")}
+          />
+        )}
 
-        <Text style={styles.title}>BPI Connect</Text>
-        <Text style={styles.subtitle}>
-          The communication hub for Boston Pie teams.
-        </Text>
+        {activeTab === "Inbox" && (
+          <InboxScreen
+            messages={messages}
+            unreadCount={unreadCount}
+            ackCount={ackCount}
+            onOpenMessage={openMessage}
+          />
+        )}
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Stay connected.</Text>
-          <Text style={styles.cardText}>
-            Messages, announcements, acknowledgements, and store updates in one place.
-          </Text>
+        {activeTab === "Announcements" && (
+          <AnnouncementsScreen
+            messages={messages.filter((message) => message.type === "announcement")}
+            onOpenMessage={openMessage}
+          />
+        )}
 
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Sign In</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={onOpenInbox}>
-            <Text style={styles.secondaryButtonText}>View Demo Inbox</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.footer}>Boston Pie, Inc.</Text>
+        {activeTab === "Profile" && (
+          <ProfileScreen user={currentUser} unreadCount={unreadCount} ackCount={ackCount} />
+        )}
       </View>
+
+      <BottomTabs activeTab={activeTab} onChangeTab={changeTab} unreadCount={unreadCount} />
     </SafeAreaView>
   );
 }
 
-function InboxScreen({ messages, onBack, onOpenMessage }) {
-  const unreadCount = messages.filter((message) => message.unread).length;
-  const ackCount = messages.filter(
-    (message) => message.requiresAck && !message.acknowledged
-  ).length;
+function HomeScreen({ user, unreadCount, ackCount, messages, onOpenMessage, onGoInbox }) {
+  const topMessages = messages.slice(0, 2);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="light" />
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      <View style={styles.homeHero}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>BPI</Text>
+        </View>
 
-      <View style={styles.appHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>‹</Text>
-        </TouchableOpacity>
+        <Text style={styles.homeEyebrow}>BPI CONNECT</Text>
+        <Text style={styles.homeTitle}>Good afternoon, {user.name}.</Text>
+        <Text style={styles.homeSubtitle}>
+          The communication hub for Boston Pie teams.
+        </Text>
+      </View>
 
-        <View>
-          <Text style={styles.headerTitle}>Inbox</Text>
-          <Text style={styles.headerSubtitle}>
-            {unreadCount} unread · {ackCount} need acknowledgement
-          </Text>
+      <View style={styles.statsGrid}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{unreadCount}</Text>
+          <Text style={styles.statLabel}>Unread</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{ackCount}</Text>
+          <Text style={styles.statLabel}>Need Ack</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.inboxHero}>
-          <Text style={styles.inboxHeroEyebrow}>BPI CONNECT</Text>
-          <Text style={styles.inboxHeroTitle}>Today’s messages</Text>
-          <Text style={styles.inboxHeroText}>
-            Company updates, store follow-ups, and required acknowledgements.
-          </Text>
+      <View style={styles.quickCard}>
+        <Text style={styles.sectionTitle}>Quick actions</Text>
+
+        <TouchableOpacity style={styles.primaryButton} onPress={onGoInbox}>
+          <Text style={styles.primaryButtonText}>Open Inbox</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>New Broadcast Coming Soon</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Latest updates</Text>
+      </View>
+
+      {topMessages.map((message) => (
+        <MessageCard key={message.id} message={message} onPress={() => onOpenMessage(message)} />
+      ))}
+    </ScrollView>
+  );
+}
+
+function InboxScreen({ messages, unreadCount, ackCount, onOpenMessage }) {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      <HeaderBlock
+        eyebrow="INBOX"
+        title="Messages"
+        subtitle={`${unreadCount} unread · ${ackCount} need acknowledgement`}
+      />
+
+      {messages.map((message) => (
+        <MessageCard key={message.id} message={message} onPress={() => onOpenMessage(message)} />
+      ))}
+    </ScrollView>
+  );
+}
+
+function AnnouncementsScreen({ messages, onOpenMessage }) {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      <HeaderBlock
+        eyebrow="ANNOUNCEMENTS"
+        title="Company updates"
+        subtitle="Important messages and operational updates from Boston Pie."
+      />
+
+      {messages.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>No announcements yet</Text>
+          <Text style={styles.emptyText}>Company announcements will show up here.</Text>
+        </View>
+      ) : (
+        messages.map((message) => (
+          <MessageCard key={message.id} message={message} onPress={() => onOpenMessage(message)} />
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+function ProfileScreen({ user, unreadCount, ackCount }) {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      <HeaderBlock
+        eyebrow="PROFILE"
+        title={user.name}
+        subtitle={`${user.role} · ${user.store}`}
+      />
+
+      <View style={styles.profileCard}>
+        <View style={styles.profileAvatar}>
+          <Text style={styles.profileAvatarText}>V</Text>
         </View>
 
-        {messages.map((message) => (
-          <TouchableOpacity
-            key={message.id}
-            style={[styles.messageCard, message.unread && styles.messageCardUnread]}
-            onPress={() => onOpenMessage(message)}
-          >
-            <View style={styles.messageTopRow}>
-              <View style={styles.messageMetaLeft}>
-                <Text style={styles.messageFrom}>{message.from}</Text>
-                <Text style={styles.messageTime}>{message.time}</Text>
-              </View>
+        <Text style={styles.profileName}>{user.name}</Text>
+        <Text style={styles.profileMeta}>{user.role}</Text>
+        <Text style={styles.profileMeta}>{user.area}</Text>
+      </View>
 
-              <View style={[styles.priorityPill, getPriorityStyle(message.priority)]}>
-                <Text style={styles.priorityText}>{message.priority}</Text>
-              </View>
-            </View>
+      <View style={styles.profileList}>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileRowLabel}>Unread messages</Text>
+          <Text style={styles.profileRowValue}>{unreadCount}</Text>
+        </View>
 
-            <Text style={styles.messageTitle}>{message.title}</Text>
-            <Text style={styles.messagePreview} numberOfLines={2}>
-              {message.body}
-            </Text>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileRowLabel}>Needs acknowledgement</Text>
+          <Text style={styles.profileRowValue}>{ackCount}</Text>
+        </View>
 
-            <View style={styles.messageFooterRow}>
-              {message.requiresAck && !message.acknowledged ? (
-                <Text style={styles.ackText}>Requires acknowledgement</Text>
-              ) : message.requiresAck && message.acknowledged ? (
-                <Text style={styles.ackDoneText}>Acknowledged</Text>
-              ) : (
-                <Text style={styles.normalText}>No acknowledgement needed</Text>
-              )}
-
-              {message.unread && <View style={styles.unreadDot} />}
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileRowLabel}>Push notifications</Text>
+          <Text style={styles.profileRowValue}>Coming soon</Text>
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -244,7 +305,7 @@ function MessageScreen({ message, onBack, onAcknowledge }) {
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
         <View style={styles.detailCard}>
           <View style={[styles.priorityPill, getPriorityStyle(message.priority)]}>
             <Text style={styles.priorityText}>{message.priority}</Text>
@@ -276,11 +337,99 @@ function MessageScreen({ message, onBack, onAcknowledge }) {
           )}
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>Back to Inbox</Text>
+            <Text style={styles.secondaryButtonText}>Back</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function HeaderBlock({ eyebrow, title, subtitle }) {
+  return (
+    <View style={styles.headerBlock}>
+      <Text style={styles.headerEyebrow}>{eyebrow}</Text>
+      <Text style={styles.pageTitle}>{title}</Text>
+      <Text style={styles.pageSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+function MessageCard({ message, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.messageCard, message.unread && styles.messageCardUnread]}
+      onPress={onPress}
+    >
+      <View style={styles.messageTopRow}>
+        <View style={styles.messageMetaLeft}>
+          <Text style={styles.messageFrom}>{message.from}</Text>
+          <Text style={styles.messageTime}>{message.time}</Text>
+        </View>
+
+        <View style={[styles.priorityPill, getPriorityStyle(message.priority)]}>
+          <Text style={styles.priorityText}>{message.priority}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.messageTitle}>{message.title}</Text>
+      <Text style={styles.messagePreview} numberOfLines={2}>
+        {message.body}
+      </Text>
+
+      <View style={styles.messageFooterRow}>
+        {message.requiresAck && !message.acknowledged ? (
+          <Text style={styles.ackText}>Requires acknowledgement</Text>
+        ) : message.requiresAck && message.acknowledged ? (
+          <Text style={styles.ackDoneText}>Acknowledged</Text>
+        ) : (
+          <Text style={styles.normalText}>No acknowledgement needed</Text>
+        )}
+
+        {message.unread && <View style={styles.unreadDot} />}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function BottomTabs({ activeTab, onChangeTab, unreadCount }) {
+  const tabs = [
+    { key: "Home", label: "Home", icon: "⌂" },
+    { key: "Inbox", label: "Inbox", icon: "✉" },
+    { key: "Announcements", label: "News", icon: "!" },
+    { key: "Profile", label: "Profile", icon: "●" },
+  ];
+
+  return (
+    <View style={styles.bottomTabs}>
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.key;
+
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={styles.tabButton}
+            onPress={() => onChangeTab(tab.key)}
+          >
+            <View style={[styles.tabIconWrap, isActive && styles.tabIconWrapActive]}>
+              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>
+                {tab.icon}
+              </Text>
+
+              {tab.key === "Inbox" && unreadCount > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
@@ -296,64 +445,108 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#07111f",
   },
-  container: {
+  appShell: {
     flex: 1,
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: "#07111f",
+  },
+  screenContent: {
+    padding: 20,
+    paddingBottom: 112,
+  },
+  homeHero: {
+    backgroundColor: "#ffffff",
+    borderRadius: 30,
     padding: 24,
-    justifyContent: "center",
+    marginBottom: 16,
   },
   badge: {
-    width: 72,
-    height: 72,
+    width: 66,
+    height: 66,
     borderRadius: 22,
     backgroundColor: "#e91f3f",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    marginBottom: 20,
   },
   badgeText: {
     color: "#ffffff",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     letterSpacing: -1,
   },
-  title: {
-    color: "#ffffff",
-    fontSize: 44,
+  homeEyebrow: {
+    color: "#e91f3f",
+    fontSize: 11,
     fontWeight: "900",
-    letterSpacing: -2,
-    marginBottom: 10,
-  },
-  subtitle: {
-    color: "#b9c7d8",
-    fontSize: 17,
-    lineHeight: 25,
-    marginBottom: 34,
-  },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 28,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 14 },
-  },
-  cardTitle: {
-    color: "#10212b",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -1,
+    letterSpacing: 1.4,
     marginBottom: 8,
   },
-  cardText: {
+  homeTitle: {
+    color: "#10212b",
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: -1.4,
+    marginBottom: 8,
+  },
+  homeSubtitle: {
     color: "#526273",
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 22,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#101d2d",
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  statNumber: {
+    color: "#ffffff",
+    fontSize: 32,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  statLabel: {
+    color: "#8fa2b6",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 3,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  quickCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 26,
+    padding: 20,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.6,
+    marginBottom: 12,
+  },
+  quickCard: {
+    backgroundColor: "#101d2d",
+    borderRadius: 26,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   primaryButton: {
     backgroundColor: "#e91f3f",
@@ -379,76 +572,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
   },
-  footer: {
-    color: "#718399",
-    textAlign: "center",
-    marginTop: 28,
-    fontWeight: "700",
-  },
-  appHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backButtonText: {
-    color: "#ffffff",
-    fontSize: 36,
-    lineHeight: 38,
-    fontWeight: "600",
-  },
-  headerTitle: {
-    color: "#ffffff",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  headerSubtitle: {
-    color: "#9cadbf",
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 36,
-  },
-  inboxHero: {
+  headerBlock: {
     backgroundColor: "#ffffff",
-    borderRadius: 26,
+    borderRadius: 28,
     padding: 22,
     marginBottom: 16,
   },
-  inboxHeroEyebrow: {
+  headerEyebrow: {
     color: "#e91f3f",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.4,
     marginBottom: 8,
   },
-  inboxHeroTitle: {
+  pageTitle: {
     color: "#10212b",
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: "900",
-    letterSpacing: -1.2,
+    letterSpacing: -1.3,
     marginBottom: 6,
   },
-  inboxHeroText: {
+  pageSubtitle: {
     color: "#526273",
     fontSize: 15,
     lineHeight: 22,
@@ -549,6 +693,42 @@ const styles = StyleSheet.create({
   priorityTraining: {
     backgroundColor: "#24556b",
   },
+  appHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backButtonText: {
+    color: "#ffffff",
+    fontSize: 36,
+    lineHeight: 38,
+    fontWeight: "600",
+  },
+  headerTitle: {
+    color: "#ffffff",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  headerSubtitle: {
+    color: "#9cadbf",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 2,
+  },
   detailCard: {
     backgroundColor: "#ffffff",
     borderRadius: 28,
@@ -593,5 +773,145 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "700",
+  },
+  emptyCard: {
+    backgroundColor: "#101d2d",
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  emptyTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  emptyText: {
+    color: "#9cadbf",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  profileCard: {
+    backgroundColor: "#101d2d",
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  profileAvatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 28,
+    backgroundColor: "#e91f3f",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  profileAvatarText: {
+    color: "#ffffff",
+    fontSize: 30,
+    fontWeight: "900",
+  },
+  profileName: {
+    color: "#ffffff",
+    fontSize: 26,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  profileMeta: {
+    color: "#9cadbf",
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  profileList: {
+    backgroundColor: "#101d2d",
+    borderRadius: 24,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  profileRow: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  profileRowLabel: {
+    color: "#b8c6d6",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  profileRowValue: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  bottomTabs: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 14,
+    backgroundColor: "rgba(16,29,45,0.96)",
+    borderRadius: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+  tabIconWrap: {
+    width: 38,
+    height: 34,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  tabIconWrapActive: {
+    backgroundColor: "#e91f3f",
+  },
+  tabIcon: {
+    color: "#9cadbf",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  tabIconActive: {
+    color: "#ffffff",
+  },
+  tabLabel: {
+    color: "#8fa2b6",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  tabLabelActive: {
+    color: "#ffffff",
+  },
+  tabBadge: {
+    position: "absolute",
+    right: -4,
+    top: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: "#e91f3f",
+    fontSize: 10,
+    fontWeight: "900",
   },
 });
