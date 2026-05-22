@@ -3,7 +3,7 @@ import { SafeAreaView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { styles } from "./src/styles/styles";
-import { currentUser } from "./src/data/currentUser";
+import { demoUsers } from "./src/data/users";
 import { starterMessages } from "./src/data/messages";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -17,6 +17,7 @@ import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
+  const [currentUser, setCurrentUser] = useState(demoUsers[0]);
   const [messages, setMessages] = useState(starterMessages);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
 
@@ -53,6 +54,12 @@ export default function App() {
   function changeTab(tab) {
     setSelectedMessageId(null);
     setActiveTab(tab);
+  }
+
+  function switchUser(user) {
+    setCurrentUser(user);
+    setSelectedMessageId(null);
+    setActiveTab("Home");
   }
 
   function sendBroadcast({ title, body, targetLabel, requiresAck }) {
@@ -123,7 +130,12 @@ export default function App() {
         )}
 
         {activeTab === "Profile" && (
-          <ProfileScreen user={currentUser} unreadCount={unreadCount} ackCount={ackCount} />
+          <ProfileScreen
+            user={currentUser}
+            unreadCount={unreadCount}
+            ackCount={ackCount}
+            onSwitchUser={switchUser}
+          />
         )}
       </View>
 
