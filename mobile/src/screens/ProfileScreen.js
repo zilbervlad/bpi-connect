@@ -1,10 +1,9 @@
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
-import { demoUsers } from "../data/users";
 import { canSendBroadcast } from "../data/recipientGroups";
 
-export function ProfileScreen({ user, unreadCount, ackCount, onSwitchUser }) {
+export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
@@ -50,7 +49,7 @@ export function ProfileScreen({ user, unreadCount, ackCount, onSwitchUser }) {
       <View style={styles.quickCard}>
         <Text style={styles.sectionTitle}>Demo role switcher</Text>
 
-        {demoUsers.map((demoUser) => {
+        {users.map((demoUser) => {
           const isActive = demoUser.id === user.id;
 
           return (
