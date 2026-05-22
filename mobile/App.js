@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 
-const demoMessages = [
+const starterMessages = [
   {
     id: 1,
     priority: "HIGH",
@@ -18,6 +18,7 @@ const demoMessages = [
     time: "Today · 9:15 AM",
     body: "All stores should have a certified Load Captain assigned for every rush. Focus on clean oven flow, clear dispatch, and keeping load time under control.",
     requiresAck: true,
+    acknowledged: false,
     unread: true,
   },
   {
@@ -28,6 +29,7 @@ const demoMessages = [
     time: "Yesterday · 4:42 PM",
     body: "Managers, please review image standards with your team before Friday night. Uniforms, hats, aprons, and clean presentation matter.",
     requiresAck: true,
+    acknowledged: false,
     unread: true,
   },
   {
@@ -38,6 +40,7 @@ const demoMessages = [
     time: "Yesterday · 1:20 PM",
     body: "Open maintenance items should be reviewed during the manager walk. Add notes if the issue is resolved or needs escalation.",
     requiresAck: false,
+    acknowledged: false,
     unread: false,
   },
   {
@@ -48,28 +51,46 @@ const demoMessages = [
     time: "Mon · 10:05 AM",
     body: "The MIT development checklist is being cleaned up to better track Level I, II, and III progress.",
     requiresAck: false,
+    acknowledged: false,
     unread: false,
   },
 ];
 
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [messages, setMessages] = useState(starterMessages);
+  const [selectedMessageId, setSelectedMessageId] = useState(null);
+
+  const selectedMessage = messages.find((message) => message.id === selectedMessageId);
 
   function openInbox() {
     setScreen("inbox");
-    setSelectedMessage(null);
+    setSelectedMessageId(null);
   }
 
   function openMessage(message) {
-    setSelectedMessage(message);
+    setMessages((currentMessages) =>
+      currentMessages.map((item) =>
+        item.id === message.id ? { ...item, unread: false } : item
+      )
+    );
+
+    setSelectedMessageId(message.id);
     setScreen("message");
+  }
+
+  function acknowledgeMessage(messageId) {
+    setMessages((currentMessages) =>
+      currentMessages.map((item) =>
+        item.id === messageId ? { ...item, acknowledged: true, unread: false } : item
+      )
+    );
   }
 
   function goBack() {
     if (screen === "message") {
       setScreen("inbox");
-      setSelectedMessage(null);
+      setSelectedMessageId(null);
       return;
     }
 
@@ -77,11 +98,23 @@ export default function App() {
   }
 
   if (screen === "inbox") {
-    return <InboxScreen onBack={goBack} onOpenMessage={openMessage} />;
+    return (
+      <InboxScreen
+        messages={messages}
+        onBack={goBack}
+        onOpenMessage={openMessage}
+      />
+    );
   }
 
   if (screen === "message" && selectedMessage) {
-    return <MessageScreen message={selectedMessage} onBack={goBack} />;
+    return (
+      <MessageScreen
+        message={selectedMessage}
+        onBack={goBack}
+        onAcknowledge={acknowledgeMessage}
+      />
+    );
   }
 
   return <HomeScreen onOpenInbox={openInbox} />;
@@ -123,9 +156,11 @@ function HomeScreen({ onOpenInbox }) {
   );
 }
 
-function InboxScreen({ onBack, onOpenMessage }) {
-  const unreadCount = demoMessages.filter((message) => message.unread).length;
-  const ackCount = demoMessages.filter((message) => message.requiresAck).length;
+function InboxScreen({ messages, onBack, onOpenMessage }) {
+  const unreadCount = messages.filter((message) => message.unread).length;
+  const ackCount = messages.filter(
+    (message) => message.requiresAck && !message.acknowledged
+  ).length;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -153,7 +188,7 @@ function InboxScreen({ onBack, onOpenMessage }) {
           </Text>
         </View>
 
-        {demoMessages.map((message) => (
+        {messages.map((message) => (
           <TouchableOpacity
             key={message.id}
             style={[styles.messageCard, message.unread && styles.messageCardUnread]}
@@ -176,8 +211,10 @@ function InboxScreen({ onBack, onOpenMessage }) {
             </Text>
 
             <View style={styles.messageFooterRow}>
-              {message.requiresAck ? (
+              {message.requiresAck && !message.acknowledged ? (
                 <Text style={styles.ackText}>Requires acknowledgement</Text>
+              ) : message.requiresAck && message.acknowledged ? (
+                <Text style={styles.ackDoneText}>Acknowledged</Text>
               ) : (
                 <Text style={styles.normalText}>No acknowledgement needed</Text>
               )}
@@ -191,7 +228,7 @@ function InboxScreen({ onBack, onOpenMessage }) {
   );
 }
 
-function MessageScreen({ message, onBack }) {
+function MessageScreen({ message, onBack, onAcknowledge }) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
@@ -220,10 +257,22 @@ function MessageScreen({ message, onBack }) {
 
           <Text style={styles.detailBody}>{message.body}</Text>
 
-          {message.requiresAck && (
-            <TouchableOpacity style={styles.primaryButton}>
+          {message.requiresAck && !message.acknowledged && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => onAcknowledge(message.id)}
+            >
               <Text style={styles.primaryButtonText}>Acknowledge Message</Text>
             </TouchableOpacity>
+          )}
+
+          {message.requiresAck && message.acknowledged && (
+            <View style={styles.acknowledgedBox}>
+              <Text style={styles.acknowledgedBoxTitle}>Acknowledged</Text>
+              <Text style={styles.acknowledgedBoxText}>
+                You confirmed that you read this message.
+              </Text>
+            </View>
           )}
 
           <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
@@ -460,6 +509,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+  ackDoneText: {
+    color: "#7ee0a0",
+    fontSize: 12,
+    fontWeight: "900",
+  },
   normalText: {
     color: "#8092a6",
     fontSize: 12,
@@ -519,5 +573,25 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 27,
     marginBottom: 18,
+  },
+  acknowledgedBox: {
+    backgroundColor: "#ecfdf3",
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+  },
+  acknowledgedBoxTitle: {
+    color: "#166534",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  acknowledgedBoxText: {
+    color: "#216b3b",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
   },
 });
