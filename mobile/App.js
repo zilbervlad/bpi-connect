@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { styles } from "./src/styles/styles";
 import { demoUsers } from "./src/data/users";
 import { starterMessages } from "./src/data/messages";
+import { starterThreads } from "./src/data/threads";
 
 import {
   fetchApiUsers,
@@ -17,12 +18,14 @@ import { BottomTabs } from "./src/components/BottomTabs";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
+import { ChatsScreen } from "./src/screens/ChatsScreen";
 import { AnnouncementsScreen } from "./src/screens/AnnouncementsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
 import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { PeopleScreen } from "./src/screens/PeopleScreen";
+import { ThreadScreen } from "./src/screens/ThreadScreen";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -73,13 +76,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
   const [currentUser, setCurrentUser] = useState(demoUsers[0]);
   const [messages, setMessages] = useState(starterMessages);
+  const [threads, setThreads] = useState(starterThreads);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
+  const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [startingRecipient, setStartingRecipient] = useState(null);
   const [apiUsers, setApiUsers] = useState([]);
   const [usingApi, setUsingApi] = useState(false);
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
-  const unreadCount = messages.filter((message) => message.unread).length;
+  const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
+
+  const unreadCount = threads.reduce((total, thread) => total + thread.unread, 0);
   const ackCount = messages.filter(
     (message) => message.requiresAck && !message.acknowledged
   ).length;
@@ -145,6 +152,44 @@ export default function App() {
     setSelectedMessageId(null);
   }
 
+  function openThread(thread) {
+    setThreads((currentThreads) =>
+      currentThreads.map((item) =>
+        item.id === thread.id ? { ...item, unread: 0 } : item
+      )
+    );
+
+    setSelectedThreadId(thread.id);
+  }
+
+  function closeThread() {
+    setSelectedThreadId(null);
+  }
+
+  function sendThreadMessage(threadId, body) {
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+
+        const newMessage = {
+          id: `m-${Date.now()}`,
+          sender: currentUser.name,
+          senderRole: currentUser.role,
+          body,
+          time: "Now",
+          isMe: true,
+        };
+
+        return {
+          ...thread,
+          messages: [...thread.messages, newMessage],
+          lastMessage: body,
+          lastTime: "Now",
+        };
+      })
+    );
+  }
+
   async function acknowledgeMessage(messageId) {
     setMessages((currentMessages) =>
       currentMessages.map((item) =>
@@ -165,6 +210,7 @@ export default function App() {
 
   function changeTab(tab) {
     setSelectedMessageId(null);
+    setSelectedThreadId(null);
 
     if (tab !== "Compose") {
       setStartingRecipient(null);
@@ -176,6 +222,7 @@ export default function App() {
   function switchUser(user) {
     setCurrentUser(user);
     setSelectedMessageId(null);
+    setSelectedThreadId(null);
     setStartingRecipient(null);
     setActiveTab("Home");
     reloadMessagesForUser(user);
@@ -184,6 +231,7 @@ export default function App() {
   function startMessageToRecipient(recipient) {
     setStartingRecipient(recipient);
     setSelectedMessageId(null);
+    setSelectedThreadId(null);
     setActiveTab("Compose");
   }
 
@@ -206,25 +254,56 @@ export default function App() {
   }
 
   function sendPrivateMessage({ recipient, body }) {
-    const newMessage = {
-      id: Date.now(),
-      type: "message",
-      priority: "DM",
-      title: `Private message to ${recipient.name}`,
-      from: `${currentUser.role} · ${currentUser.name}`,
-      time: "Just now",
-      body: `${body}\n\nTo: ${recipient.name} · ${recipient.store}`,
-      requiresAck: false,
-      acknowledged: false,
-      unread: true,
+    const threadId = `dm-${recipient.id}`;
+
+    const existingThread = threads.find((thread) => thread.id === threadId);
+
+    if (existingThread) {
+      sendThreadMessage(threadId, body);
+      setSelectedThreadId(threadId);
+      setActiveTab("Chats");
+      return;
+    }
+
+    const newThread = {
+      id: threadId,
+      type: "direct",
+      groupKey: threadId,
+      name: recipient.name,
+      subtitle: "Private message",
+      lastMessage: body,
+      lastTime: "Now",
+      unread: 0,
+      members: [currentUser.name, recipient.name],
+      messages: [
+        {
+          id: `m-${Date.now()}`,
+          sender: currentUser.name,
+          senderRole: currentUser.role,
+          body,
+          time: "Now",
+          isMe: true,
+        },
+      ],
     };
 
-    setMessages((currentMessages) => [newMessage, ...currentMessages]);
+    setThreads((currentThreads) => [newThread, ...currentThreads]);
     setStartingRecipient(null);
-    setActiveTab("Inbox");
+    setSelectedThreadId(newThread.id);
+    setActiveTab("Chats");
   }
 
   const profileUsers = usingApi && apiUsers.length ? apiUsers : demoUsers;
+
+  if (selectedThread) {
+    return (
+      <ThreadScreen
+        thread={selectedThread}
+        onBack={closeThread}
+        onSendThreadMessage={sendThreadMessage}
+      />
+    );
+  }
 
   if (selectedMessage) {
     return (
@@ -248,7 +327,14 @@ export default function App() {
             ackCount={ackCount}
             messages={messages}
             onOpenMessage={openMessage}
-            onGoInbox={() => changeTab("Inbox")}
+            onGoInbox={() => changeTab("Chats")}
+          />
+        )}
+
+        {activeTab === "Chats" && (
+          <ChatsScreen
+            threads={threads}
+            onOpenThread={openThread}
           />
         )}
 

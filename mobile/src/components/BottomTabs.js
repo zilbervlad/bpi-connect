@@ -5,10 +5,9 @@ import { canSendBroadcast } from "../data/recipientGroups";
 export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
-    { key: "Inbox", label: "Inbox", icon: "✉" },
+    { key: "Chats", label: "Chats", icon: "✉" },
     { key: "People", label: "People", icon: "◎" },
     { key: "Compose", label: "Message", icon: "＋" },
-    { key: "Announcements", label: "News", icon: "!" },
   ];
 
   if (canSendBroadcast(user)) {
@@ -33,7 +32,7 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
                 {tab.icon}
               </Text>
 
-              {tab.key === "Inbox" && unreadCount > 0 && (
+              {tab.key === "Chats" && unreadCount > 0 && (
                 <View style={styles.tabBadge}>
                   <Text style={styles.tabBadgeText}>{unreadCount}</Text>
                 </View>
