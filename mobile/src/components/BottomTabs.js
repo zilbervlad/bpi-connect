@@ -1,13 +1,19 @@
 import { View, Text, TouchableOpacity } from "react-native";
 import { styles } from "../styles/styles";
+import { canSendBroadcast } from "../data/recipientGroups";
 
-export function BottomTabs({ activeTab, onChangeTab, unreadCount }) {
+export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
     { key: "Inbox", label: "Inbox", icon: "✉" },
     { key: "Announcements", label: "News", icon: "!" },
-    { key: "Profile", label: "Profile", icon: "●" },
   ];
+
+  if (canSendBroadcast(user)) {
+    tabs.push({ key: "Broadcast", label: "Send", icon: "+" });
+  }
+
+  tabs.push({ key: "Profile", label: "Profile", icon: "●" });
 
   return (
     <View style={styles.bottomTabs}>
