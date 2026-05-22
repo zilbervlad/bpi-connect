@@ -13,6 +13,7 @@ import { InboxScreen } from "./src/screens/InboxScreen";
 import { AnnouncementsScreen } from "./src/screens/AnnouncementsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
+import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
@@ -52,6 +53,24 @@ export default function App() {
   function changeTab(tab) {
     setSelectedMessageId(null);
     setActiveTab(tab);
+  }
+
+  function sendBroadcast({ title, body, targetLabel, requiresAck }) {
+    const newMessage = {
+      id: Date.now(),
+      type: "announcement",
+      priority: requiresAck ? "ACK" : "STORE",
+      title,
+      from: `${currentUser.role} · ${currentUser.name}`,
+      time: "Just now",
+      body: `${body}\n\nTarget: ${targetLabel}`,
+      requiresAck,
+      acknowledged: false,
+      unread: true,
+    };
+
+    setMessages((currentMessages) => [newMessage, ...currentMessages]);
+    setActiveTab("Inbox");
   }
 
   if (selectedMessage) {
@@ -96,12 +115,24 @@ export default function App() {
           />
         )}
 
+        {activeTab === "Broadcast" && (
+          <BroadcastScreen
+            user={currentUser}
+            onSendBroadcast={sendBroadcast}
+          />
+        )}
+
         {activeTab === "Profile" && (
           <ProfileScreen user={currentUser} unreadCount={unreadCount} ackCount={ackCount} />
         )}
       </View>
 
-      <BottomTabs activeTab={activeTab} onChangeTab={changeTab} unreadCount={unreadCount} />
+      <BottomTabs
+        activeTab={activeTab}
+        onChangeTab={changeTab}
+        unreadCount={unreadCount}
+        user={currentUser}
+      />
     </SafeAreaView>
   );
 }
