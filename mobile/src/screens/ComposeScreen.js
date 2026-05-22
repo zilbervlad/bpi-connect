@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,18 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { getVisiblePrivateRecipients } from "../data/privateRecipients";
 
-export function ComposeScreen({ user, onSendPrivateMessage }) {
+export function ComposeScreen({ user, onSendPrivateMessage, startingRecipient }) {
   const recipients = useMemo(() => getVisiblePrivateRecipients(user), [user]);
-  const [selectedRecipientId, setSelectedRecipientId] = useState(recipients[0]?.id || null);
+  const [selectedRecipientId, setSelectedRecipientId] = useState(
+    startingRecipient?.id || recipients[0]?.id || null
+  );
   const [messageBody, setMessageBody] = useState("Can you check this and let me know when it is done?");
+
+  useEffect(() => {
+    if (startingRecipient?.id) {
+      setSelectedRecipientId(startingRecipient.id);
+    }
+  }, [startingRecipient]);
 
   const selectedRecipient = recipients.find((recipient) => recipient.id === selectedRecipientId);
 

@@ -6,6 +6,7 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
     { key: "Inbox", label: "Inbox", icon: "✉" },
+    { key: "People", label: "People", icon: "◎" },
     { key: "Compose", label: "Message", icon: "＋" },
     { key: "Announcements", label: "News", icon: "!" },
   ];

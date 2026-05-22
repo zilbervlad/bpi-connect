@@ -15,12 +15,14 @@ import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
 import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 import { ComposeScreen } from "./src/screens/ComposeScreen";
+import { PeopleScreen } from "./src/screens/PeopleScreen";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
   const [currentUser, setCurrentUser] = useState(demoUsers[0]);
   const [messages, setMessages] = useState(starterMessages);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
+  const [startingRecipient, setStartingRecipient] = useState(null);
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const unreadCount = messages.filter((message) => message.unread).length;
@@ -54,13 +56,25 @@ export default function App() {
 
   function changeTab(tab) {
     setSelectedMessageId(null);
+
+    if (tab !== "Compose") {
+      setStartingRecipient(null);
+    }
+
     setActiveTab(tab);
   }
 
   function switchUser(user) {
     setCurrentUser(user);
     setSelectedMessageId(null);
+    setStartingRecipient(null);
     setActiveTab("Home");
+  }
+
+  function startMessageToRecipient(recipient) {
+    setStartingRecipient(recipient);
+    setSelectedMessageId(null);
+    setActiveTab("Compose");
   }
 
   function sendBroadcast({ title, body, targetLabel, requiresAck }) {
@@ -96,6 +110,7 @@ export default function App() {
     };
 
     setMessages((currentMessages) => [newMessage, ...currentMessages]);
+    setStartingRecipient(null);
     setActiveTab("Inbox");
   }
 
@@ -134,9 +149,17 @@ export default function App() {
           />
         )}
 
+        {activeTab === "People" && (
+          <PeopleScreen
+            user={currentUser}
+            onStartMessage={startMessageToRecipient}
+          />
+        )}
+
         {activeTab === "Compose" && (
           <ComposeScreen
             user={currentUser}
+            startingRecipient={startingRecipient}
             onSendPrivateMessage={sendPrivateMessage}
           />
         )}
