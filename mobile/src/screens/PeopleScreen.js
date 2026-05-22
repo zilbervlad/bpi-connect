@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-nati
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { getVisiblePrivateRecipients } from "../data/privateRecipients";
+import { getVisibleApiPeople } from "../api/peoplePermissions";
 
-export function PeopleScreen({ user, onStartMessage }) {
-  const people = getVisiblePrivateRecipients(user);
+export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
+  const people = usingApi
+    ? getVisibleApiPeople(user, users)
+    : getVisiblePrivateRecipients(user);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>

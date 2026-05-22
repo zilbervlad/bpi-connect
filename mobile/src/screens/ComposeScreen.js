@@ -11,9 +11,21 @@ import {
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { getVisiblePrivateRecipients } from "../data/privateRecipients";
+import { getVisibleApiPeople } from "../api/peoplePermissions";
 
-export function ComposeScreen({ user, onSendPrivateMessage, startingRecipient }) {
-  const recipients = useMemo(() => getVisiblePrivateRecipients(user), [user]);
+export function ComposeScreen({
+  user,
+  users,
+  usingApi,
+  onSendPrivateMessage,
+  startingRecipient,
+}) {
+  const recipients = useMemo(() => {
+    return usingApi
+      ? getVisibleApiPeople(user, users)
+      : getVisiblePrivateRecipients(user);
+  }, [user, users, usingApi]);
+
   const [selectedRecipientId, setSelectedRecipientId] = useState(
     startingRecipient?.id || recipients[0]?.id || null
   );
@@ -22,8 +34,10 @@ export function ComposeScreen({ user, onSendPrivateMessage, startingRecipient })
   useEffect(() => {
     if (startingRecipient?.id) {
       setSelectedRecipientId(startingRecipient.id);
+    } else if (!selectedRecipientId && recipients[0]?.id) {
+      setSelectedRecipientId(recipients[0].id);
     }
-  }, [startingRecipient]);
+  }, [startingRecipient, recipients, selectedRecipientId]);
 
   const selectedRecipient = recipients.find((recipient) => recipient.id === selectedRecipientId);
 

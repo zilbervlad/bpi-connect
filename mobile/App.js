@@ -264,6 +264,8 @@ export default function App() {
         {activeTab === "People" && (
           <PeopleScreen
             user={currentUser}
+            users={profileUsers}
+            usingApi={usingApi}
             onStartMessage={startMessageToRecipient}
           />
         )}
@@ -271,6 +273,8 @@ export default function App() {
         {activeTab === "Compose" && (
           <ComposeScreen
             user={currentUser}
+            users={profileUsers}
+            usingApi={usingApi}
             startingRecipient={startingRecipient}
             onSendPrivateMessage={sendPrivateMessage}
           />
