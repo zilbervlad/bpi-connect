@@ -14,6 +14,7 @@ import { AnnouncementsScreen } from "./src/screens/AnnouncementsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
 import { BroadcastScreen } from "./src/screens/BroadcastScreen";
+import { ComposeScreen } from "./src/screens/ComposeScreen";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
@@ -80,6 +81,24 @@ export default function App() {
     setActiveTab("Inbox");
   }
 
+  function sendPrivateMessage({ recipient, body }) {
+    const newMessage = {
+      id: Date.now(),
+      type: "message",
+      priority: "DM",
+      title: `Private message to ${recipient.name}`,
+      from: `${currentUser.role} · ${currentUser.name}`,
+      time: "Just now",
+      body: `${body}\n\nTo: ${recipient.name} · ${recipient.store}`,
+      requiresAck: false,
+      acknowledged: false,
+      unread: true,
+    };
+
+    setMessages((currentMessages) => [newMessage, ...currentMessages]);
+    setActiveTab("Inbox");
+  }
+
   if (selectedMessage) {
     return (
       <MessageScreen
@@ -112,6 +131,13 @@ export default function App() {
             unreadCount={unreadCount}
             ackCount={ackCount}
             onOpenMessage={openMessage}
+          />
+        )}
+
+        {activeTab === "Compose" && (
+          <ComposeScreen
+            user={currentUser}
+            onSendPrivateMessage={sendPrivateMessage}
           />
         )}
 

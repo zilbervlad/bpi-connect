@@ -6,11 +6,12 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
     { key: "Inbox", label: "Inbox", icon: "✉" },
+    { key: "Compose", label: "Message", icon: "＋" },
     { key: "Announcements", label: "News", icon: "!" },
   ];
 
   if (canSendBroadcast(user)) {
-    tabs.push({ key: "Broadcast", label: "Send", icon: "+" });
+    tabs.push({ key: "Broadcast", label: "Send", icon: "➤" });
   }
 
   tabs.push({ key: "Profile", label: "Profile", icon: "●" });

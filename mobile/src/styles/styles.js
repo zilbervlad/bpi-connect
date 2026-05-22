@@ -4,6 +4,7 @@ export function getPriorityStyle(priority) {
   if (priority === "HIGH") return styles.priorityHigh;
   if (priority === "ACK") return styles.priorityAck;
   if (priority === "STORE") return styles.priorityStore;
+  if (priority === "DM") return styles.priorityStore;
   return styles.priorityTraining;
 }
 
