@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from secrets import token_urlsafe
 
@@ -11,8 +12,14 @@ from app.models import Area, Store, User, Message, MessageRecipient, Thread, Thr
 
 def create_app():
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "dev-secret-key"
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bpi_connect.db"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
+
+    database_url = os.getenv("DATABASE_URL", "").strip()
+
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url or "sqlite:///bpi_connect.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     CORS(app)
