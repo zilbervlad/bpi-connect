@@ -1,7 +1,9 @@
 from datetime import datetime
+from secrets import token_urlsafe
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck
@@ -52,6 +54,11 @@ def create_app():
         ]
         db.session.add_all(users)
         db.session.flush()
+
+        # Demo accounts use password: password123
+        for user in users:
+            user.password_hash = generate_password_hash("password123")
+            user.invite_accepted_at = datetime.utcnow()
 
         sender = users[0]
         recipients = users[1:]
@@ -179,6 +186,145 @@ def create_app():
             "success": True,
             "message": "Database initialized with demo BPI Connect data.",
         })
+
+    @app.post("/api/auth/login")
+    def login():
+        data = request.get_json() or {}
+
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
+
+        if not email or not password:
+            return jsonify({
+                "success": False,
+                "error": "Email and password are required.",
+            }), 400
+
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+
+        if not user or not user.password_hash or not check_password_hash(user.password_hash, password):
+            return jsonify({
+                "success": False,
+                "error": "Invalid email or password.",
+            }), 401
+
+        if not user.is_active:
+            return jsonify({
+                "success": False,
+                "error": "This account is inactive.",
+            }), 403
+
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user(user),
+        })
+
+
+    @app.post("/api/invites")
+    def create_invite():
+        data = request.get_json() or {}
+
+        name = (data.get("name") or "").strip()
+        email = (data.get("email") or "").strip().lower()
+        role = (data.get("role") or "").strip().lower()
+        store_number = (data.get("store_number") or "").strip()
+        area_name = (data.get("area") or "").strip()
+
+        if not name or not email or not role:
+            return jsonify({
+                "success": False,
+                "error": "name, email, and role are required.",
+            }), 400
+
+        existing = User.query.filter(db.func.lower(User.email) == email).first()
+        if existing:
+            return jsonify({
+                "success": False,
+                "error": "A user with this email already exists.",
+            }), 409
+
+        store = None
+        area = None
+
+        if store_number:
+            store = Store.query.filter_by(store_number=store_number).first()
+
+        if area_name:
+            area = Area.query.filter_by(name=area_name).first()
+
+        if store and not area:
+            area = store.area
+
+        invite_token = token_urlsafe(32)
+
+        user = User(
+            name=name,
+            email=email,
+            role=role,
+            store_id=store.id if store else None,
+            area_id=area.id if area else None,
+            invite_token=invite_token,
+            invite_sent_at=datetime.utcnow(),
+            is_active=True,
+        )
+
+        db.session.add(user)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user(user),
+            "invite_token": invite_token,
+            "invite_url": f"bpi-connect://accept-invite/{invite_token}",
+        }), 201
+
+
+    @app.post("/api/invites/accept")
+    def accept_invite():
+        data = request.get_json() or {}
+
+        invite_token = (data.get("invite_token") or "").strip()
+        password = data.get("password") or ""
+
+        if not invite_token or not password:
+            return jsonify({
+                "success": False,
+                "error": "invite_token and password are required.",
+            }), 400
+
+        if len(password) < 8:
+            return jsonify({
+                "success": False,
+                "error": "Password must be at least 8 characters.",
+            }), 400
+
+        user = User.query.filter_by(invite_token=invite_token).first()
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Invite not found.",
+            }), 404
+
+        if not user.is_active:
+            return jsonify({
+                "success": False,
+                "error": "This invite is for an inactive account.",
+            }), 403
+
+        user.password_hash = generate_password_hash(password)
+        user.invite_accepted_at = datetime.utcnow()
+        user.invite_token = None
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user(user),
+        })
+
 
     @app.get("/api/users")
     def list_users():
@@ -492,6 +638,9 @@ def serialize_user(user):
         "store_name": user.store.name if user.store else None,
         "area": user.area.name if user.area else None,
         "is_active": user.is_active,
+        "invite_sent_at": user.invite_sent_at.isoformat() if user.invite_sent_at else None,
+        "invite_accepted_at": user.invite_accepted_at.isoformat() if user.invite_accepted_at else None,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
     }
 
 

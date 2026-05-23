@@ -32,6 +32,13 @@ class User(db.Model):
     role = db.Column(db.String(50), nullable=False)
     store_id = db.Column(db.Integer, db.ForeignKey("stores.id"), nullable=True)
     area_id = db.Column(db.Integer, db.ForeignKey("areas.id"), nullable=True)
+
+    password_hash = db.Column(db.String(255), nullable=True)
+    invite_token = db.Column(db.String(255), unique=True, nullable=True)
+    invite_sent_at = db.Column(db.DateTime, nullable=True)
+    invite_accepted_at = db.Column(db.DateTime, nullable=True)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -69,11 +76,12 @@ class MessageRecipient(db.Model):
     message = db.relationship("Message", backref="recipients")
     user = db.relationship("User", backref="received_messages")
 
+
 class Thread(db.Model):
     __tablename__ = "threads"
 
     id = db.Column(db.Integer, primary_key=True)
-    thread_type = db.Column(db.String(40), nullable=False)  # direct, store, area, role, company, hr
+    thread_type = db.Column(db.String(40), nullable=False)
     name = db.Column(db.String(160), nullable=False)
     group_key = db.Column(db.String(160), unique=True, nullable=False)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
