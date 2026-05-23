@@ -12,6 +12,10 @@ import {
   fetchApiMessages,
   markApiMessageRead,
   acknowledgeApiMessage,
+  fetchApiThreads,
+  fetchApiThreadMessages,
+  sendApiThreadMessage,
+  markApiThreadRead,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -72,6 +76,60 @@ function mapApiMessageToAppMessage(apiMessage) {
   };
 }
 
+function getThreadSubtitle(threadType) {
+  const map = {
+    direct: "Private message",
+    store: "Store group",
+    area: "Area group",
+    role: "Role group",
+    company: "Everyone",
+    hr: "HR announcements",
+  };
+
+  return map[threadType] || "Group thread";
+}
+
+function formatApiTime(value) {
+  if (!value) return "";
+
+  try {
+    const date = new Date(value);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function mapApiThreadToAppThread(apiThread) {
+  return {
+    id: apiThread.id,
+    apiThread: true,
+    type: apiThread.thread_type,
+    groupKey: apiThread.group_key,
+    name: apiThread.name,
+    subtitle: getThreadSubtitle(apiThread.thread_type),
+    lastMessage: apiThread.last_message || "",
+    lastTime: formatApiTime(apiThread.last_time),
+    unread: apiThread.unread || 0,
+    members: (apiThread.members || []).map((member) => member.name),
+    messages: [],
+  };
+}
+
+function mapApiThreadMessageToBubble(apiMessage) {
+  return {
+    id: apiMessage.id,
+    apiMessage: true,
+    sender: apiMessage.sender?.name || "BPI Connect",
+    senderRole: normalizeApiRole(apiMessage.sender?.role || ""),
+    body: apiMessage.body,
+    time: formatApiTime(apiMessage.created_at),
+    isMe: Boolean(apiMessage.is_me),
+    requiresAck: apiMessage.requires_ack,
+    acknowledged: apiMessage.acknowledged,
+  };
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
   const [currentUser, setCurrentUser] = useState(demoUsers[0]);
@@ -104,29 +162,42 @@ export default function App() {
         mappedUsers.find((user) => user.role === "Admin") || mappedUsers[0];
 
       const loadedMessages = await fetchApiMessages(defaultUser?.id);
-      const mappedMessages = loadedMessages.map(mapApiMessageToAppMessage);
+      const loadedThreads = await fetchApiThreads(defaultUser?.id);
 
       setApiUsers(mappedUsers);
       setCurrentUser(defaultUser || demoUsers[0]);
-      setMessages(mappedMessages.length ? mappedMessages : starterMessages);
+      setMessages(
+        loadedMessages.length
+          ? loadedMessages.map(mapApiMessageToAppMessage)
+          : starterMessages
+      );
+      setThreads(
+        loadedThreads.length
+          ? loadedThreads.map(mapApiThreadToAppThread)
+          : starterThreads
+      );
       setUsingApi(true);
     } catch (error) {
       console.log("API unavailable, using local demo data:", error.message);
       setApiUsers([]);
       setCurrentUser(demoUsers[0]);
       setMessages(starterMessages);
+      setThreads(starterThreads);
       setUsingApi(false);
     }
   }
 
-  async function reloadMessagesForUser(user) {
+  async function reloadDataForUser(user) {
     if (!usingApi || !user?.apiUser) return;
 
     try {
       const loadedMessages = await fetchApiMessages(user.id);
+      const loadedThreads = await fetchApiThreads(user.id);
+
       setMessages(loadedMessages.map(mapApiMessageToAppMessage));
+      setThreads(loadedThreads.map(mapApiThreadToAppThread));
     } catch (error) {
-      console.log("Could not reload messages:", error.message);
+      console.log("Could not reload user data:", error.message);
     }
   }
 
@@ -152,7 +223,7 @@ export default function App() {
     setSelectedMessageId(null);
   }
 
-  function openThread(thread) {
+  async function openThread(thread) {
     setThreads((currentThreads) =>
       currentThreads.map((item) =>
         item.id === thread.id ? { ...item, unread: 0 } : item
@@ -160,13 +231,59 @@ export default function App() {
     );
 
     setSelectedThreadId(thread.id);
+
+    if (usingApi && thread.apiThread && currentUser?.id) {
+      try {
+        const data = await fetchApiThreadMessages(thread.id, currentUser.id);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((item) =>
+            item.id === thread.id
+              ? {
+                  ...item,
+                  members: (data.thread.members || []).map((member) => member.name),
+                  messages: data.messages.map(mapApiThreadMessageToBubble),
+                }
+              : item
+          )
+        );
+
+        await markApiThreadRead(thread.id, currentUser.id);
+      } catch (error) {
+        console.log("Could not load thread messages:", error.message);
+      }
+    }
   }
 
   function closeThread() {
     setSelectedThreadId(null);
   }
 
-  function sendThreadMessage(threadId, body) {
+  async function sendThreadMessage(threadId, body) {
+    if (usingApi && currentUser?.apiUser) {
+      try {
+        const apiMessage = await sendApiThreadMessage(threadId, currentUser.id, body);
+        const bubbleMessage = mapApiThreadMessageToBubble(apiMessage);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((thread) => {
+            if (thread.id !== threadId) return thread;
+
+            return {
+              ...thread,
+              messages: [...thread.messages, bubbleMessage],
+              lastMessage: body,
+              lastTime: "Now",
+            };
+          })
+        );
+
+        return;
+      } catch (error) {
+        console.log("Could not send API thread message:", error.message);
+      }
+    }
+
     setThreads((currentThreads) =>
       currentThreads.map((thread) => {
         if (thread.id !== threadId) return thread;
@@ -225,7 +342,7 @@ export default function App() {
     setSelectedThreadId(null);
     setStartingRecipient(null);
     setActiveTab("Home");
-    reloadMessagesForUser(user);
+    reloadDataForUser(user);
   }
 
   function startMessageToRecipient(recipient) {

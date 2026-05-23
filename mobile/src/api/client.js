@@ -61,3 +61,64 @@ export async function acknowledgeApiMessage(messageId, userId) {
 
   return data;
 }
+
+export async function fetchApiThreads(userId) {
+  const response = await fetch(`${API_BASE_URL}/api/threads?user_id=${userId}`);
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not load threads");
+  }
+
+  return data.threads;
+}
+
+export async function fetchApiThreadMessages(threadId, userId) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/messages?user_id=${userId}`);
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not load thread messages");
+  }
+
+  return data;
+}
+
+export async function sendApiThreadMessage(threadId, senderUserId, body) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender_user_id: senderUserId,
+      body,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not send thread message");
+  }
+
+  return data.message;
+}
+
+export async function markApiThreadRead(threadId, userId) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/read`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not mark thread read");
+  }
+
+  return data;
+}
