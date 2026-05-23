@@ -57,7 +57,7 @@ def create_app():
 
         # Demo accounts use password: password123
         for user in users:
-            user.password_hash = generate_password_hash("password123")
+            user.password_hash = generate_password_hash("password123", method="pbkdf2:sha256")
             user.invite_accepted_at = datetime.utcnow()
 
         sender = users[0]
