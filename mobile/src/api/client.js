@@ -289,3 +289,43 @@ export async function createApiArea(name) {
 
   return data.area;
 }
+
+export async function createApiStore({ storeNumber, name, area }) {
+  const response = await fetch(`${API_BASE_URL}/api/stores`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      store_number: storeNumber,
+      name,
+      area,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not create store");
+  }
+
+  return data.store;
+}
+
+export async function updateApiStore(storeId, updates) {
+  const response = await fetch(`${API_BASE_URL}/api/stores/${storeId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not update store");
+  }
+
+  return data.store;
+}

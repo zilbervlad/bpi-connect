@@ -20,6 +20,8 @@ import {
   removeApiUserStoreAssignment,
   fetchApiAreas,
   createApiArea,
+  createApiStore,
+  updateApiStore,
 } from "../api/client";
 
 const roles = [
@@ -46,6 +48,9 @@ export function AdminScreen({ user }) {
   const [stores, setStores] = useState([]);
   const [areas, setAreas] = useState([]);
   const [newAreaName, setNewAreaName] = useState("");
+  const [newStoreNumber, setNewStoreNumber] = useState("");
+  const [newStoreName, setNewStoreName] = useState("");
+  const [newStoreArea, setNewStoreArea] = useState("");
   const [showInactiveUsers, setShowInactiveUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,6 +88,10 @@ export function AdminScreen({ user }) {
 
       if (loadedStores[0]?.store_number) {
         setStoreNumber(loadedStores[0].store_number);
+      }
+
+      if (loadedAreas[0]?.name && !newStoreArea) {
+        setNewStoreArea(loadedAreas[0].name);
       }
     } catch (error) {
       setErrorMessage(error.message || "Could not load admin data.");
@@ -249,6 +258,51 @@ export function AdminScreen({ user }) {
     }
   }
 
+  async function handleCreateStore() {
+    setErrorMessage("");
+    setStatusMessage("");
+
+    if (!newStoreNumber.trim()) {
+      setErrorMessage("Store number is required.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await createApiStore({
+        storeNumber: newStoreNumber.trim(),
+        name: newStoreName.trim() || `Store ${newStoreNumber.trim()}`,
+        area: newStoreArea,
+      });
+
+      setNewStoreNumber("");
+      setNewStoreName("");
+      setStatusMessage("Store created.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not create store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleUpdateStoreArea(storeId, areaName) {
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      await updateApiStore(storeId, { area: areaName });
+      setStatusMessage("Store area updated.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not update store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   if (!canInvite) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -307,6 +361,18 @@ export function AdminScreen({ user }) {
         >
           <Text style={[localStyles.navText, activeSection === "areas" && localStyles.navTextActive]}>
             Areas
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[localStyles.navPill, activeSection === "stores" && localStyles.navPillActive]}
+          onPress={() => {
+            setSelectedUser(null);
+            setActiveSection("stores");
+          }}
+        >
+          <Text style={[localStyles.navText, activeSection === "stores" && localStyles.navTextActive]}>
+            Stores
           </Text>
         </TouchableOpacity>
       </View>
@@ -509,6 +575,80 @@ export function AdminScreen({ user }) {
               </View>
             </View>
           ))}
+        </View>
+      )}
+
+      {activeSection === "stores" && (
+        <View style={localStyles.card}>
+          <Text style={localStyles.sectionHeading}>Stores</Text>
+
+          <Text style={localStyles.label}>Create Store</Text>
+
+          <TextInput
+            value={newStoreNumber}
+            onChangeText={setNewStoreNumber}
+            placeholder="Store number"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+            keyboardType="number-pad"
+          />
+
+          <TextInput
+            value={newStoreName}
+            onChangeText={setNewStoreName}
+            placeholder="Store name, optional"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+          />
+
+          <Text style={localStyles.label}>Area</Text>
+          <OptionGrid
+            options={areas.map((item) => ({ label: item.name, value: item.name }))}
+            selectedValue={newStoreArea}
+            onSelect={setNewStoreArea}
+          />
+
+          <TouchableOpacity
+            style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+            onPress={handleCreateStore}
+            disabled={isLoading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {isLoading ? "Creating Store..." : "Create Store"}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={[localStyles.label, { marginTop: 20 }]}>Current Stores</Text>
+
+          {stores.length ? (
+            stores.map((store) => (
+              <View key={store.id} style={localStyles.storeCard}>
+                <View style={localStyles.storeTopRow}>
+                  <View>
+                    <Text style={localStyles.assignmentTitle}>
+                      Store {store.store_number}
+                    </Text>
+                    <Text style={localStyles.assignmentMeta}>
+                      {store.name} · {store.area || "No Area"}
+                    </Text>
+                  </View>
+
+                  <Text style={store.is_active ? localStyles.statusPill : [localStyles.statusPill, localStyles.statusPillInactive]}>
+                    {store.is_active ? "Active" : "Off"}
+                  </Text>
+                </View>
+
+                <Text style={localStyles.label}>Move to Area</Text>
+                <OptionGrid
+                  options={areas.map((item) => ({ label: item.name, value: item.name }))}
+                  selectedValue={store.area}
+                  onSelect={(areaName) => handleUpdateStoreArea(store.id, areaName)}
+                />
+              </View>
+            ))
+          ) : (
+            <Text style={localStyles.emptyText}>No stores created yet.</Text>
+          )}
         </View>
       )}
 
@@ -915,6 +1055,21 @@ const localStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     marginBottom: 20,
+  },
+  storeCard: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  storeTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
   },
   assignmentRow: {
     backgroundColor: "rgba(255,255,255,0.05)",
