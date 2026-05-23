@@ -352,7 +352,20 @@ export default function App() {
     setActiveTab("Compose");
   }
 
-  function sendBroadcast({ title, body, targetLabel, requiresAck }) {
+  async function sendBroadcast({ title, body, targetGroup, requiresAck }) {
+    const targetThread = threads.find(
+      (thread) => thread.groupKey === targetGroup.threadGroupKey
+    );
+
+    const formattedBody = `${title}\n\n${body}`;
+
+    if (targetThread) {
+      await sendThreadMessage(targetThread.id, formattedBody);
+      setSelectedThreadId(targetThread.id);
+      setActiveTab("Chats");
+      return;
+    }
+
     const newMessage = {
       id: Date.now(),
       type: "announcement",
@@ -360,7 +373,7 @@ export default function App() {
       title,
       from: `${currentUser.role} · ${currentUser.name}`,
       time: "Just now",
-      body: `${body}\n\nTarget: ${targetLabel}`,
+      body: `${body}\n\nTarget: ${targetGroup.label}`,
       requiresAck,
       acknowledged: false,
       unread: true,

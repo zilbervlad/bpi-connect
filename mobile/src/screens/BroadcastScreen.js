@@ -31,7 +31,7 @@ export function BroadcastScreen({ user, onSendBroadcast }) {
     onSendBroadcast({
       title: title.trim(),
       body: body.trim(),
-      targetLabel: selectedGroup.label,
+      targetGroup: selectedGroup,
       requiresAck,
     });
   }
@@ -39,13 +39,13 @@ export function BroadcastScreen({ user, onSendBroadcast }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
-        eyebrow="BROADCAST"
-        title="Send update"
-        subtitle={`${user.role} access · choose who needs to receive this message.`}
+        eyebrow="SEND"
+        title="Post to group"
+        subtitle={`${user.role} access · choose the group thread this should go into.`}
       />
 
       <View style={localStyles.card}>
-        <Text style={localStyles.label}>Recipients</Text>
+        <Text style={localStyles.label}>Group thread</Text>
 
         <View style={localStyles.groupGrid}>
           {availableGroups.map((group) => {
@@ -70,16 +70,16 @@ export function BroadcastScreen({ user, onSendBroadcast }) {
       </View>
 
       <View style={localStyles.card}>
-        <Text style={localStyles.label}>Message title</Text>
+        <Text style={localStyles.label}>Subject</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Enter message title"
+          placeholder="Enter subject"
           placeholderTextColor="#7b8da0"
           style={localStyles.input}
         />
 
-        <Text style={localStyles.label}>Message body</Text>
+        <Text style={localStyles.label}>Message</Text>
         <TextInput
           value={body}
           onChangeText={setBody}
@@ -103,13 +103,13 @@ export function BroadcastScreen({ user, onSendBroadcast }) {
           <Text style={localStyles.previewLabel}>Preview</Text>
           <Text style={localStyles.previewTitle}>{title || "Message title"}</Text>
           <Text style={localStyles.previewMeta}>
-            To: {selectedGroup?.label || "Choose recipients"}
+            Posting to: {selectedGroup?.label || "Choose group"}
           </Text>
           <Text style={localStyles.previewBody}>{body || "Message body"}</Text>
         </View>
 
         <TouchableOpacity style={styles.primaryButton} onPress={handleSend}>
-          <Text style={styles.primaryButtonText}>Send Demo Broadcast</Text>
+          <Text style={styles.primaryButtonText}>Post to Group Thread</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

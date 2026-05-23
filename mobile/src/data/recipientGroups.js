@@ -5,6 +5,15 @@ export const recipientGroups = [
     scope: "all",
     description: "All BPI Connect users",
     allowedRoles: ["Admin", "HR"],
+    threadGroupKey: "company-all",
+  },
+  {
+    id: "hr-announcements",
+    label: "HR Announcements",
+    scope: "hr",
+    description: "HR messages for all users",
+    allowedRoles: ["Admin", "HR"],
+    threadGroupKey: "hr-announcements",
   },
   {
     id: "all-tms",
@@ -12,6 +21,7 @@ export const recipientGroups = [
     scope: "role",
     description: "All team members",
     allowedRoles: ["Admin", "HR"],
+    threadGroupKey: "role-tm",
   },
   {
     id: "all-managers",
@@ -19,6 +29,7 @@ export const recipientGroups = [
     scope: "role",
     description: "Managers and General Managers",
     allowedRoles: ["Admin", "HR"],
+    threadGroupKey: "role-general-manager",
   },
   {
     id: "area-north",
@@ -26,6 +37,7 @@ export const recipientGroups = [
     scope: "area",
     description: "Stores assigned to North Area",
     allowedRoles: ["Admin", "HR", "Supervisor", "Coach"],
+    threadGroupKey: "area-north",
   },
   {
     id: "store-3001",
@@ -33,6 +45,7 @@ export const recipientGroups = [
     scope: "store",
     description: "Store group: managers and TMs",
     allowedRoles: ["Admin", "HR", "Supervisor", "Coach", "General Manager", "Manager"],
+    threadGroupKey: "store-3001",
   },
   {
     id: "store-3209",
@@ -40,6 +53,7 @@ export const recipientGroups = [
     scope: "store",
     description: "Store group: managers and TMs",
     allowedRoles: ["Admin", "HR", "Supervisor", "Coach", "General Manager", "Manager"],
+    threadGroupKey: "store-3209",
   },
 ];
 
