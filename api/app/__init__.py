@@ -66,6 +66,39 @@ def create_app():
         })
 
 
+    @app.post("/dev/reset-admin-only")
+    def reset_admin_only():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        db.session.remove()
+        db.drop_all()
+        db.create_all()
+
+        company = Area(name="Company")
+        db.session.add(company)
+        db.session.flush()
+
+        admin = User(
+            name="Vlad",
+            email="vlad@bostonpie.com",
+            role="admin",
+            area_id=company.id,
+            password_hash=generate_password_hash("password123", method="pbkdf2:sha256"),
+            invite_accepted_at=datetime.utcnow(),
+            is_active=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Database reset to admin-only.",
+            "admin": serialize_user(admin),
+        })
+
+
     @app.post("/dev/init-db")
     def init_db():
         auth_error = require_dev_admin_secret()
@@ -388,7 +421,48 @@ def create_app():
 
     @app.get("/api/users")
     def list_users():
-        users = User.query.order_by(User.role.asc(), User.name.asc()).all()
+        query = User.query
+
+        active = request.args.get("active")
+        role = (request.args.get("role") or "").strip().lower()
+        store_number = (request.args.get("store_number") or "").strip()
+        search = (request.args.get("search") or "").strip().lower()
+
+        if active in ["true", "false"]:
+            query = query.filter(User.is_active == (active == "true"))
+
+        if role:
+            query = query.filter(User.role == role)
+
+        if store_number:
+            query = (
+                query
+                .outerjoin(UserStoreAssignment)
+                .outerjoin(Store, UserStoreAssignment.store_id == Store.id)
+                .filter(
+                    db.or_(
+                        Store.store_number == store_number,
+                        User.store.has(Store.store_number == store_number),
+                    )
+                )
+            )
+
+        if search:
+            like = f"%{search}%"
+            query = query.filter(
+                db.or_(
+                    db.func.lower(User.name).like(like),
+                    db.func.lower(User.email).like(like),
+                    db.func.lower(User.role).like(like),
+                )
+            )
+
+        users = (
+            query
+            .distinct()
+            .order_by(User.is_active.desc(), User.role.asc(), User.name.asc())
+            .all()
+        )
 
         return jsonify({
             "success": True,
@@ -433,6 +507,36 @@ def create_app():
             "success": True,
             "area": serialize_area(area),
         }), 201
+
+
+    @app.delete("/api/areas/<int:area_id>")
+    def delete_area(area_id):
+        area = Area.query.get(area_id)
+
+        if not area:
+            return jsonify({"success": False, "error": "Area not found."}), 404
+
+        if area.name.lower() == "company":
+            return jsonify({
+                "success": False,
+                "error": "Company area cannot be deleted.",
+            }), 400
+
+        stores_count = Store.query.filter_by(area_id=area.id).count()
+        users_count = User.query.filter_by(area_id=area.id).count()
+
+        if stores_count or users_count:
+            return jsonify({
+                "success": False,
+                "error": "Area is still assigned to stores or users. Reassign them before deleting.",
+                "stores_count": stores_count,
+                "users_count": users_count,
+            }), 400
+
+        db.session.delete(area)
+        db.session.commit()
+
+        return jsonify({"success": True})
 
 
     @app.get("/api/stores")
