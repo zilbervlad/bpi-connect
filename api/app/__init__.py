@@ -6,7 +6,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
-from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck
+from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck, UserStoreAssignment
 
 
 def create_app():
@@ -59,6 +59,20 @@ def create_app():
         for user in users:
             user.password_hash = generate_password_hash("password123", method="pbkdf2:sha256")
             user.invite_accepted_at = datetime.utcnow()
+
+        # Store assignments
+        # GM / Manager / TM = primary store
+        # Coach/Supervisor-style users = oversight stores
+        db.session.add_all([
+            UserStoreAssignment(user_id=users[2].id, store_id=store_3001.id, assignment_type="oversight"),
+            UserStoreAssignment(user_id=users[2].id, store_id=store_3209.id, assignment_type="oversight"),
+            UserStoreAssignment(user_id=users[3].id, store_id=store_3001.id, assignment_type="primary"),
+            UserStoreAssignment(user_id=users[4].id, store_id=store_3001.id, assignment_type="primary"),
+            UserStoreAssignment(user_id=users[5].id, store_id=store_3001.id, assignment_type="primary"),
+            UserStoreAssignment(user_id=users[6].id, store_id=store_3001.id, assignment_type="primary"),
+            UserStoreAssignment(user_id=users[7].id, store_id=store_3209.id, assignment_type="primary"),
+            UserStoreAssignment(user_id=users[8].id, store_id=store_3209.id, assignment_type="primary"),
+        ])
 
         sender = users[0]
         recipients = users[1:]
@@ -334,6 +348,152 @@ def create_app():
             "success": True,
             "users": [serialize_user(user) for user in users],
         })
+
+    @app.get("/api/stores")
+    def list_stores():
+        stores = Store.query.order_by(Store.store_number.asc()).all()
+
+        return jsonify({
+            "success": True,
+            "stores": [serialize_store(store) for store in stores],
+        })
+
+
+    @app.get("/api/users/<int:user_id>")
+    def get_user(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+        })
+
+
+    @app.patch("/api/users/<int:user_id>")
+    def update_user(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        data = request.get_json() or {}
+
+        if "name" in data:
+            user.name = (data.get("name") or "").strip() or user.name
+
+        if "email" in data:
+            new_email = (data.get("email") or "").strip().lower()
+            if new_email:
+                existing = User.query.filter(
+                    db.func.lower(User.email) == new_email,
+                    User.id != user.id,
+                ).first()
+
+                if existing:
+                    return jsonify({
+                        "success": False,
+                        "error": "Another user already has that email.",
+                    }), 409
+
+                user.email = new_email
+
+        if "role" in data:
+            user.role = (data.get("role") or "").strip().lower() or user.role
+
+        if "is_active" in data:
+            user.is_active = bool(data.get("is_active"))
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+        })
+
+
+    @app.post("/api/users/<int:user_id>/store-assignments")
+    def add_store_assignment(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        data = request.get_json() or {}
+
+        store_number = (data.get("store_number") or "").strip()
+        assignment_type = (data.get("assignment_type") or "primary").strip().lower()
+
+        if assignment_type not in ["primary", "oversight"]:
+            return jsonify({
+                "success": False,
+                "error": "assignment_type must be primary or oversight.",
+            }), 400
+
+        store = Store.query.filter_by(store_number=store_number).first()
+
+        if not store:
+            return jsonify({"success": False, "error": "Store not found."}), 404
+
+        # Enforce one primary store for GM / Manager / TM
+        if assignment_type == "primary":
+            UserStoreAssignment.query.filter_by(
+                user_id=user.id,
+                assignment_type="primary",
+            ).delete()
+
+            user.store_id = store.id
+            user.area_id = store.area_id
+
+        existing = UserStoreAssignment.query.filter_by(
+            user_id=user.id,
+            store_id=store.id,
+            assignment_type=assignment_type,
+        ).first()
+
+        if not existing:
+            existing = UserStoreAssignment(
+                user_id=user.id,
+                store_id=store.id,
+                assignment_type=assignment_type,
+            )
+            db.session.add(existing)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+        })
+
+
+    @app.delete("/api/users/<int:user_id>/store-assignments/<int:assignment_id>")
+    def remove_store_assignment(user_id, assignment_id):
+        assignment = UserStoreAssignment.query.filter_by(
+            id=assignment_id,
+            user_id=user_id,
+        ).first()
+
+        if not assignment:
+            return jsonify({"success": False, "error": "Assignment not found."}), 404
+
+        was_primary = assignment.assignment_type == "primary"
+        user = assignment.user
+
+        db.session.delete(assignment)
+
+        if was_primary:
+            user.store_id = None
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+        })
+
 
     @app.get("/api/messages")
     def list_messages():
@@ -726,4 +886,34 @@ def serialize_thread_message(message, user_id=None):
         "created_at": message.created_at.isoformat(),
         "is_me": message.sender_user_id == user_id if user_id else False,
     }
+
+def serialize_store(store):
+    return {
+        "id": store.id,
+        "store_number": store.store_number,
+        "name": store.name,
+        "area": store.area.name if store.area else None,
+        "is_active": store.is_active,
+    }
+
+
+def serialize_store_assignment(assignment):
+    return {
+        "id": assignment.id,
+        "assignment_type": assignment.assignment_type,
+        "store": serialize_store(assignment.store),
+        "created_at": assignment.created_at.isoformat() if assignment.created_at else None,
+    }
+
+
+def serialize_user_detail(user):
+    data = serialize_user(user)
+    data["store_assignments"] = [
+        serialize_store_assignment(assignment)
+        for assignment in sorted(
+            user.store_assignments,
+            key=lambda item: (item.assignment_type, item.store.store_number),
+        )
+    ]
+    return data
 
