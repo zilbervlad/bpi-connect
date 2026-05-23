@@ -17,6 +17,7 @@ import {
   sendApiThreadMessage,
   markApiThreadRead,
   findOrCreateDirectThread,
+  loginApiUser,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -31,6 +32,7 @@ import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { ThreadScreen } from "./src/screens/ThreadScreen";
+import { LoginScreen } from "./src/screens/LoginScreen";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -133,6 +135,9 @@ function mapApiThreadMessageToBubble(apiMessage) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(demoUsers[0]);
   const [messages, setMessages] = useState(starterMessages);
   const [threads, setThreads] = useState(starterThreads);
@@ -153,6 +158,34 @@ export default function App() {
   useEffect(() => {
     loadApiData();
   }, []);
+
+  async function handleLogin(email, password) {
+    setIsLoggingIn(true);
+    setLoginError("");
+
+    try {
+      const apiUser = await loginApiUser(email, password);
+      const mappedUser = mapApiUserToDemoUser(apiUser);
+
+      setCurrentUser(mappedUser);
+      setIsLoggedIn(true);
+      setActiveTab("Home");
+
+      await reloadDataForUser(mappedUser);
+    } catch (error) {
+      setLoginError(error.message || "Could not sign in.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }
+
+  function handleLogout() {
+    setIsLoggedIn(false);
+    setSelectedMessageId(null);
+    setSelectedThreadId(null);
+    setStartingRecipient(null);
+    setActiveTab("Home");
+  }
 
   async function loadApiData() {
     try {
@@ -455,6 +488,16 @@ export default function App() {
 
   const profileUsers = usingApi && apiUsers.length ? apiUsers : demoUsers;
 
+  if (!isLoggedIn) {
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        errorMessage={loginError}
+        isLoading={isLoggingIn}
+      />
+    );
+  }
+
   if (selectedThread) {
     return (
       <ThreadScreen
@@ -547,6 +590,7 @@ export default function App() {
             unreadCount={unreadCount}
             ackCount={ackCount}
             onSwitchUser={switchUser}
+            onLogout={handleLogout}
           />
         )}
       </View>

@@ -3,7 +3,7 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { canSendBroadcast } from "../data/recipientGroups";
 
-export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser }) {
+export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser, onLogout }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
@@ -44,6 +44,14 @@ export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser
           <Text style={styles.profileRowLabel}>Push notifications</Text>
           <Text style={styles.profileRowValue}>Coming soon</Text>
         </View>
+      </View>
+
+      <View style={styles.quickCard}>
+        <Text style={styles.sectionTitle}>Account</Text>
+
+        <TouchableOpacity style={styles.primaryButton} onPress={onLogout}>
+          <Text style={styles.primaryButtonText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.quickCard}>
