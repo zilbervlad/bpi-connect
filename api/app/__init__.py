@@ -33,8 +33,31 @@ def create_app():
             "status": "running",
         })
 
+    def require_dev_admin_secret():
+        expected_secret = os.getenv("DEV_ADMIN_SECRET", "").strip()
+        provided_secret = request.headers.get("X-Dev-Admin-Secret", "").strip()
+
+        if not expected_secret:
+            return jsonify({
+                "success": False,
+                "error": "DEV_ADMIN_SECRET is not configured.",
+            }), 403
+
+        if provided_secret != expected_secret:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized.",
+            }), 403
+
+        return None
+
+
     @app.get("/dev/tables")
     def dev_tables():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
         inspector = db.inspect(db.engine)
         return jsonify({
             "success": True,
@@ -45,6 +68,10 @@ def create_app():
 
     @app.post("/dev/init-db")
     def init_db():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
         # Development/demo reset. Creates the current schema before seeding data.
         db.session.remove()
         db.drop_all()
