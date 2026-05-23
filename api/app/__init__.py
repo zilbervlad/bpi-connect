@@ -7,7 +7,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
-from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck, UserStoreAssignment
+from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck, UserStoreAssignment, ThreadMessageReaction
 
 
 def create_app():
@@ -962,6 +962,56 @@ def create_app():
             "thread": serialize_thread(thread, user_id=sender.id),
         })
 
+    @app.post("/api/thread-messages/<int:message_id>/reactions")
+    def toggle_thread_message_reaction(message_id):
+        data = request.get_json() or {}
+
+        user_id = data.get("user_id")
+        emoji = (data.get("emoji") or "👍").strip()
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        message = ThreadMessage.query.get(message_id)
+        user = User.query.get(user_id)
+
+        if not message:
+            return jsonify({"success": False, "error": "Message not found."}), 404
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        existing = ThreadMessageReaction.query.filter_by(
+            thread_message_id=message.id,
+            user_id=user.id,
+            emoji=emoji,
+        ).first()
+
+        action = "added"
+
+        if existing:
+            db.session.delete(existing)
+            action = "removed"
+        else:
+            db.session.add(ThreadMessageReaction(
+                thread_message_id=message.id,
+                user_id=user.id,
+                emoji=emoji,
+            ))
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "action": action,
+            "message_id": message.id,
+            "reactions": serialize_message_reactions(message, user.id),
+        })
+
+
     @app.get("/api/threads/<int:thread_id>/messages")
     def list_thread_messages(thread_id):
         user_id = request.args.get("user_id", type=int)
@@ -1216,4 +1266,23 @@ def serialize_area(area):
         "name": area.name,
         "created_at": area.created_at.isoformat() if area.created_at else None,
     }
+
+def serialize_message_reactions(message, current_user_id=None):
+    counts = {}
+    reacted_by_me = {}
+
+    for reaction in message.reactions:
+        counts[reaction.emoji] = counts.get(reaction.emoji, 0) + 1
+
+        if current_user_id and int(reaction.user_id) == int(current_user_id):
+            reacted_by_me[reaction.emoji] = True
+
+    return [
+        {
+            "emoji": emoji,
+            "count": count,
+            "reacted_by_me": bool(reacted_by_me.get(emoji)),
+        }
+        for emoji, count in sorted(counts.items())
+    ]
 
