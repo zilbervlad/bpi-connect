@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://172.20.10.12:5050";
+const API_BASE_URL = "https://bpi-connect.onrender.com";
 
 export async function fetchApiUsers() {
   const response = await fetch(`${API_BASE_URL}/api/users`);
