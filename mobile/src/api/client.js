@@ -185,3 +185,78 @@ export async function createInviteApiUser({ name, email, role, storeNumber, area
 
   return data;
 }
+
+export async function fetchApiStores() {
+  const response = await fetch(`${API_BASE_URL}/api/stores`);
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not load stores");
+  }
+
+  return data.stores;
+}
+
+export async function fetchApiUserDetail(userId) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`);
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not load user");
+  }
+
+  return data.user;
+}
+
+export async function updateApiUser(userId, updates) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not update user");
+  }
+
+  return data.user;
+}
+
+export async function addApiUserStoreAssignment(userId, { storeNumber, assignmentType }) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/store-assignments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      store_number: storeNumber,
+      assignment_type: assignmentType,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not assign store");
+  }
+
+  return data.user;
+}
+
+export async function removeApiUserStoreAssignment(userId, assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/store-assignments/${assignmentId}`, {
+    method: "DELETE",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not remove store assignment");
+  }
+
+  return data.user;
+}
