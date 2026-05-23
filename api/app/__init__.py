@@ -33,8 +33,20 @@ def create_app():
             "status": "running",
         })
 
+    @app.get("/dev/tables")
+    def dev_tables():
+        inspector = db.inspect(db.engine)
+        return jsonify({
+            "success": True,
+            "tables": sorted(inspector.get_table_names()),
+            "database": str(db.engine.url).split("@")[-1],
+        })
+
+
     @app.post("/dev/init-db")
     def init_db():
+        # Development/demo reset. Creates the current schema before seeding data.
+        db.session.remove()
         db.drop_all()
         db.create_all()
 
