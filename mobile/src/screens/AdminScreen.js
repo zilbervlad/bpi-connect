@@ -52,6 +52,9 @@ export function AdminScreen({ user }) {
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreArea, setNewStoreArea] = useState("");
   const [showInactiveUsers, setShowInactiveUsers] = useState(false);
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const [peopleRoleFilter, setPeopleRoleFilter] = useState("all");
+  const [peopleStoreFilter, setPeopleStoreFilter] = useState("all");
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -65,6 +68,28 @@ export function AdminScreen({ user }) {
   const [createdInvite, setCreatedInvite] = useState(null);
 
   const canInvite = ["Admin", "HR"].includes(user.role);
+
+  const filteredUsers = users.filter((item) => {
+    const searchValue = peopleSearch.trim().toLowerCase();
+    const matchesSearch =
+      !searchValue ||
+      item.name?.toLowerCase().includes(searchValue) ||
+      item.email?.toLowerCase().includes(searchValue) ||
+      item.role?.toLowerCase().includes(searchValue);
+
+    const matchesRole =
+      peopleRoleFilter === "all" || item.role === peopleRoleFilter;
+
+    const matchesStore =
+      peopleStoreFilter === "all" ||
+      item.store === peopleStoreFilter ||
+      item.store_name === `Store ${peopleStoreFilter}`;
+
+    return matchesSearch && matchesRole && matchesStore;
+  });
+
+  const activeUsers = filteredUsers.filter((item) => item.is_active);
+  const inactiveUsers = filteredUsers.filter((item) => !item.is_active);
 
   useEffect(() => {
     if (canInvite) {
@@ -473,36 +498,84 @@ export function AdminScreen({ user }) {
         <View style={localStyles.card}>
           <Text style={localStyles.sectionHeading}>Users</Text>
 
+          <Text style={localStyles.label}>Search People</Text>
+          <TextInput
+            value={peopleSearch}
+            onChangeText={setPeopleSearch}
+            placeholder="Search name, email, or position"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+          />
+
+          <Text style={localStyles.label}>Position</Text>
+          <OptionGrid
+            options={[
+              { label: "All", value: "all" },
+              ...roles,
+            ]}
+            selectedValue={peopleRoleFilter}
+            onSelect={setPeopleRoleFilter}
+          />
+
+          <Text style={localStyles.label}>Store</Text>
+          <OptionGrid
+            options={[
+              { label: "All Stores", value: "all" },
+              ...stores.map((store) => ({
+                label: `Store ${store.store_number}`,
+                value: store.store_number,
+              })),
+            ]}
+            selectedValue={peopleStoreFilter}
+            onSelect={setPeopleStoreFilter}
+          />
+
+          <View style={localStyles.peopleSummaryRow}>
+            <View style={localStyles.peopleSummaryBox}>
+              <Text style={localStyles.peopleSummaryNumber}>{activeUsers.length}</Text>
+              <Text style={localStyles.peopleSummaryLabel}>Active</Text>
+            </View>
+
+            <View style={localStyles.peopleSummaryBox}>
+              <Text style={localStyles.peopleSummaryNumber}>{inactiveUsers.length}</Text>
+              <Text style={localStyles.peopleSummaryLabel}>Deactivated</Text>
+            </View>
+          </View>
+
           <Text style={localStyles.label}>Active People</Text>
 
-          {users.filter((item) => item.is_active).map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={localStyles.userRow}
-              onPress={() => openUserDetail(item.id)}
-            >
-              <View style={localStyles.avatar}>
-                <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
-              </View>
+          {activeUsers.length ? (
+            activeUsers.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={localStyles.userRow}
+                onPress={() => openUserDetail(item.id)}
+              >
+                <View style={localStyles.avatar}>
+                  <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
+                </View>
 
-              <View style={localStyles.userMain}>
-                <Text style={localStyles.userName}>{item.name}</Text>
-                <Text style={localStyles.userMeta}>
-                  {formatRole(item.role)} · {item.store_name || item.area || "Company"}
-                </Text>
-                <Text style={localStyles.userEmail}>{item.email}</Text>
-              </View>
+                <View style={localStyles.userMain}>
+                  <Text style={localStyles.userName}>{item.name}</Text>
+                  <Text style={localStyles.userMeta}>
+                    {formatRole(item.role)} · {item.store_name || item.area || "Company"}
+                  </Text>
+                  <Text style={localStyles.userEmail}>{item.email}</Text>
+                </View>
 
-              <Text style={localStyles.statusPill}>Active</Text>
-            </TouchableOpacity>
-          ))}
+                <Text style={localStyles.statusPill}>Active</Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={localStyles.emptyText}>No active people match those filters.</Text>
+          )}
 
           <TouchableOpacity
             style={localStyles.deactivatedToggle}
             onPress={() => setShowInactiveUsers((current) => !current)}
           >
             <Text style={localStyles.deactivatedToggleText}>
-              {showInactiveUsers ? "Hide Deactivated People" : `Show Deactivated People (${users.filter((item) => !item.is_active).length})`}
+              {showInactiveUsers ? "Hide Deactivated People" : `Show Deactivated People (${inactiveUsers.length})`}
             </Text>
           </TouchableOpacity>
 
@@ -510,8 +583,8 @@ export function AdminScreen({ user }) {
             <View style={localStyles.deactivatedBlock}>
               <Text style={localStyles.label}>Deactivated People</Text>
 
-              {users.filter((item) => !item.is_active).length ? (
-                users.filter((item) => !item.is_active).map((item) => (
+              {inactiveUsers.length ? (
+                inactiveUsers.map((item) => (
                   <TouchableOpacity
                     key={item.id}
                     style={[localStyles.userRow, localStyles.inactiveUserRow]}
@@ -535,7 +608,7 @@ export function AdminScreen({ user }) {
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={localStyles.emptyText}>No deactivated people.</Text>
+                <Text style={localStyles.emptyText}>No deactivated people match those filters.</Text>
               )}
             </View>
           )}
@@ -955,6 +1028,32 @@ const localStyles = StyleSheet.create({
     color: "#697b8d",
     fontSize: 12,
     fontWeight: "800",
+  },
+  peopleSummaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+  },
+  peopleSummaryBox: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  peopleSummaryNumber: {
+    color: "#ffffff",
+    fontSize: 26,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  peopleSummaryLabel: {
+    color: "#9cadbf",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 2,
+    textTransform: "uppercase",
   },
   deactivatedToggle: {
     backgroundColor: "rgba(255,255,255,0.06)",
