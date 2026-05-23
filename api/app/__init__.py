@@ -549,6 +549,109 @@ def create_app():
         })
 
 
+    @app.post("/api/stores")
+    def create_store():
+        data = request.get_json() or {}
+
+        store_number = (data.get("store_number") or "").strip()
+        name = (data.get("name") or "").strip()
+        area_name = (data.get("area") or "").strip()
+
+        if not store_number:
+            return jsonify({
+                "success": False,
+                "error": "store_number is required.",
+            }), 400
+
+        existing = Store.query.filter_by(store_number=store_number).first()
+        if existing:
+            return jsonify({
+                "success": False,
+                "error": "A store with that number already exists.",
+            }), 409
+
+        area = None
+        if area_name:
+            area = Area.query.filter(db.func.lower(Area.name) == area_name.lower()).first()
+
+            if not area:
+                return jsonify({
+                    "success": False,
+                    "error": "Area not found.",
+                }), 404
+
+        store = Store(
+            store_number=store_number,
+            name=name or f"Store {store_number}",
+            area_id=area.id if area else None,
+            is_active=True,
+        )
+
+        db.session.add(store)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "store": serialize_store(store),
+        }), 201
+
+
+    @app.patch("/api/stores/<int:store_id>")
+    def update_store(store_id):
+        store = Store.query.get(store_id)
+
+        if not store:
+            return jsonify({"success": False, "error": "Store not found."}), 404
+
+        data = request.get_json() or {}
+
+        if "store_number" in data:
+            new_store_number = (data.get("store_number") or "").strip()
+
+            if new_store_number:
+                existing = Store.query.filter(
+                    Store.store_number == new_store_number,
+                    Store.id != store.id,
+                ).first()
+
+                if existing:
+                    return jsonify({
+                        "success": False,
+                        "error": "Another store already has that number.",
+                    }), 409
+
+                store.store_number = new_store_number
+
+        if "name" in data:
+            store.name = (data.get("name") or "").strip() or store.name
+
+        if "area" in data:
+            area_name = (data.get("area") or "").strip()
+
+            if area_name:
+                area = Area.query.filter(db.func.lower(Area.name) == area_name.lower()).first()
+
+                if not area:
+                    return jsonify({
+                        "success": False,
+                        "error": "Area not found.",
+                    }), 404
+
+                store.area_id = area.id
+            else:
+                store.area_id = None
+
+        if "is_active" in data:
+            store.is_active = bool(data.get("is_active"))
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "store": serialize_store(store),
+        })
+
+
     @app.get("/api/users/<int:user_id>")
     def get_user(user_id):
         user = User.query.get(user_id)
