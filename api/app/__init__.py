@@ -349,6 +349,46 @@ def create_app():
             "users": [serialize_user(user) for user in users],
         })
 
+    @app.get("/api/areas")
+    def list_areas():
+        areas = Area.query.order_by(Area.name.asc()).all()
+
+        return jsonify({
+            "success": True,
+            "areas": [serialize_area(area) for area in areas],
+        })
+
+
+    @app.post("/api/areas")
+    def create_area():
+        data = request.get_json() or {}
+
+        name = (data.get("name") or "").strip()
+
+        if not name:
+            return jsonify({
+                "success": False,
+                "error": "Area name is required.",
+            }), 400
+
+        existing = Area.query.filter(db.func.lower(Area.name) == name.lower()).first()
+
+        if existing:
+            return jsonify({
+                "success": False,
+                "error": "An area with this name already exists.",
+            }), 409
+
+        area = Area(name=name)
+        db.session.add(area)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "area": serialize_area(area),
+        }), 201
+
+
     @app.get("/api/stores")
     def list_stores():
         stores = Store.query.order_by(Store.store_number.asc()).all()
@@ -916,4 +956,11 @@ def serialize_user_detail(user):
         )
     ]
     return data
+
+def serialize_area(area):
+    return {
+        "id": area.id,
+        "name": area.name,
+        "created_at": area.created_at.isoformat() if area.created_at else None,
+    }
 
