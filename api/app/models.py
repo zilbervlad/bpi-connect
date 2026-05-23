@@ -68,3 +68,56 @@ class MessageRecipient(db.Model):
 
     message = db.relationship("Message", backref="recipients")
     user = db.relationship("User", backref="received_messages")
+
+class Thread(db.Model):
+    __tablename__ = "threads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_type = db.Column(db.String(40), nullable=False)  # direct, store, area, role, company, hr
+    name = db.Column(db.String(160), nullable=False)
+    group_key = db.Column(db.String(160), unique=True, nullable=False)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    created_by = db.relationship("User", backref="created_threads")
+
+
+class ThreadMember(db.Model):
+    __tablename__ = "thread_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("threads.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    member_role = db.Column(db.String(40), default="member")
+    muted = db.Column(db.Boolean, default=False)
+    last_read_at = db.Column(db.DateTime, nullable=True)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    thread = db.relationship("Thread", backref="members")
+    user = db.relationship("User", backref="thread_memberships")
+
+
+class ThreadMessage(db.Model):
+    __tablename__ = "thread_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("threads.id"), nullable=False)
+    sender_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    requires_ack = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    thread = db.relationship("Thread", backref="thread_messages")
+    sender = db.relationship("User", backref="thread_messages_sent")
+
+
+class ThreadMessageAck(db.Model):
+    __tablename__ = "thread_message_acks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_message_id = db.Column(db.Integer, db.ForeignKey("thread_messages.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    acknowledged_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    thread_message = db.relationship("ThreadMessage", backref="acks")
+    user = db.relationship("User", backref="thread_message_acks")
