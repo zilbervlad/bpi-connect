@@ -3,7 +3,7 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { canSendBroadcast } from "../data/recipientGroups";
 
-export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser, onLogout }) {
+export function ProfileScreen({ user, unreadCount, ackCount, onLogout }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
@@ -24,7 +24,7 @@ export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser
 
       <View style={styles.profileList}>
         <View style={styles.profileRow}>
-          <Text style={styles.profileRowLabel}>Unread messages</Text>
+          <Text style={styles.profileRowLabel}>Unread chats</Text>
           <Text style={styles.profileRowValue}>{unreadCount}</Text>
         </View>
 
@@ -34,7 +34,7 @@ export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser
         </View>
 
         <View style={styles.profileRow}>
-          <Text style={styles.profileRowLabel}>Can send broadcasts</Text>
+          <Text style={styles.profileRowLabel}>Can post to groups</Text>
           <Text style={styles.profileRowValue}>
             {canSendBroadcast(user) ? "Yes" : "No"}
           </Text>
@@ -52,34 +52,6 @@ export function ProfileScreen({ user, users, unreadCount, ackCount, onSwitchUser
         <TouchableOpacity style={styles.primaryButton} onPress={onLogout}>
           <Text style={styles.primaryButtonText}>Sign Out</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.quickCard}>
-        <Text style={styles.sectionTitle}>Demo role switcher</Text>
-
-        {users.map((demoUser) => {
-          const isActive = demoUser.id === user.id;
-
-          return (
-            <TouchableOpacity
-              key={demoUser.id}
-              style={[
-                styles.secondaryButton,
-                isActive && { backgroundColor: "#e91f3f" },
-              ]}
-              onPress={() => onSwitchUser(demoUser)}
-            >
-              <Text
-                style={[
-                  styles.secondaryButtonText,
-                  isActive && { color: "#ffffff" },
-                ]}
-              >
-                {demoUser.role} · {demoUser.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
     </ScrollView>
   );

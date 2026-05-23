@@ -33,6 +33,7 @@ import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { AdminScreen } from "./src/screens/AdminScreen";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -583,13 +584,15 @@ export default function App() {
           />
         )}
 
+        {activeTab === "Admin" && (
+          <AdminScreen user={currentUser} />
+        )}
+
         {activeTab === "Profile" && (
           <ProfileScreen
             user={currentUser}
-            users={profileUsers}
             unreadCount={unreadCount}
             ackCount={ackCount}
-            onSwitchUser={switchUser}
             onLogout={handleLogout}
           />
         )}

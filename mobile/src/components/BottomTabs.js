@@ -14,6 +14,10 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
     tabs.push({ key: "Broadcast", label: "Send", icon: "➤" });
   }
 
+  if (user?.role === "Admin" || user?.role === "HR") {
+    tabs.push({ key: "Admin", label: "Admin", icon: "⚙" });
+  }
+
   tabs.push({ key: "Profile", label: "Profile", icon: "●" });
 
   return (

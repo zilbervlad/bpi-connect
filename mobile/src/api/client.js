@@ -161,3 +161,27 @@ export async function loginApiUser(email, password) {
 
   return data.user;
 }
+
+export async function createInviteApiUser({ name, email, role, storeNumber, area }) {
+  const response = await fetch(`${API_BASE_URL}/api/invites`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      email,
+      role,
+      store_number: storeNumber,
+      area,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not create invite");
+  }
+
+  return data;
+}
