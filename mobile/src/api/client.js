@@ -143,3 +143,21 @@ export async function findOrCreateDirectThread(senderUserId, recipientUserId) {
 
   return data.thread;
 }
+
+export async function loginApiUser(email, password) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not log in");
+  }
+
+  return data.user;
+}
