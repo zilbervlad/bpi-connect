@@ -260,3 +260,32 @@ export async function removeApiUserStoreAssignment(userId, assignmentId) {
 
   return data.user;
 }
+
+export async function fetchApiAreas() {
+  const response = await fetch(`${API_BASE_URL}/api/areas`);
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not load areas");
+  }
+
+  return data.areas;
+}
+
+export async function createApiArea(name) {
+  const response = await fetch(`${API_BASE_URL}/api/areas`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not create area");
+  }
+
+  return data.area;
+}

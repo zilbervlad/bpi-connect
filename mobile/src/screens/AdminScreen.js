@@ -18,6 +18,8 @@ import {
   updateApiUser,
   addApiUserStoreAssignment,
   removeApiUserStoreAssignment,
+  fetchApiAreas,
+  createApiArea,
 } from "../api/client";
 
 const roles = [
@@ -42,6 +44,9 @@ export function AdminScreen({ user }) {
   const [activeSection, setActiveSection] = useState("invite");
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [newAreaName, setNewAreaName] = useState("");
+  const [showInactiveUsers, setShowInactiveUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -66,13 +71,15 @@ export function AdminScreen({ user }) {
     setErrorMessage("");
 
     try {
-      const [loadedUsers, loadedStores] = await Promise.all([
+      const [loadedUsers, loadedStores, loadedAreas] = await Promise.all([
         fetchApiUsers(),
         fetchApiStores(),
+        fetchApiAreas(),
       ]);
 
       setUsers(loadedUsers);
       setStores(loadedStores);
+      setAreas(loadedAreas);
 
       if (loadedStores[0]?.store_number) {
         setStoreNumber(loadedStores[0].store_number);
@@ -219,6 +226,29 @@ export function AdminScreen({ user }) {
     }
   }
 
+  async function handleCreateArea() {
+    setErrorMessage("");
+    setStatusMessage("");
+
+    if (!newAreaName.trim()) {
+      setErrorMessage("Area name is required.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await createApiArea(newAreaName.trim());
+      setNewAreaName("");
+      setStatusMessage("Area created.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not create area.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   if (!canInvite) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -265,6 +295,18 @@ export function AdminScreen({ user }) {
         >
           <Text style={[localStyles.navText, activeSection === "users" && localStyles.navTextActive]}>
             Users
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[localStyles.navPill, activeSection === "areas" && localStyles.navPillActive]}
+          onPress={() => {
+            setSelectedUser(null);
+            setActiveSection("areas");
+          }}
+        >
+          <Text style={[localStyles.navText, activeSection === "areas" && localStyles.navTextActive]}>
+            Areas
           </Text>
         </TouchableOpacity>
       </View>
@@ -326,10 +368,7 @@ export function AdminScreen({ user }) {
 
             <Text style={localStyles.label}>Area</Text>
             <OptionGrid
-              options={[
-                { label: "North Area", value: "North Area" },
-                { label: "Company", value: "Company" },
-              ]}
+              options={areas.map((item) => ({ label: item.name, value: item.name }))}
               selectedValue={area}
               onSelect={setArea}
             />
@@ -368,7 +407,9 @@ export function AdminScreen({ user }) {
         <View style={localStyles.card}>
           <Text style={localStyles.sectionHeading}>Users</Text>
 
-          {users.map((item) => (
+          <Text style={localStyles.label}>Active People</Text>
+
+          {users.filter((item) => item.is_active).map((item) => (
             <TouchableOpacity
               key={item.id}
               style={localStyles.userRow}
@@ -386,10 +427,87 @@ export function AdminScreen({ user }) {
                 <Text style={localStyles.userEmail}>{item.email}</Text>
               </View>
 
-              <Text style={[localStyles.statusPill, !item.is_active && localStyles.statusPillInactive]}>
-                {item.is_active ? "Active" : "Off"}
-              </Text>
+              <Text style={localStyles.statusPill}>Active</Text>
             </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={localStyles.deactivatedToggle}
+            onPress={() => setShowInactiveUsers((current) => !current)}
+          >
+            <Text style={localStyles.deactivatedToggleText}>
+              {showInactiveUsers ? "Hide Deactivated People" : `Show Deactivated People (${users.filter((item) => !item.is_active).length})`}
+            </Text>
+          </TouchableOpacity>
+
+          {showInactiveUsers && (
+            <View style={localStyles.deactivatedBlock}>
+              <Text style={localStyles.label}>Deactivated People</Text>
+
+              {users.filter((item) => !item.is_active).length ? (
+                users.filter((item) => !item.is_active).map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[localStyles.userRow, localStyles.inactiveUserRow]}
+                    onPress={() => openUserDetail(item.id)}
+                  >
+                    <View style={[localStyles.avatar, localStyles.inactiveAvatar]}>
+                      <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
+                    </View>
+
+                    <View style={localStyles.userMain}>
+                      <Text style={localStyles.userName}>{item.name}</Text>
+                      <Text style={localStyles.userMeta}>
+                        {formatRole(item.role)} · {item.store_name || item.area || "Company"}
+                      </Text>
+                      <Text style={localStyles.userEmail}>{item.email}</Text>
+                    </View>
+
+                    <Text style={[localStyles.statusPill, localStyles.statusPillInactive]}>
+                      Off
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={localStyles.emptyText}>No deactivated people.</Text>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {activeSection === "areas" && (
+        <View style={localStyles.card}>
+          <Text style={localStyles.sectionHeading}>Areas</Text>
+
+          <Text style={localStyles.label}>Create Area</Text>
+          <TextInput
+            value={newAreaName}
+            onChangeText={setNewAreaName}
+            placeholder="Area name"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+          />
+
+          <TouchableOpacity
+            style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+            onPress={handleCreateArea}
+            disabled={isLoading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {isLoading ? "Creating Area..." : "Create Area"}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={[localStyles.label, { marginTop: 20 }]}>Current Areas</Text>
+
+          {areas.map((item) => (
+            <View key={item.id} style={localStyles.assignmentRow}>
+              <View>
+                <Text style={localStyles.assignmentTitle}>{item.name}</Text>
+                <Text style={localStyles.assignmentMeta}>Area</Text>
+              </View>
+            </View>
           ))}
         </View>
       )}
@@ -697,6 +815,30 @@ const localStyles = StyleSheet.create({
     color: "#697b8d",
     fontSize: 12,
     fontWeight: "800",
+  },
+  deactivatedToggle: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 16,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  deactivatedToggleText: {
+    color: "#93c5fd",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  deactivatedBlock: {
+    marginTop: 10,
+  },
+  inactiveUserRow: {
+    opacity: 0.78,
+  },
+  inactiveAvatar: {
+    backgroundColor: "#64748b",
   },
   userRow: {
     flexDirection: "row",
