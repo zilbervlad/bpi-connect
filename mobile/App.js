@@ -16,6 +16,7 @@ import {
   fetchApiThreadMessages,
   sendApiThreadMessage,
   markApiThreadRead,
+  findOrCreateDirectThread,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -345,10 +346,39 @@ export default function App() {
     reloadDataForUser(user);
   }
 
-  function startMessageToRecipient(recipient) {
+  async function startMessageToRecipient(recipient) {
     setStartingRecipient(recipient);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
+
+    if (usingApi && currentUser?.apiUser && recipient?.id) {
+      try {
+        const apiThread = await findOrCreateDirectThread(currentUser.id, recipient.id);
+        const mappedThread = mapApiThreadToAppThread(apiThread);
+
+        const threadMessages = await fetchApiThreadMessages(apiThread.id, currentUser.id);
+        mappedThread.messages = threadMessages.messages.map(mapApiThreadMessageToBubble);
+
+        setThreads((currentThreads) => {
+          const exists = currentThreads.some((thread) => thread.id === mappedThread.id);
+
+          if (exists) {
+            return currentThreads.map((thread) =>
+              thread.id === mappedThread.id ? mappedThread : thread
+            );
+          }
+
+          return [mappedThread, ...currentThreads];
+        });
+
+        setSelectedThreadId(mappedThread.id);
+        setActiveTab("Chats");
+        return;
+      } catch (error) {
+        console.log("Could not open direct API thread:", error.message);
+      }
+    }
+
     setActiveTab("Compose");
   }
 

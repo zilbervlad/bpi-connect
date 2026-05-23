@@ -122,3 +122,24 @@ export async function markApiThreadRead(threadId, userId) {
 
   return data;
 }
+
+export async function findOrCreateDirectThread(senderUserId, recipientUserId) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/direct`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender_user_id: senderUserId,
+      recipient_user_id: recipientUserId,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not find or create direct thread");
+  }
+
+  return data.thread;
+}
