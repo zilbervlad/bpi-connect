@@ -311,6 +311,58 @@ def create_app():
             "threads": [serialize_thread(thread, user_id=user_id) for thread in threads],
         })
 
+    @app.post("/api/threads/direct")
+    def find_or_create_direct_thread():
+        data = request.get_json() or {}
+
+        sender_user_id = data.get("sender_user_id")
+        recipient_user_id = data.get("recipient_user_id")
+
+        if not sender_user_id or not recipient_user_id:
+            return jsonify({
+                "success": False,
+                "error": "sender_user_id and recipient_user_id are required.",
+            }), 400
+
+        if int(sender_user_id) == int(recipient_user_id):
+            return jsonify({
+                "success": False,
+                "error": "Cannot create a direct thread with yourself.",
+            }), 400
+
+        sender = User.query.get(sender_user_id)
+        recipient = User.query.get(recipient_user_id)
+
+        if not sender or not recipient:
+            return jsonify({
+                "success": False,
+                "error": "Sender or recipient not found.",
+            }), 404
+
+        ordered_ids = sorted([int(sender.id), int(recipient.id)])
+        group_key = f"direct-{ordered_ids[0]}-{ordered_ids[1]}"
+
+        thread = Thread.query.filter_by(group_key=group_key).first()
+
+        if not thread:
+            thread = Thread(
+                thread_type="direct",
+                name=f"{sender.name} + {recipient.name}",
+                group_key=group_key,
+                created_by_user_id=sender.id,
+            )
+            db.session.add(thread)
+            db.session.flush()
+
+            db.session.add(ThreadMember(thread_id=thread.id, user_id=sender.id))
+            db.session.add(ThreadMember(thread_id=thread.id, user_id=recipient.id))
+            db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread, user_id=sender.id),
+        })
+
     @app.get("/api/threads/<int:thread_id>/messages")
     def list_thread_messages(thread_id):
         user_id = request.args.get("user_id", type=int)
