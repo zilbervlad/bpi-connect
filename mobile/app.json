@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bostonpie.bpiconnect"
+      "bundleIdentifier": "com.bostonpie.bpiconnect",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.bostonpie.bpiconnect",
