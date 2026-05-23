@@ -28,7 +28,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "https://bpi-connect.onrender.com"
+      "apiBaseUrl": "https://bpi-connect.onrender.com",
+      "eas": {
+        "projectId": "9673de76-13f5-4771-897a-e9da5d14dc8c"
+      }
     }
   }
 }
