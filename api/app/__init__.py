@@ -67,6 +67,32 @@ def create_app():
         })
 
 
+    @app.post("/dev/test-invite-email")
+    def test_invite_email():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        data = request.get_json() or {}
+        email = (data.get("email") or "vlad@bostonpie.com").strip()
+        name = (data.get("name") or "Vlad").strip()
+
+        class TestUser:
+            def __init__(self, name, email):
+                self.name = name
+                self.email = email
+
+        invite_url = "https://bpi-connect.onrender.com/invite/test-email-only"
+        email_result = send_invite_email(TestUser(name, email), invite_url)
+
+        return jsonify({
+            "success": email_result.get("sent", False),
+            "email_sent": email_result.get("sent", False),
+            "email_error": email_result.get("error"),
+            "provider_response": email_result.get("provider_response"),
+        })
+
+
     @app.post("/dev/reset-admin-only")
     def reset_admin_only():
         auth_error = require_dev_admin_secret()
