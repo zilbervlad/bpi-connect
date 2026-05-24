@@ -134,20 +134,25 @@ function mapApiThreadToAppThread(apiThread) {
   };
 }
 
-function mapApiThreadMessageToBubble(apiMessage) {
+function mapApiThreadMessageToBubble(apiMessageResponse) {
+  const apiMessage =
+    apiMessageResponse?.message ||
+    apiMessageResponse?.thread_message ||
+    apiMessageResponse;
+
   return {
     id: apiMessage.id,
     apiMessage: true,
     sender: apiMessage.sender?.name || "BPI Connect",
     senderUser: apiMessage.sender || null,
     senderRole: normalizeApiRole(apiMessage.sender?.role || ""),
-    body: apiMessage.body,
-    text: apiMessage.body,
+    body: apiMessage.body || "",
+    text: apiMessage.body || "",
     time: formatApiTime(apiMessage.created_at),
     isMe: Boolean(apiMessage.is_me),
-    requiresAck: apiMessage.requires_ack,
-    responded: apiMessage.responded,
-    acknowledged: apiMessage.acknowledged,
+    requiresAck: Boolean(apiMessage.requires_ack),
+    responded: Boolean(apiMessage.responded),
+    acknowledged: Boolean(apiMessage.acknowledged),
     reactions: apiMessage.reactions || [],
     attachments: apiMessage.attachments || [],
   };
@@ -602,7 +607,7 @@ export default function App() {
   async function sendThreadImageMessage(threadId, imageData, body = "", metadata = {}) {
     if (usingApi && currentUser?.apiUser) {
       try {
-        const apiMessage = await sendApiThreadImageMessage(
+        const apiMessageResponse = await sendApiThreadImageMessage(
           threadId,
           currentUser.id,
           imageData,
@@ -610,7 +615,12 @@ export default function App() {
           metadata
         );
 
-        const bubbleMessage = mapApiThreadMessageToBubble(apiMessage);
+        const bubbleMessage = mapApiThreadMessageToBubble(apiMessageResponse);
+
+        if (!bubbleMessage.body && !bubbleMessage.attachments?.length) {
+          await refreshOpenThreadMessages(threadId);
+          return;
+        }
 
         setThreads((currentThreads) =>
           currentThreads.map((thread) => {
@@ -636,8 +646,13 @@ export default function App() {
   async function sendThreadMessage(threadId, body, requiresAck = false) {
     if (usingApi && currentUser?.apiUser) {
       try {
-        const apiMessage = await sendApiThreadMessage(threadId, currentUser.id, body, requiresAck);
-        const bubbleMessage = mapApiThreadMessageToBubble(apiMessage);
+        const apiMessageResponse = await sendApiThreadMessage(threadId, currentUser.id, body, requiresAck);
+        const bubbleMessage = mapApiThreadMessageToBubble(apiMessageResponse);
+
+        if (!bubbleMessage.body && !bubbleMessage.attachments?.length) {
+          await refreshOpenThreadMessages(threadId);
+          return;
+        }
 
         setThreads((currentThreads) =>
           currentThreads.map((thread) => {

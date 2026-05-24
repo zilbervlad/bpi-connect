@@ -2709,6 +2709,50 @@ def create_app():
             "push_result": push_result,
         }), 201
 
+    @app.post("/api/threads/<int:thread_id>/favorite")
+    def toggle_thread_favorite(thread_id):
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+        favorite = bool(data.get("favorite"))
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user_id,
+        ).first()
+
+        if not membership:
+            return jsonify({"success": False, "error": "Thread membership not found."}), 404
+
+        existing = ThreadFavorite.query.filter_by(
+            thread_id=thread.id,
+            user_id=user_id,
+        ).first()
+
+        if favorite and not existing:
+            db.session.add(ThreadFavorite(thread_id=thread.id, user_id=user_id))
+
+        if not favorite and existing:
+            db.session.delete(existing)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread, user_id=user_id),
+        })
+
+
     @app.post("/api/threads/<int:thread_id>/mute")
     def toggle_thread_mute(thread_id):
         data = request.get_json() or {}
@@ -3028,6 +3072,12 @@ def serialize_thread(thread, user_id=None):
         "unread": unread_count,
         "members": [serialize_user(member.user) for member in thread.members],
         "muted": membership.muted if membership else False,
+        "favorite": bool(
+            user_id and ThreadFavorite.query.filter_by(
+                thread_id=thread.id,
+                user_id=user_id,
+            ).first()
+        ),
     }
 
 
