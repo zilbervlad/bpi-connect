@@ -20,6 +20,18 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
     onLogin(email.trim(), password);
   }
 
+  const maskedPassword = password ? "•".repeat(password.length) : "";
+
+  function handlePasswordChange(value) {
+    if (value.length < maskedPassword.length) {
+      setPassword(password.slice(0, Math.max(value.length, 0)));
+      return;
+    }
+
+    const addedText = value.slice(maskedPassword.length);
+    setPassword(password + addedText);
+  }
+
   async function handleForgotPassword() {
     if (!email.trim()) {
       setResetMessage("Enter your email first, then tap Forgot Password.");
@@ -74,9 +86,8 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
 
           <Text style={localStyles.label}>Password</Text>
           <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+            value={maskedPassword}
+            onChangeText={handlePasswordChange}
             placeholder="Password"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
@@ -86,6 +97,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             autoCorrect={false}
             spellCheck={false}
             autoCapitalize="none"
+            keyboardType="default"
           />
 
           <TouchableOpacity
