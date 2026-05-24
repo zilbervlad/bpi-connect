@@ -160,20 +160,61 @@ def sync_user_to_default_chats(user):
     if not user:
         return
 
-    company_thread = ensure_company_thread(created_by_user_id=user.id)
-    ensure_thread_member(company_thread.id, user.id)
+    desired_group_keys = set()
 
-    role_thread = ensure_role_thread(user.role, created_by_user_id=user.id)
-    if role_thread:
-        ensure_thread_member(role_thread.id, user.id)
+    if user.is_active:
+        company_thread = ensure_company_thread(created_by_user_id=user.id)
+        desired_group_keys.add(company_thread.group_key)
 
-    if user.area:
-        area_thread = ensure_area_thread(user.area, created_by_user_id=user.id)
-        if area_thread:
-            ensure_thread_member(area_thread.id, user.id)
+        role_thread = ensure_role_thread(user.role, created_by_user_id=user.id)
+        if role_thread:
+            desired_group_keys.add(role_thread.group_key)
 
-    if user.store:
-        sync_user_to_store_chat(user, user.store)
+        if user.area:
+            area_thread = ensure_area_thread(user.area, created_by_user_id=user.id)
+            if area_thread:
+                desired_group_keys.add(area_thread.group_key)
+
+        assigned_stores = []
+
+        if user.store:
+            assigned_stores.append(user.store)
+
+        for assignment in getattr(user, "store_assignments", []) or []:
+            if assignment.store:
+                assigned_stores.append(assignment.store)
+
+        seen_store_ids = set()
+
+        for store in assigned_stores:
+            if store.id in seen_store_ids:
+                continue
+
+            seen_store_ids.add(store.id)
+            store_thread = ensure_store_thread(store, created_by_user_id=user.id)
+
+            if store_thread:
+                desired_group_keys.add(store_thread.group_key)
+
+    auto_threads = Thread.query.filter(
+        Thread.thread_type.in_(["company", "area", "store", "role"])
+    ).all()
+
+    for thread in auto_threads:
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user.id,
+        ).first()
+
+        should_be_member = thread.group_key in desired_group_keys
+
+        if should_be_member and not membership:
+            db.session.add(ThreadMember(thread_id=thread.id, user_id=user.id))
+
+        if membership and not should_be_member:
+            db.session.delete(membership)
+
+
 
 
 def create_app():
