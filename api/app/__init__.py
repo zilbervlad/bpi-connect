@@ -42,6 +42,24 @@ def create_app():
     CORS(app)
     db.init_app(app)
 
+    @app.get("/dev/email-config")
+    def dev_email_config():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        return jsonify({
+            "success": True,
+            "from_email": get_outbound_email_sender(),
+            "has_resend_api_key": bool(os.getenv("RESEND_API_KEY", "").strip()),
+            "has_invite_email_from": bool(os.getenv("INVITE_EMAIL_FROM", "").strip()),
+            "has_invite_from_email": bool(os.getenv("INVITE_FROM_EMAIL", "").strip()),
+            "has_resend_from_email": bool(os.getenv("RESEND_FROM_EMAIL", "").strip()),
+            "has_password_reset_from_email": bool(os.getenv("PASSWORD_RESET_FROM_EMAIL", "").strip()),
+            "has_from_email": bool(os.getenv("FROM_EMAIL", "").strip()),
+        })
+
+
     @app.get("/")
     def health():
         return jsonify({
