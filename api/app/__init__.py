@@ -1740,8 +1740,15 @@ def create_app():
 
                 user.email = new_email
 
+        role_changed = False
+
         if "role" in data:
-            user.role = (data.get("role") or "").strip().lower() or user.role
+            next_role = (data.get("role") or "").strip().lower() or user.role
+            role_changed = next_role != user.role
+            user.role = next_role
+
+        if role_changed:
+            sync_user_to_default_chats(user)
 
         if "avatar_url" in data:
             avatar_url = (data.get("avatar_url") or "").strip()
