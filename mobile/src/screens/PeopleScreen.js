@@ -3,31 +3,14 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   TextInput,
+  FlatList,
   StyleSheet,
 } from "react-native";
 
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
-
-const roleLabels = {
-  admin: "Admin",
-  hr: "HR",
-  coach: "Coach",
-  supervisor: "Supervisor",
-  general_manager: "General Manager",
-  manager: "Manager",
-  tm: "TM",
-  Admin: "Admin",
-  HR: "HR",
-  Coach: "Coach",
-  Supervisor: "Supervisor",
-  "General Manager": "General Manager",
-  Manager: "Manager",
-  TM: "TM",
-};
 
 const roleOrder = {
   Admin: 1,
@@ -39,9 +22,41 @@ const roleOrder = {
   TM: 7,
 };
 
+const roleFilters = [
+  "All",
+  "Admin",
+  "HR",
+  "Coach",
+  "Supervisor",
+  "General Manager",
+  "Manager",
+  "TM",
+];
+
 export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
   const [search, setSearch] = useState("");
-  const [selectedStore, setSelectedStore] = useState("all");
+  const [selectedRole, setSelectedRole] = useState("All");
+  const [selectedStore, setSelectedStore] = useState("All");
+
+  const storeFilters = useMemo(() => {
+    const storeMap = new Map();
+
+    users.forEach((item) => {
+      const key = getStoreKey(item);
+      const label = getStoreLabel(item);
+
+      if (key && key !== "company") {
+        storeMap.set(key, label);
+      }
+    });
+
+    return [
+      { key: "All", label: "All Stores" },
+      ...Array.from(storeMap.entries())
+        .map(([key, label]) => ({ key, label }))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label))),
+    ];
+  }, [users]);
 
   const visibleUsers = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
@@ -49,6 +64,14 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
     return users
       .filter((item) => item.id !== user.id)
       .filter((item) => item.is_active !== false)
+      .filter((item) => {
+        if (selectedRole === "All") return true;
+        return formatRole(item.role) === selectedRole;
+      })
+      .filter((item) => {
+        if (selectedStore === "All") return true;
+        return getStoreKey(item) === selectedStore;
+      })
       .filter((item) => {
         if (!searchValue) return true;
 
@@ -59,384 +82,347 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
           getStoreLabel(item).toLowerCase().includes(searchValue)
         );
       })
-      .filter((item) => {
-        if (selectedStore === "all") return true;
-        return getStoreKey(item) === selectedStore;
-      })
       .sort(sortPeople);
-  }, [users, user.id, search, selectedStore]);
-
-  const stores = useMemo(() => {
-    const storeMap = new Map();
-
-    users.forEach((item) => {
-      const key = getStoreKey(item);
-      const label = getStoreLabel(item);
-
-      if (!storeMap.has(key)) {
-        storeMap.set(key, label);
-      }
-    });
-
-    return [...storeMap.entries()]
-      .map(([key, label]) => ({ key, label }))
-      .sort((a, b) => {
-        if (a.key === "company") return 1;
-        if (b.key === "company") return -1;
-        return a.label.localeCompare(b.label);
-      });
-  }, [users]);
-
-  const groupedPeople = useMemo(() => {
-    const groups = new Map();
-
-    visibleUsers.forEach((person) => {
-      const key = getStoreKey(person);
-      const label = getStoreLabel(person);
-
-      if (!groups.has(key)) {
-        groups.set(key, {
-          key,
-          label,
-          people: [],
-        });
-      }
-
-      groups.get(key).people.push(person);
-    });
-
-    return [...groups.values()].sort((a, b) => {
-      if (a.key === "company") return 1;
-      if (b.key === "company") return -1;
-      return a.label.localeCompare(b.label);
-    });
-  }, [visibleUsers]);
+  }, [users, user.id, search, selectedRole, selectedStore]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
-      <HeaderBlock
-        eyebrow="PEOPLE"
-        title="Directory"
-        subtitle={
-          usingApi
-            ? "Find people by store, name, email, or position."
-            : "Demo directory"
-        }
-      />
+    <View style={styles.screen}>
+      <FlatList
+        data={visibleUsers}
+        keyExtractor={(item) => String(item.id)}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={18}
+        maxToRenderPerBatch={20}
+        windowSize={8}
+        contentContainerStyle={styles.screenContent}
+        ListHeaderComponent={
+          <>
+            <HeaderBlock
+              eyebrow="DIRECTORY"
+              title="People"
+              subtitle={`${visibleUsers.length} shown · ${users.length} total`}
+            />
 
-      <View style={localStyles.searchCard}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search people, store, or position"
-          placeholderTextColor="#7b8da0"
-          style={localStyles.searchInput}
-        />
+            <View style={localStyles.searchCard}>
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search name, role, email, or store..."
+                placeholderTextColor="#7b8da0"
+                autoCapitalize="none"
+                style={localStyles.searchInput}
+              />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={localStyles.storeFilterRow}
-        >
-          <TouchableOpacity
-            style={[
-              localStyles.filterChip,
-              selectedStore === "all" && localStyles.filterChipActive,
-            ]}
-            onPress={() => setSelectedStore("all")}
-          >
-            <Text
-              style={[
-                localStyles.filterText,
-                selectedStore === "all" && localStyles.filterTextActive,
-              ]}
-            >
-              All
-            </Text>
-          </TouchableOpacity>
+              <FlatList
+                horizontal
+                data={roleFilters}
+                keyExtractor={(item) => item}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={localStyles.filterRow}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      localStyles.filterPill,
+                      selectedRole === item && localStyles.filterPillActive,
+                    ]}
+                    onPress={() => setSelectedRole(item)}
+                    activeOpacity={0.84}
+                  >
+                    <Text
+                      style={[
+                        localStyles.filterPillText,
+                        selectedRole === item && localStyles.filterPillTextActive,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
 
-          {stores.map((store) => (
-            <TouchableOpacity
-              key={store.key}
-              style={[
-                localStyles.filterChip,
-                selectedStore === store.key && localStyles.filterChipActive,
-              ]}
-              onPress={() => setSelectedStore(store.key)}
-            >
-              <Text
-                style={[
-                  localStyles.filterText,
-                  selectedStore === store.key && localStyles.filterTextActive,
-                ]}
-              >
-                {store.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={localStyles.summaryRow}>
-        <View style={localStyles.summaryBox}>
-          <Text style={localStyles.summaryNumber}>{visibleUsers.length}</Text>
-          <Text style={localStyles.summaryLabel}>People</Text>
-        </View>
-
-        <View style={localStyles.summaryBox}>
-          <Text style={localStyles.summaryNumber}>{groupedPeople.length}</Text>
-          <Text style={localStyles.summaryLabel}>Groups</Text>
-        </View>
-      </View>
-
-      {groupedPeople.length ? (
-        groupedPeople.map((group) => (
-          <View key={group.key} style={localStyles.groupCard}>
-            <View style={localStyles.groupHeader}>
-              <View>
-                <Text style={localStyles.groupTitle}>{group.label}</Text>
-                <Text style={localStyles.groupMeta}>
-                  {group.people.length} {group.people.length === 1 ? "person" : "people"}
-                </Text>
-              </View>
+              <FlatList
+                horizontal
+                data={storeFilters}
+                keyExtractor={(item) => item.key}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={localStyles.filterRow}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      localStyles.storePill,
+                      selectedStore === item.key && localStyles.storePillActive,
+                    ]}
+                    onPress={() => setSelectedStore(item.key)}
+                    activeOpacity={0.84}
+                  >
+                    <Text
+                      style={[
+                        localStyles.storePillText,
+                        selectedStore === item.key && localStyles.storePillTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
             </View>
 
-            {group.people.map((person) => (
-              <PersonRow
-                key={person.id}
-                person={person}
-                currentUser={user}
-                onStartMessage={onStartMessage}
-              />
-            ))}
+            <View style={localStyles.groupCard}>
+              {visibleUsers.length ? null : (
+                <View style={localStyles.emptyState}>
+                  <Text style={localStyles.emptyTitle}>No people found</Text>
+                  <Text style={localStyles.emptyText}>
+                    Try another name, role, email, or store.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </>
+        }
+        renderItem={({ item, index }) => (
+          <View style={localStyles.groupCard}>
+            <View style={localStyles.personRow}>
+              <UserAvatar user={item} name={item.name} size={34} />
+
+              <View style={localStyles.personMain}>
+                <View style={localStyles.personTop}>
+                  <Text style={localStyles.personName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+
+                  <Text style={localStyles.rolePill}>
+                    {formatRoleShort(item.role)}
+                  </Text>
+                </View>
+
+                <Text style={localStyles.personMeta} numberOfLines={1}>
+                  {formatRole(item.role)} · {getStoreLabel(item)}
+                </Text>
+
+                {item.email ? (
+                  <Text style={localStyles.personEmail} numberOfLines={1}>
+                    {item.email}
+                  </Text>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                style={localStyles.messageButton}
+                onPress={() => onStartMessage?.(item)}
+                activeOpacity={0.84}
+              >
+                <Text style={localStyles.messageButtonText}>Message</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        ))
-      ) : (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No people found</Text>
-          <Text style={styles.emptyText}>
-            Try a different name, email, position, or store.
-          </Text>
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-
-function PersonRow({ person, currentUser, onStartMessage }) {
-  const canMessage = person.id !== currentUser.id;
-
-  return (
-    <View style={localStyles.personRow}>
-      <UserAvatar user={person} size={44} />
-
-      <View style={localStyles.personMain}>
-        <Text style={localStyles.personName}>{person.name}</Text>
-        <Text style={localStyles.personMeta}>
-          {formatRole(person.role)} · {getStoreLabel(person)}
-        </Text>
-        {person.email ? (
-          <Text style={localStyles.personEmail}>{person.email}</Text>
-        ) : null}
-      </View>
-
-      {canMessage && (
-        <TouchableOpacity
-          style={localStyles.messageButton}
-          onPress={() => onStartMessage(person)}
-        >
-          <Text style={localStyles.messageButtonText}>Message</Text>
-        </TouchableOpacity>
-      )}
+        )}
+        ItemSeparatorComponent={() => <View style={localStyles.rowGap} />}
+        ListFooterComponent={<View style={{ height: 12 }} />}
+      />
     </View>
   );
 }
 
-function sortPeople(a, b) {
-  const storeA = getStoreLabel(a);
-  const storeB = getStoreLabel(b);
+function formatRole(role) {
+  if (!role) return "Team Member";
 
-  if (storeA !== storeB) {
-    return storeA.localeCompare(storeB);
-  }
+  const map = {
+    admin: "Admin",
+    hr: "HR",
+    coach: "Coach",
+    supervisor: "Supervisor",
+    general_manager: "General Manager",
+    manager: "Manager",
+    tm: "TM",
+  };
 
-  const roleA = roleOrder[formatRole(a.role)] || 99;
-  const roleB = roleOrder[formatRole(b.role)] || 99;
-
-  if (roleA !== roleB) {
-    return roleA - roleB;
-  }
-
-  return a.name.localeCompare(b.name);
+  return map[role] || role;
 }
 
-function formatRole(role) {
-  return roleLabels[role] || role || "Team Member";
+function formatRoleShort(role) {
+  const formatted = formatRole(role);
+
+  const map = {
+    "General Manager": "GM",
+    Supervisor: "Sup",
+    Manager: "Mgr",
+    "Team Member": "TM",
+  };
+
+  return map[formatted] || formatted;
 }
 
 function getStoreKey(person) {
   if (person.store) return String(person.store);
-  if (person.store_name) return String(person.store_name).replace("Store ", "");
-  if (person.storeGroupId?.startsWith("store-")) {
-    return person.storeGroupId.replace("store-", "");
-  }
-
+  if (person.store_number) return String(person.store_number);
+  if (person.store_name) return String(person.store_name);
+  if (person.storeGroupId) return String(person.storeGroupId);
   return "company";
 }
 
 function getStoreLabel(person) {
-  const key = getStoreKey(person);
+  if (person.store_name) return person.store_name;
+  if (person.store) return `Store ${person.store}`;
+  if (person.store_number) return `Store ${person.store_number}`;
+  if (person.area) return person.area;
+  return "Company";
+}
 
-  if (key === "company") {
-    return person.area || "Company";
-  }
+function sortPeople(a, b) {
+  const roleA = roleOrder[formatRole(a.role)] || 99;
+  const roleB = roleOrder[formatRole(b.role)] || 99;
 
-  return person.store_name || `Store ${key}`;
+  if (roleA !== roleB) return roleA - roleB;
+
+  const storeA = getStoreLabel(a);
+  const storeB = getStoreLabel(b);
+
+  if (storeA !== storeB) return storeA.localeCompare(storeB);
+
+  return String(a.name || "").localeCompare(String(b.name || ""));
 }
 
 const localStyles = StyleSheet.create({
   searchCard: {
-    backgroundColor: "#101d2d",
+    backgroundColor: "#101d2c",
     borderRadius: 18,
-    padding: 12,
-    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "#203044",
+    padding: 10,
+    marginBottom: 8,
+    gap: 7,
   },
   searchInput: {
-    backgroundColor: "#ffffff",
-    borderRadius: 18,
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-    color: "#10212b",
-    fontSize: 15,
+    backgroundColor: "#0b1624",
+    borderWidth: 1,
+    borderColor: "#203044",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: "#ffffff",
+    fontSize: 13,
     fontWeight: "800",
-    marginBottom: 12,
   },
-  storeFilterRow: {
-    gap: 8,
-    paddingRight: 4,
+  filterRow: {
+    gap: 6,
+    paddingRight: 10,
   },
-  filterChip: {
+  filterPill: {
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 999,
     paddingHorizontal: 9,
-    paddingVertical: 9,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 5,
   },
-  filterChipActive: {
-    backgroundColor: "#e91f3f",
-    borderColor: "#e91f3f",
+  filterPillActive: {
+    backgroundColor: "#ef1745",
   },
-  filterText: {
-    color: "#b8c6d6",
-    fontSize: 13,
+  filterPillText: {
+    color: "#9aacbf",
+    fontSize: 10,
     fontWeight: "900",
   },
-  filterTextActive: {
+  filterPillTextActive: {
     color: "#ffffff",
   },
-  summaryRow: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 14,
+  storePill: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    maxWidth: 130,
   },
-  summaryBox: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 9,
+  storePillActive: {
+    backgroundColor: "#26364a",
   },
-  summaryNumber: {
-    color: "#10212b",
-    fontSize: 19,
+  storePillText: {
+    color: "#9aacbf",
+    fontSize: 10,
     fontWeight: "900",
-    letterSpacing: -1,
   },
-  summaryLabel: {
-    color: "#6b7c8e",
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    marginTop: 3,
+  storePillTextActive: {
+    color: "#ffffff",
   },
   groupCard: {
-    backgroundColor: "#101d2d",
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 14,
+    backgroundColor: "#101d2c",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  groupHeader: {
-    marginBottom: 8,
-  },
-  groupTitle: {
-    color: "#ffffff",
-    fontSize: 19,
-    fontWeight: "900",
-    letterSpacing: -0.7,
-  },
-  groupMeta: {
-    color: "#9cadbf",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 3,
+    borderColor: "#203044",
+    overflow: "hidden",
   },
   personRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderRadius: 18,
-    padding: 12,
-    marginTop: 5,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.075)",
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 17,
-    backgroundColor: "#e91f3f",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    minHeight: 54,
+    gap: 8,
   },
   personMain: {
     flex: 1,
+    minWidth: 0,
+  },
+  personTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   personName: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "900",
-    marginBottom: 2,
+    flex: 1,
+  },
+  rolePill: {
+    color: "#ffffff",
+    backgroundColor: "#26364a",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    fontSize: 8,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   personMeta: {
-    color: "#b8c6d6",
-    fontSize: 12,
+    color: "#9aacbf",
+    fontSize: 11,
     fontWeight: "800",
+    marginTop: 1,
   },
   personEmail: {
-    color: "#7f91a5",
-    fontSize: 11,
+    color: "#708399",
+    fontSize: 10,
     fontWeight: "700",
-    marginTop: 2,
+    marginTop: 1,
   },
   messageButton: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
+    backgroundColor: "#ef1745",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
   },
   messageButtonText: {
-    color: "#10212b",
-    fontSize: 12,
+    color: "#ffffff",
+    fontSize: 10,
     fontWeight: "900",
+  },
+  rowGap: {
+    height: 5,
+  },
+  emptyState: {
+    padding: 12,
+  },
+  emptyTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  emptyText: {
+    color: "#9aacbf",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4,
   },
 });
