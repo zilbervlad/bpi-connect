@@ -299,6 +299,12 @@ export default function App() {
     try {
       const result = await toggleApiThreadMessageReaction(messageId, currentUser.id, emoji);
 
+      const updatedReactions =
+        result.reactions ||
+        result.message?.reactions ||
+        result.thread_message?.reactions ||
+        [];
+
       setThreads((currentThreads) =>
         currentThreads.map((thread) => {
           if (thread.id !== selectedThreadId) return thread;
@@ -307,12 +313,14 @@ export default function App() {
             ...thread,
             messages: thread.messages.map((message) =>
               message.id === messageId
-                ? { ...message, reactions: result.reactions || [] }
+                ? { ...message, reactions: updatedReactions }
                 : message
             ),
           };
         })
       );
+
+      await refreshOpenThreadMessages(selectedThreadId);
     } catch (error) {
       console.log("Could not update reaction:", error.message);
     }
