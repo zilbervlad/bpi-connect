@@ -21,6 +21,7 @@ import {
   addApiUserStoreAssignment,
   removeApiUserStoreAssignment,
   resendApiUserInvite,
+  sendApiUserPasswordReset,
   fetchApiAreas,
   createApiArea,
   deleteApiArea,
@@ -73,6 +74,7 @@ export function AdminScreen({ user }) {
   const [inviteArea, setInviteArea] = useState("");
   const [createdInvite, setCreatedInvite] = useState(null);
   const [resentInvite, setResentInvite] = useState(null);
+  const [passwordResetResult, setPasswordResetResult] = useState(null);
 
   const [newAreaName, setNewAreaName] = useState("");
   const [newStoreNumber, setNewStoreNumber] = useState("");
@@ -150,6 +152,7 @@ export function AdminScreen({ user }) {
       const detail = await fetchApiUserDetail(userId);
       setSelectedUser(detail);
       setResentInvite(null);
+      setPasswordResetResult(null);
       setActiveSection("detail");
     } catch (error) {
       setErrorMessage(error.message || "Could not load user.");
@@ -321,6 +324,33 @@ export function AdminScreen({ user }) {
       await loadAdminData();
     } catch (error) {
       setErrorMessage(error.message || "Could not update store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSendPasswordReset() {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setPasswordResetResult(null);
+    setIsLoading(true);
+
+    try {
+      const result = await sendApiUserPasswordReset(selectedUser.id);
+      setSelectedUser(result.user);
+      setPasswordResetResult(result);
+
+      if (result.reset_email_sent) {
+        setStatusMessage("Password reset email sent.");
+      } else {
+        setStatusMessage("Password reset link created, but email did not send.");
+      }
+
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not send password reset.");
     } finally {
       setIsLoading(false);
     }
@@ -925,6 +955,42 @@ export function AdminScreen({ user }) {
               )}
             </View>
           )}
+
+          <View style={localStyles.resendInviteBlock}>
+            <TouchableOpacity
+              style={[styles.secondaryButton, isLoading && localStyles.disabledButton]}
+              onPress={handleSendPasswordReset}
+              disabled={isLoading}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {isLoading ? "Sending Reset..." : "Send Password Reset"}
+              </Text>
+            </TouchableOpacity>
+
+            {passwordResetResult && (
+              <View style={localStyles.resendResultCard}>
+                <Text style={localStyles.resendResultTitle}>
+                  {passwordResetResult.reset_email_sent ? "Password Reset Sent" : "Reset Link Ready"}
+                </Text>
+
+                <Text style={localStyles.resendResultText}>
+                  {passwordResetResult.reset_email_sent
+                    ? "The employee was sent a password reset email."
+                    : "The email did not send, but this reset link can still be shared."}
+                </Text>
+
+                <View style={localStyles.inviteUrlBox}>
+                  <Text style={localStyles.inviteUrl}>{passwordResetResult.reset_url}</Text>
+                </View>
+
+                {!passwordResetResult.reset_email_sent && passwordResetResult.reset_email_error ? (
+                  <Text style={localStyles.inviteError}>
+                    Email issue: {passwordResetResult.reset_email_error}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </View>
 
           <Text style={localStyles.label}>Current Store Access</Text>
 

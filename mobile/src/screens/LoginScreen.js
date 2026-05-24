@@ -8,13 +8,35 @@ import {
   StyleSheet,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { requestApiPasswordReset } from "../api/client";
 
 export function LoginScreen({ onLogin, errorMessage, isLoading }) {
   const [email, setEmail] = useState("vlad@bostonpie.com");
   const [password, setPassword] = useState("password123");
+  const [resetMessage, setResetMessage] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
 
   function handleLogin() {
     onLogin(email.trim(), password);
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setResetMessage("Enter your email first, then tap Forgot Password.");
+      return;
+    }
+
+    setIsResetting(true);
+    setResetMessage("");
+
+    try {
+      const result = await requestApiPasswordReset(email.trim());
+      setResetMessage(result.message || "If that email exists, a reset link has been sent.");
+    } catch (error) {
+      setResetMessage(error.message || "Could not request password reset.");
+    } finally {
+      setIsResetting(false);
+    }
   }
 
   return (
@@ -54,6 +76,22 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
           />
+
+          <TouchableOpacity
+            style={localStyles.forgotButton}
+            onPress={handleForgotPassword}
+            disabled={isResetting}
+          >
+            <Text style={localStyles.forgotButtonText}>
+              {isResetting ? "Sending reset..." : "Forgot Password?"}
+            </Text>
+          </TouchableOpacity>
+
+          {resetMessage ? (
+            <View style={localStyles.resetBox}>
+              <Text style={localStyles.resetText}>{resetMessage}</Text>
+            </View>
+          ) : null}
 
           {errorMessage ? (
             <View style={localStyles.errorBox}>
@@ -149,6 +187,31 @@ const localStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 14,
+  },
+  forgotButton: {
+    alignSelf: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  forgotButtonText: {
+    color: "#e91f3f",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  resetBox: {
+    backgroundColor: "#eef5f8",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  resetText: {
+    color: "#526273",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+    textAlign: "center",
   },
   errorBox: {
     backgroundColor: "#ffe4e8",
