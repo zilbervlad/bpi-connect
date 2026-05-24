@@ -486,7 +486,9 @@ export default function App() {
 
   async function sendUpdate({ title, body, targetGroup, requiresAck }) {
     const targetThread = threads.find(
-      (thread) => thread.groupKey === targetGroup.threadGroupKey
+      (thread) =>
+        thread.id === targetGroup.threadId ||
+        thread.groupKey === targetGroup.threadGroupKey
     );
 
     const formattedBody = `${title}\n\n${body}`;
@@ -501,7 +503,7 @@ export default function App() {
     const newMessage = {
       id: Date.now(),
       type: "announcement",
-      priority: requiresAck ? "ACK" : "STORE",
+      priority: requiresAck ? "RESPONSE" : "UPDATE",
       title,
       from: `${currentUser.role} · ${currentUser.name}`,
       time: "Just now",
@@ -654,6 +656,7 @@ export default function App() {
         {activeTab === "Update" && (
           <BroadcastScreen
             user={currentUser}
+            threads={threads}
             onSendUpdate={sendUpdate}
           />
         )}

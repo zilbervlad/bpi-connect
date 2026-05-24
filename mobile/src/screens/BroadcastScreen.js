@@ -10,20 +10,30 @@ import {
 
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
-import { getVisibleRecipientGroups } from "../data/recipientGroups";
 
-export function UpdateScreen({ user, onSendUpdate }) {
-  const availableGroups = useMemo(() => getVisibleRecipientGroups(user), [user]);
-  const [selectedGroupId, setSelectedGroupId] = useState(
-    availableGroups[0]?.id || null
-  );
-  const [title, setTitle] = useState("Weekend Operations Reminder");
-  const [body, setBody] = useState(
-    "Please review staffing, image standards, and Load & Go execution before the rush. Reply to your supervisor if you need support."
-  );
-  const [requiresAck, setRequiresAck] = useState(true);
+export function BroadcastScreen({ user, threads = [], onSendUpdate }) {
+  const availableGroups = useMemo(() => {
+    return threads
+      .filter((thread) => thread.type !== "direct")
+      .map((thread) => ({
+        id: thread.id,
+        label: thread.name,
+        description: thread.subtitle || formatThreadType(thread.type),
+        threadId: thread.id,
+        threadGroupKey: thread.groupKey,
+        type: thread.type,
+        memberCount: thread.members?.length || 0,
+      }));
+  }, [threads]);
 
-  const selectedGroup = availableGroups.find((group) => group.id === selectedGroupId);
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [requiresAck, setRequiresAck] = useState(false);
+
+  const selectedGroup =
+    availableGroups.find((group) => group.id === selectedGroupId) ||
+    availableGroups[0];
 
   function handleSend() {
     if (!selectedGroup || !title.trim() || !body.trim()) return;
@@ -34,39 +44,70 @@ export function UpdateScreen({ user, onSendUpdate }) {
       targetGroup: selectedGroup,
       requiresAck,
     });
+
+    setTitle("");
+    setBody("");
+    setRequiresAck(false);
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
         eyebrow="SEND"
-        title="Post to group"
-        subtitle={`${user.role} access · choose the group thread this should go into.`}
+        title="Send Update"
+        subtitle={`${user.role} access · post into a real group chat.`}
       />
 
       <View style={localStyles.card}>
         <Text style={localStyles.label}>Group thread</Text>
 
-        <View style={localStyles.groupGrid}>
-          {availableGroups.map((group) => {
-            const isSelected = selectedGroupId === group.id;
+        {availableGroups.length ? (
+          <View style={localStyles.groupGrid}>
+            {availableGroups.map((group) => {
+              const isSelected = selectedGroup?.id === group.id;
 
-            return (
-              <TouchableOpacity
-                key={group.id}
-                style={[localStyles.groupChip, isSelected && localStyles.groupChipActive]}
-                onPress={() => setSelectedGroupId(group.id)}
-              >
-                <Text style={[localStyles.groupChipTitle, isSelected && localStyles.groupChipTitleActive]}>
-                  {group.label}
-                </Text>
-                <Text style={[localStyles.groupChipText, isSelected && localStyles.groupChipTextActive]}>
-                  {group.description}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+              return (
+                <TouchableOpacity
+                  key={group.id}
+                  style={[localStyles.groupChip, isSelected && localStyles.groupChipActive]}
+                  onPress={() => setSelectedGroupId(group.id)}
+                  activeOpacity={0.84}
+                >
+                  <View style={localStyles.groupHeader}>
+                    <Text
+                      style={[
+                        localStyles.groupChipTitle,
+                        isSelected && localStyles.groupChipTitleActive,
+                      ]}
+                    >
+                      {group.label}
+                    </Text>
+
+                    <Text style={[localStyles.typePill, isSelected && localStyles.typePillActive]}>
+                      {formatThreadType(group.type)}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={[
+                      localStyles.groupChipText,
+                      isSelected && localStyles.groupChipTextActive,
+                    ]}
+                  >
+                    {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={localStyles.emptyCard}>
+            <Text style={localStyles.emptyTitle}>No groups yet</Text>
+            <Text style={localStyles.emptyText}>
+              Create a group in Admin first, then come back to send updates.
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={localStyles.card}>
@@ -74,7 +115,7 @@ export function UpdateScreen({ user, onSendUpdate }) {
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Enter subject"
+          placeholder="Example: Weekend operations reminder"
           placeholderTextColor="#7b8da0"
           style={localStyles.input}
         />
@@ -83,7 +124,7 @@ export function UpdateScreen({ user, onSendUpdate }) {
         <TextInput
           value={body}
           onChangeText={setBody}
-          placeholder="Enter message"
+          placeholder="Write the update..."
           placeholderTextColor="#7b8da0"
           style={[localStyles.input, localStyles.textArea]}
           multiline
@@ -91,55 +132,73 @@ export function UpdateScreen({ user, onSendUpdate }) {
         />
 
         <TouchableOpacity
-          style={[localStyles.ackToggle, requiresAck && localStyles.ackToggleActive]}
+          style={[localStyles.ackRow, requiresAck && localStyles.ackRowActive]}
           onPress={() => setRequiresAck((current) => !current)}
+          activeOpacity={0.84}
         >
-          <Text style={[localStyles.ackToggleText, requiresAck && localStyles.ackToggleTextActive]}>
-            {requiresAck ? "✓ Requires acknowledgement" : "No acknowledgement required"}
-          </Text>
+          <View style={[localStyles.checkCircle, requiresAck && localStyles.checkCircleActive]}>
+            <Text style={localStyles.checkText}>{requiresAck ? "✓" : ""}</Text>
+          </View>
+
+          <View style={localStyles.ackMain}>
+            <Text style={localStyles.ackTitle}>Needs Response</Text>
+            <Text style={localStyles.ackText}>
+              Ask team members to acknowledge this update.
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        <View style={localStyles.previewBox}>
-          <Text style={localStyles.previewLabel}>Preview</Text>
-          <Text style={localStyles.previewTitle}>{title || "Message title"}</Text>
-          <Text style={localStyles.previewMeta}>
-            Posting to: {selectedGroup?.label || "Choose group"}
-          </Text>
-          <Text style={localStyles.previewBody}>{body || "Message body"}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSend}>
-          <Text style={styles.primaryButtonText}>Post to Group Thread</Text>
+        <TouchableOpacity
+          style={[
+            styles.primaryButton,
+            (!selectedGroup || !title.trim() || !body.trim()) && localStyles.disabledButton,
+          ]}
+          onPress={handleSend}
+          disabled={!selectedGroup || !title.trim() || !body.trim()}
+          activeOpacity={0.86}
+        >
+          <Text style={styles.primaryButtonText}>Post to Group</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
+function formatThreadType(type) {
+  const labels = {
+    company: "Company",
+    store: "Store",
+    area: "Area",
+    group: "Group",
+  };
+
+  return labels[type] || "Group";
+}
+
 const localStyles = StyleSheet.create({
   card: {
     backgroundColor: "#101d2d",
-    borderRadius: 26,
-    padding: 20,
+    borderRadius: 28,
+    padding: 18,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   label: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
-    marginBottom: 10,
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 1,
+    marginBottom: 10,
   },
   groupGrid: {
     gap: 10,
   },
   groupChip: {
-    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
     padding: 14,
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -147,11 +206,18 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#e91f3f",
     borderColor: "#e91f3f",
   },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 6,
+  },
   groupChipTitle: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "900",
-    marginBottom: 3,
+    flex: 1,
   },
   groupChipTitleActive: {
     color: "#ffffff",
@@ -159,74 +225,104 @@ const localStyles = StyleSheet.create({
   groupChipText: {
     color: "#9cadbf",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   groupChipTextActive: {
     color: "#ffe2e8",
   },
+  typePill: {
+    color: "#dbe7f3",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  typePillActive: {
+    color: "#e91f3f",
+    backgroundColor: "#ffffff",
+  },
+  emptyCard: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 18,
+    padding: 14,
+  },
+  emptyTitle: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  emptyText: {
+    color: "#9cadbf",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+    marginTop: 4,
+  },
   input: {
-    backgroundColor: "#07111f",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    color: "#10212b",
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    color: "#ffffff",
     fontSize: 15,
     fontWeight: "700",
     marginBottom: 16,
   },
   textArea: {
-    minHeight: 120,
-    lineHeight: 22,
+    minHeight: 126,
   },
-  ackToggle: {
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: "#eef5f8",
-    marginBottom: 16,
-  },
-  ackToggleActive: {
-    backgroundColor: "#ecfdf3",
-  },
-  ackToggleText: {
-    color: "#163847",
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  ackToggleTextActive: {
-    color: "#166534",
-  },
-  previewBox: {
-    backgroundColor: "#ffffff",
+  ackRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 20,
-    padding: 16,
-    marginTop: 2,
-    marginBottom: 4,
+    padding: 13,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  previewLabel: {
-    color: "#e91f3f",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.1,
-    marginBottom: 8,
+  ackRowActive: {
+    backgroundColor: "rgba(233,31,63,0.16)",
+    borderColor: "rgba(233,31,63,0.42)",
   },
-  previewTitle: {
-    color: "#10212b",
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    marginBottom: 4,
+  checkCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#8fa1b6",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  previewMeta: {
-    color: "#697b8d",
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 12,
+  checkCircleActive: {
+    backgroundColor: "#e91f3f",
+    borderColor: "#e91f3f",
   },
-  previewBody: {
-    color: "#263847",
+  checkText: {
+    color: "#ffffff",
     fontSize: 15,
-    lineHeight: 22,
+    fontWeight: "900",
+  },
+  ackMain: {
+    flex: 1,
+  },
+  ackTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  ackText: {
+    color: "#9cadbf",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });
