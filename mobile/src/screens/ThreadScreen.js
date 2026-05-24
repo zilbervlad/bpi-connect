@@ -239,6 +239,12 @@ export function ThreadScreen({
 
           {thread.messages.map((message, index) => (
             <View key={message.id}>
+              {shouldShowDateDivider(thread.messages, message, index) ? (
+                <View style={localStyles.dateDivider}>
+                  <Text style={localStyles.dateDividerText}>{getMessageDateLabel(message)}</Text>
+                </View>
+              ) : null}
+
               {index === unreadStartIndex ? (
                 <View style={localStyles.unreadDivider}>
                   <View style={localStyles.unreadDividerLine} />
@@ -436,6 +442,47 @@ export function ThreadScreen({
   );
 }
 
+function getMessageDateLabel(message) {
+  const rawValue = message.createdAt || message.created_at || message.createdAtIso || message.timeRaw;
+
+  if (!rawValue || rawValue === "Now" || rawValue === "API") {
+    return null;
+  }
+
+  const messageDate = new Date(rawValue);
+
+  if (Number.isNaN(messageDate.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  if (sameDay(messageDate, today)) return "Today";
+  if (sameDay(messageDate, yesterday)) return "Yesterday";
+
+  return messageDate.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function shouldShowDateDivider(messages, message, index) {
+  const currentLabel = getMessageDateLabel(message);
+
+  if (!currentLabel) return false;
+  if (index === 0) return true;
+
+  const previousLabel = getMessageDateLabel(messages[index - 1]);
+  return currentLabel !== previousLabel;
+}
+
 function shouldShowSenderName(messages, message, index) {
   const previousMessage = messages[index - 1];
 
@@ -543,6 +590,19 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     lineHeight: 17,
+  },
+  dateDivider: {
+    alignSelf: "center",
+    backgroundColor: "#e5e7eb",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginVertical: 10,
+  },
+  dateDividerText: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "900",
   },
   unreadDivider: {
     flexDirection: "row",

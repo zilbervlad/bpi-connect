@@ -151,6 +151,8 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     body: apiMessage.body || "",
     text: apiMessage.body || "",
     time: formatApiTime(apiMessage.created_at),
+    created_at: apiMessage.created_at,
+    createdAt: apiMessage.created_at,
     isMe: Boolean(apiMessage.is_me),
     requiresAck: Boolean(apiMessage.requires_ack),
     responded: Boolean(apiMessage.responded),
