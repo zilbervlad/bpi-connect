@@ -2266,7 +2266,7 @@ def create_app():
         member_user_ids = [
             membership.user_id
             for membership in ThreadMember.query.filter_by(thread_id=thread.id).all()
-            if membership.user_id != sender.id
+            if membership.user_id != sender.id and not membership.muted
         ]
 
         if not member_user_ids:
@@ -2342,6 +2342,41 @@ def create_app():
             "message": serialize_thread_message(message, user_id=sender.id),
             "push_result": push_result,
         }), 201
+
+    @app.post("/api/threads/<int:thread_id>/mute")
+    def toggle_thread_mute(thread_id):
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+        muted = bool(data.get("muted", True))
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user_id,
+        ).first()
+
+        if not membership:
+            return jsonify({"success": False, "error": "Thread membership not found."}), 404
+
+        membership.muted = muted
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread, user_id=user_id),
+            "muted": membership.muted,
+        })
+
 
     @app.post("/api/threads/<int:thread_id>/read")
     def mark_thread_read(thread_id):
