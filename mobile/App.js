@@ -224,12 +224,14 @@ export default function App() {
   useEffect(() => {
     if (!selectedThreadId || !usingApi || !currentUser?.id) return undefined;
 
+    refreshOpenThreadMessages(selectedThreadId);
+
     const interval = setInterval(() => {
       refreshOpenThreadMessages(selectedThreadId);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [selectedThreadId, usingApi, currentUser?.id, threads.length]);
+  }, [selectedThreadId, usingApi, currentUser?.id]);
 
   async function handleLogin(email, password) {
     setIsLoggingIn(true);
@@ -382,28 +384,27 @@ export default function App() {
   async function refreshOpenThreadMessages(threadId = selectedThreadId) {
     if (!threadId || !usingApi || !currentUser?.id) return;
 
-    const thread = threads.find((item) => item.id === threadId);
-
-    if (!thread?.apiThread) return;
-
     try {
-      const data = await fetchApiThreadMessages(thread.id, currentUser.id);
+      const data = await fetchApiThreadMessages(threadId, currentUser.id);
+      await markApiThreadRead(threadId, currentUser.id);
+      const mappedMessages = data.messages.map(mapApiThreadMessageToBubble);
+      const members = data.thread.members || [];
 
       setThreads((currentThreads) =>
-        currentThreads.map((item) =>
-          item.id === thread.id
-            ? {
-                ...item,
-                lastMessage: data.thread.last_message || item.lastMessage,
-                lastTime: formatApiTime(data.thread.last_time) || item.lastTime,
-                unread: data.thread.unread || 0,
-                members: data.thread.members || [],
-                memberNames: (data.thread.members || []).map((member) => member.name),
-                subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${(data.thread.members || []).length} ${(data.thread.members || []).length === 1 ? "member" : "members"}`,
-                messages: data.messages.map(mapApiThreadMessageToBubble),
-              }
-            : item
-        )
+        currentThreads.map((thread) => {
+          if (thread.id !== threadId) return thread;
+
+          return {
+            ...thread,
+            lastMessage: data.thread.last_message || thread.lastMessage,
+            lastTime: formatApiTime(data.thread.last_time) || thread.lastTime,
+            unread: 0,
+            members,
+            memberNames: members.map((member) => member.name),
+            subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`,
+            messages: mappedMessages,
+          };
+        })
       );
     } catch (error) {
       console.log("Could not refresh open thread:", error.message);
@@ -425,6 +426,13 @@ export default function App() {
     );
 
     setSelectedThreadId(thread.id);
+
+    // clear unread when opening thread
+    setThreads((currentThreads) =>
+      currentThreads.map((item) =>
+        item.id === thread.id ? { ...item, unread: 0 } : item
+      )
+    );
 
     if (usingApi && thread.apiThread && currentUser?.id) {
       try {
@@ -703,6 +711,7 @@ export default function App() {
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
+        onRefreshThread={refreshOpenThreadMessages}
         onReact={handleReactToThreadMessage}
         onAcknowledge={handleAcknowledgeThreadMessage}
       />
