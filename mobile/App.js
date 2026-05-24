@@ -22,6 +22,7 @@ import {
   toggleApiThreadMessageReaction,
   acknowledgeApiThreadMessage,
   saveApiUserPushToken,
+  setApiThreadMuted,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -46,9 +47,9 @@ function normalizeApiRole(role) {
     admin: "Admin",
     hr: "HR",
     coach: "Coach",
-    supervisor: "Supervisor",
+    supervisor: "Coach",
     general_manager: "General Manager",
-    manager: "Manager",
+    manager: "MIT",
     tm: "TM",
   };
 
@@ -127,6 +128,7 @@ function mapApiThreadToAppThread(apiThread) {
     lastMessage: apiThread.last_message || "No messages yet",
     lastTime: formatApiTime(apiThread.last_time),
     unread: apiThread.unread || 0,
+    muted: Boolean(apiThread.muted),
     members,
     memberNames: members.map((member) => member.name),
     messages: [],
@@ -504,6 +506,44 @@ export default function App() {
     }
   }
 
+  async function handleToggleThreadMute(threadId, muted) {
+    if (!currentUser?.id) return;
+
+    // Optimistic UI update so the button changes immediately
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        thread.id === threadId ? { ...thread, muted } : thread
+      )
+    );
+
+    if (!usingApi) return;
+
+    try {
+      const updatedThread = await setApiThreadMuted(threadId, currentUser.id, muted);
+      const mappedThread = mapApiThreadToAppThread(updatedThread);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === threadId
+            ? {
+                ...thread,
+                muted: Boolean(mappedThread.muted),
+              }
+            : thread
+        )
+      );
+    } catch (error) {
+      console.log("Could not toggle thread mute:", error.message);
+
+      // Roll back if API failed
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === threadId ? { ...thread, muted: !muted } : thread
+        )
+      );
+    }
+  }
+
   function closeThread() {
     setSelectedThreadId(null);
   }
@@ -798,6 +838,7 @@ export default function App() {
           <ChatsScreen
             threads={threads}
             onOpenThread={openThread}
+            onToggleMute={handleToggleThreadMute}
           />
         )}
 

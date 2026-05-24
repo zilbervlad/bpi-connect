@@ -16,10 +16,9 @@ const roleOrder = {
   Admin: 1,
   HR: 2,
   Coach: 3,
-  Supervisor: 4,
-  "General Manager": 5,
-  Manager: 6,
-  TM: 7,
+  "General Manager": 4,
+  MIT: 5,
+  TM: 6,
 };
 
 const roleFilters = [
@@ -27,9 +26,8 @@ const roleFilters = [
   "Admin",
   "HR",
   "Coach",
-  "Supervisor",
   "General Manager",
-  "Manager",
+  "MIT",
   "TM",
 ];
 
@@ -232,9 +230,9 @@ function formatRole(role) {
     admin: "Admin",
     hr: "HR",
     coach: "Coach",
-    supervisor: "Supervisor",
+    supervisor: "Coach",
     general_manager: "General Manager",
-    manager: "Manager",
+    manager: "MIT",
     tm: "TM",
   };
 
@@ -246,8 +244,8 @@ function formatRoleShort(role) {
 
   const map = {
     "General Manager": "GM",
-    Supervisor: "Sup",
-    Manager: "Mgr",
+    Coach: "Coach",
+    MIT: "MIT",
     "Team Member": "TM",
   };
 
