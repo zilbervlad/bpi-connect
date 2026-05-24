@@ -10,6 +10,7 @@ import {
 
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
+import QRCode from "react-native-qrcode-svg";
 import {
   createInviteApiUser,
   fetchApiStores,
@@ -523,13 +524,34 @@ export function AdminScreen({ user }) {
 
           {createdInvite && (
             <View style={localStyles.inviteCard}>
-              <Text style={localStyles.inviteTitle}>Invite created</Text>
-              <Text style={localStyles.inviteText}>
-                Send this link so the employee can set their password.
+              <Text style={localStyles.inviteTitle}>
+                {createdInvite.invite_email_sent ? "Invite sent" : "Invite created"}
               </Text>
+
+              <Text style={localStyles.inviteText}>
+                {createdInvite.invite_email_sent
+                  ? "The invite email was sent. The employee can also scan this QR code to set up their account."
+                  : "Email was not sent. The employee can still scan this QR code or use the invite link."}
+              </Text>
+
+              <View style={localStyles.qrWrap}>
+                <QRCode
+                  value={createdInvite.invite_url}
+                  size={168}
+                  backgroundColor="#ffffff"
+                  color="#10212b"
+                />
+              </View>
+
               <View style={localStyles.inviteUrlBox}>
                 <Text style={localStyles.inviteUrl}>{createdInvite.invite_url}</Text>
               </View>
+
+              {!createdInvite.invite_email_sent && createdInvite.invite_email_error ? (
+                <Text style={localStyles.inviteError}>
+                  Email issue: {createdInvite.invite_email_error}
+                </Text>
+              ) : null}
             </View>
           )}
         </View>
@@ -1076,6 +1098,25 @@ const localStyles = StyleSheet.create({
   },
   deactivatedBlock: {
     marginTop: 12,
+  },
+  qrWrap: {
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    padding: 16,
+    alignSelf: "center",
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  inviteError: {
+    color: "#991b2f",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 10,
+    lineHeight: 17,
   },
   inviteCard: {
     backgroundColor: "#ffffff",
