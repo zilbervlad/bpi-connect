@@ -20,6 +20,7 @@ import {
   updateApiUser,
   addApiUserStoreAssignment,
   removeApiUserStoreAssignment,
+  resendApiUserInvite,
   fetchApiAreas,
   createApiArea,
   createApiStore,
@@ -68,6 +69,7 @@ export function AdminScreen({ user }) {
   const [inviteStoreNumber, setInviteStoreNumber] = useState("");
   const [inviteArea, setInviteArea] = useState("");
   const [createdInvite, setCreatedInvite] = useState(null);
+  const [resentInvite, setResentInvite] = useState(null);
 
   const [newAreaName, setNewAreaName] = useState("");
   const [newStoreNumber, setNewStoreNumber] = useState("");
@@ -142,6 +144,7 @@ export function AdminScreen({ user }) {
     try {
       const detail = await fetchApiUserDetail(userId);
       setSelectedUser(detail);
+      setResentInvite(null);
       setActiveSection("detail");
     } catch (error) {
       setErrorMessage(error.message || "Could not load user.");
@@ -247,6 +250,33 @@ export function AdminScreen({ user }) {
       await loadAdminData();
     } catch (error) {
       setErrorMessage(error.message || "Could not update store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleResendInvite() {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setResentInvite(null);
+    setIsLoading(true);
+
+    try {
+      const result = await resendApiUserInvite(selectedUser.id);
+      setSelectedUser(result.user);
+      setResentInvite(result);
+
+      if (result.invite_email_sent) {
+        setStatusMessage("Invite email resent.");
+      } else {
+        setStatusMessage("Invite link regenerated, but email did not send.");
+      }
+
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not resend invite.");
     } finally {
       setIsLoading(false);
     }
@@ -712,6 +742,44 @@ export function AdminScreen({ user }) {
                 onSelect={(storeNumber) => handleAssignStore("oversight", storeNumber)}
               />
             </>
+          )}
+
+          {!selectedUser.invite_accepted_at && (
+            <View style={localStyles.resendInviteBlock}>
+              <TouchableOpacity
+                style={[styles.secondaryButton, isLoading && localStyles.disabledButton]}
+                onPress={handleResendInvite}
+                disabled={isLoading}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {isLoading ? "Sending Invite..." : "Resend Invite"}
+                </Text>
+              </TouchableOpacity>
+
+              {resentInvite && (
+                <View style={localStyles.resendResultCard}>
+                  <Text style={localStyles.resendResultTitle}>
+                    {resentInvite.invite_email_sent ? "Invite Email Sent" : "Invite Link Ready"}
+                  </Text>
+
+                  <Text style={localStyles.resendResultText}>
+                    {resentInvite.invite_email_sent
+                      ? "The employee was sent a new invite email."
+                      : "The email did not send, but this invite link can still be shared."}
+                  </Text>
+
+                  <View style={localStyles.inviteUrlBox}>
+                    <Text style={localStyles.inviteUrl}>{resentInvite.invite_url}</Text>
+                  </View>
+
+                  {!resentInvite.invite_email_sent && resentInvite.invite_email_error ? (
+                    <Text style={localStyles.inviteError}>
+                      Email issue: {resentInvite.invite_email_error}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+            </View>
           )}
 
           <Text style={localStyles.label}>Current Store Access</Text>
@@ -1215,6 +1283,28 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
+  },
+  resendInviteBlock: {
+    marginBottom: 18,
+  },
+  resendResultCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 14,
+    marginTop: 12,
+  },
+  resendResultTitle: {
+    color: "#10212b",
+    fontSize: 17,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  resendResultText: {
+    color: "#526273",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+    marginBottom: 10,
   },
   assignmentRow: {
     backgroundColor: "rgba(255,255,255,0.05)",
