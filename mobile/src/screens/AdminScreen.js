@@ -10,6 +10,7 @@ import {
 
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
+import { UserAvatar } from "../components/UserAvatar";
 import QRCode from "react-native-qrcode-svg";
 import {
   createInviteApiUser,
@@ -674,9 +675,7 @@ export function AdminScreen({ user }) {
           </TouchableOpacity>
 
           <View style={localStyles.detailHeader}>
-            <View style={localStyles.detailAvatar}>
-              <Text style={localStyles.detailAvatarText}>{selectedUser.name.charAt(0)}</Text>
-            </View>
+            <UserAvatar user={selectedUser} size={58} />
             <View style={localStyles.detailMain}>
               <Text style={localStyles.detailName}>{selectedUser.name}</Text>
               <Text style={localStyles.detailMeta}>{selectedUser.email}</Text>

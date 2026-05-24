@@ -13,6 +13,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 
 import { styles } from "../styles/styles";
+import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 
 export function ThreadScreen({ thread, onBack, onSendThreadMessage }) {
