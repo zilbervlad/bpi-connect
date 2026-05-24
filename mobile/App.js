@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { SafeAreaView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { io } from "socket.io-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { styles } from "./src/styles/styles";
 import { demoUsers } from "./src/data/users";
@@ -246,19 +247,18 @@ export default function App() {
     }
 
     const socket = io(REALTIME_URL, {
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 600,
-      timeout: 10000,
+      timeout: 15000,
     });
 
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      socket.emit("join_user", { user_id: currentUser.id }, (response) => {
-        console.log("Realtime joined:", response);
-      });
+      socket.emit("join_user", { user_id: currentUser.id });
     });
 
     socket.on("thread_message_created", async (payload) => {

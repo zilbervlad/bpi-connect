@@ -247,14 +247,13 @@ export async function acknowledgeApiThreadMessage(messageId, userId) {
   });
 }
 
-export async function saveApiUserPushToken(userId, token, platform = "ios", deviceName = "iPhone") {
-  return apiRequest("/api/push-tokens", {
+export async function saveApiUserPushToken(userId, token, options = {}) {
+  return apiRequest(`/api/users/${userId}/push-token`, {
     method: "POST",
     body: JSON.stringify({
-      user_id: userId,
       token,
-      platform,
-      device_name: deviceName,
+      platform: options.platform || "ios",
+      device_name: options.deviceName || "iPhone",
     }),
   });
 }
