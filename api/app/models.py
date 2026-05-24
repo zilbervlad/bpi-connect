@@ -38,6 +38,9 @@ class User(db.Model):
     invite_token = db.Column(db.String(255), unique=True, nullable=True)
     invite_sent_at = db.Column(db.DateTime, nullable=True)
     invite_accepted_at = db.Column(db.DateTime, nullable=True)
+
+    password_reset_token = db.Column(db.String(255), unique=True, nullable=True)
+    password_reset_sent_at = db.Column(db.DateTime, nullable=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
 
     is_active = db.Column(db.Boolean, default=True)

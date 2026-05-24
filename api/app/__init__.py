@@ -67,6 +67,44 @@ def create_app():
         return None
 
 
+    @app.post("/dev/migrate-password-reset")
+    def migrate_password_reset_fields():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        # db.create_all does not add columns to existing tables, so use safe ALTER TABLE.
+        engine_name = db.engine.url.get_backend_name()
+
+        with db.engine.begin() as connection:
+            if engine_name == "postgresql":
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255)"
+                ))
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_sent_at TIMESTAMP"
+                ))
+            else:
+                existing_columns = [
+                    row[1] for row in connection.execute(db.text("PRAGMA table_info(users)")).fetchall()
+                ]
+
+                if "password_reset_token" not in existing_columns:
+                    connection.execute(db.text(
+                        "ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255)"
+                    ))
+
+                if "password_reset_sent_at" not in existing_columns:
+                    connection.execute(db.text(
+                        "ALTER TABLE users ADD COLUMN password_reset_sent_at DATETIME"
+                    ))
+
+        return jsonify({
+            "success": True,
+            "message": "Password reset fields migrated.",
+        })
+
+
     @app.post("/dev/migrate-attachments")
     def migrate_attachments_table():
         auth_error = require_dev_admin_secret()
@@ -334,6 +372,203 @@ def create_app():
             "success": True,
             "message": "Database initialized with demo BPI Connect data.",
         })
+
+    @app.post("/api/auth/forgot-password")
+    def forgot_password():
+        data = request.get_json() or {}
+        email = (data.get("email") or "").strip().lower()
+
+        generic_response = jsonify({
+            "success": True,
+            "message": "If that email exists, a password reset link has been sent.",
+        })
+
+        if not email:
+            return generic_response
+
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+
+        if not user:
+            return generic_response
+
+        token = secrets.token_urlsafe(32)
+        user.password_reset_token = token
+        user.password_reset_sent_at = datetime.utcnow()
+        db.session.commit()
+
+        base_url = os.getenv("APP_WEB_BASE_URL", "https://bpi-connect.onrender.com").strip().rstrip("/")
+        reset_url = f"{base_url}/reset-password/{token}"
+
+        send_password_reset_email(user, reset_url)
+
+        return generic_response
+
+
+    @app.post("/api/users/<int:user_id>/send-password-reset")
+    def send_user_password_reset(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        token = secrets.token_urlsafe(32)
+        user.password_reset_token = token
+        user.password_reset_sent_at = datetime.utcnow()
+        db.session.commit()
+
+        base_url = os.getenv("APP_WEB_BASE_URL", "https://bpi-connect.onrender.com").strip().rstrip("/")
+        reset_url = f"{base_url}/reset-password/{token}"
+
+        email_result = send_password_reset_email(user, reset_url)
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+            "reset_url": reset_url,
+            "reset_email_sent": email_result.get("sent", False),
+            "reset_email_error": email_result.get("error"),
+        })
+
+
+    @app.get("/reset-password/<token>")
+    def reset_password_page(token):
+        user = User.query.filter_by(password_reset_token=token).first()
+
+        if not user:
+            return """
+            <!doctype html>
+            <html>
+              <head>
+                <title>Password Reset Not Found</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <style>
+                  body { font-family: Arial, sans-serif; background:#f4f7fb; margin:0; padding:30px; }
+                  .card { max-width:520px; margin:40px auto; background:#fff; padding:28px; border-radius:22px; box-shadow:0 16px 40px rgba(16,33,43,.12); }
+                  h1 { color:#10212b; }
+                  p { color:#526273; line-height:1.5; }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <h1>Reset link not found</h1>
+                  <p>This reset link is invalid or has already been used.</p>
+                </div>
+              </body>
+            </html>
+            """, 404
+
+        return f"""
+        <!doctype html>
+        <html>
+          <head>
+            <title>Reset BPI Connect Password</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body {{
+                font-family: Arial, sans-serif;
+                background:#f4f7fb;
+                margin:0;
+                padding:30px;
+              }}
+              .card {{
+                max-width:520px;
+                margin:40px auto;
+                background:#fff;
+                padding:28px;
+                border-radius:22px;
+                box-shadow:0 16px 40px rgba(16,33,43,.12);
+              }}
+              h1 {{ color:#10212b; margin-bottom:8px; }}
+              p {{ color:#526273; line-height:1.5; }}
+              label {{ display:block; font-weight:800; color:#10212b; margin:18px 0 8px; }}
+              input {{
+                width:100%;
+                box-sizing:border-box;
+                padding:14px;
+                border-radius:14px;
+                border:1px solid #d9e2ec;
+                font-size:16px;
+              }}
+              button {{
+                width:100%;
+                margin-top:18px;
+                border:0;
+                background:#e91f3f;
+                color:#fff;
+                padding:14px 18px;
+                border-radius:14px;
+                font-weight:900;
+                font-size:16px;
+                cursor:pointer;
+              }}
+              .small {{ font-size:13px; color:#7b8da0; }}
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>Reset Password</h1>
+              <p>Set a new password for <strong>{user.email}</strong>.</p>
+
+              <form method="POST">
+                <label>New password</label>
+                <input name="password" type="password" required minlength="6" placeholder="New password" />
+
+                <label>Confirm password</label>
+                <input name="confirm_password" type="password" required minlength="6" placeholder="Confirm password" />
+
+                <button type="submit">Update Password</button>
+              </form>
+
+              <p class="small">Your password must be at least 6 characters.</p>
+            </div>
+          </body>
+        </html>
+        """
+
+
+    @app.post("/reset-password/<token>")
+    def reset_password_submit(token):
+        user = User.query.filter_by(password_reset_token=token).first()
+
+        if not user:
+            return "Reset link not found.", 404
+
+        password = (request.form.get("password") or "").strip()
+        confirm_password = (request.form.get("confirm_password") or "").strip()
+
+        if len(password) < 6:
+            return "Password must be at least 6 characters.", 400
+
+        if password != confirm_password:
+            return "Passwords do not match.", 400
+
+        user.password_hash = generate_password_hash(password)
+        user.password_reset_token = None
+        user.password_reset_sent_at = None
+        db.session.commit()
+
+        return """
+        <!doctype html>
+        <html>
+          <head>
+            <title>Password Updated</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body { font-family: Arial, sans-serif; background:#f4f7fb; margin:0; padding:30px; }
+              .card { max-width:520px; margin:40px auto; background:#fff; padding:28px; border-radius:22px; box-shadow:0 16px 40px rgba(16,33,43,.12); }
+              h1 { color:#10212b; }
+              p { color:#526273; line-height:1.5; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>Password Updated</h1>
+              <p>Your BPI Connect password has been updated. You can now return to the app and sign in.</p>
+            </div>
+          </body>
+        </html>
+        """
+
 
     @app.post("/api/auth/login")
     def login():
@@ -2003,6 +2238,70 @@ This invite was sent by Boston Pie, Inc.
         "sent": True,
         "provider_response": data,
     }
+
+
+
+def send_password_reset_email(user, reset_url):
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    from_email = os.getenv("INVITE_FROM_EMAIL", "BPI Connect <onboarding@resend.dev>").strip()
+
+    if not resend_api_key:
+        return {
+            "sent": False,
+            "error": "RESEND_API_KEY is not configured.",
+        }
+
+    payload = {
+        "from": from_email,
+        "to": [user.email],
+        "subject": "Reset your BPI Connect password",
+        "html": f"""
+            <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+                <h2 style="color:#10212b;">Reset your BPI Connect password</h2>
+                <p>Hi {user.name},</p>
+                <p>A password reset was requested for your BPI Connect account.</p>
+                <p>
+                    <a href="{reset_url}"
+                       style="display:inline-block;background:#e91f3f;color:#ffffff;text-decoration:none;
+                              padding:12px 18px;border-radius:12px;font-weight:bold;">
+                        Reset Password
+                    </a>
+                </p>
+                <p>If the button does not work, copy and paste this link into your browser:</p>
+                <p style="word-break:break-all;color:#526273;">{reset_url}</p>
+                <p style="color:#526273;font-size:13px;">
+                    If you did not request this, you can ignore this email.
+                </p>
+            </div>
+        """,
+    }
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20,
+        )
+
+        if response.status_code >= 400:
+            return {
+                "sent": False,
+                "error": response.text,
+            }
+
+        return {
+            "sent": True,
+            "provider_response": response.json(),
+        }
+    except Exception as error:
+        return {
+            "sent": False,
+            "error": str(error),
+        }
 
 
 def serialize_user(user):
