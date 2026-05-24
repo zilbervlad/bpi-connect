@@ -3,6 +3,31 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 
+let activeNotificationThreadId = null;
+
+export function setActiveNotificationThreadId(threadId) {
+  activeNotificationThreadId = threadId ? Number(threadId) : null;
+}
+
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    const notificationThreadId = Number(notification.request.content.data?.thread_id);
+
+    const isCurrentOpenThread =
+      activeNotificationThreadId &&
+      notificationThreadId &&
+      Number(activeNotificationThreadId) === notificationThreadId;
+
+    return {
+      shouldShowBanner: !isCurrentOpenThread,
+      shouldShowList: !isCurrentOpenThread,
+      shouldPlaySound: !isCurrentOpenThread,
+      shouldSetBadge: true,
+    };
+  },
+});
+
+
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
     return {

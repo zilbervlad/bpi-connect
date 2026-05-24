@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -18,18 +18,40 @@ import * as FileSystem from "expo-file-system/legacy";
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
+import { setActiveNotificationThreadId } from "../services/pushNotifications";
 
 export function ThreadScreen({
   thread,
   onBack,
   onSendThreadMessage,
   onSendThreadImageMessage,
+  onRefreshThread,
   onReact,
   onAcknowledge,
 }) {
   const [draft, setDraft] = useState("");
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
 
   const quickReactions = ["👍", "❤️", "😂", "👀", "✅"];
+
+  useEffect(() => {
+    setActiveNotificationThreadId(thread?.id);
+
+    return () => setActiveNotificationThreadId(null);
+  }, [thread?.id]);
+
+  // ThreadScreen live refresh interval
+  useEffect(() => {
+    if (!thread?.id || !onRefreshThread) return undefined;
+
+    onRefreshThread(thread.id);
+
+    const interval = setInterval(() => {
+      onRefreshThread(thread.id);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [thread?.id, onRefreshThread]);
 
   function handleSend() {
     if (!draft.trim()) return;
@@ -117,11 +139,18 @@ export function ThreadScreen({
                 </Text>
               ) : null}
 
-              <View
+              <TouchableOpacity
                 style={[
                   localStyles.bubble,
                   message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
                 ]}
+                activeOpacity={0.9}
+                onLongPress={() => setReactionPickerMessageId(message.id)}
+                onPress={() =>
+                  setReactionPickerMessageId(
+                    reactionPickerMessageId === message.id ? null : message.id
+                  )
+                }
               >
                 {message.attachments?.map((attachment) =>
                   attachment.file_type === "image" ? (
@@ -144,35 +173,51 @@ export function ThreadScreen({
                     {message.body}
                   </Text>
                 ) : null}
-                <View style={localStyles.reactionRow}>
-                  {quickReactions.map((emoji) => {
-                    const existingReaction = message.reactions?.find(
-                      (reaction) => reaction.emoji === emoji
-                    );
-
-                    return (
+                {message.reactions?.length ? (
+                  <View style={localStyles.reactionSummaryRow}>
+                    {message.reactions.map((reaction) => (
                       <TouchableOpacity
-                        key={emoji}
+                        key={reaction.emoji}
                         style={[
-                          localStyles.quickReactionButton,
-                          existingReaction?.reacted_by_me && localStyles.quickReactionButtonActive,
+                          localStyles.reactionSummaryChip,
+                          reaction.reacted_by_me && localStyles.reactionSummaryChipActive,
                         ]}
-                        onPress={() => onReact?.(message.id, emoji)}
-                        activeOpacity={0.82}
+                        onPress={() => onReact?.(message.id, reaction.emoji)}
+                        activeOpacity={0.85}
                       >
-                        <Text
-                          style={[
-                            localStyles.quickReactionText,
-                            existingReaction?.reacted_by_me && localStyles.quickReactionTextActive,
-                          ]}
-                        >
-                          {emoji}{existingReaction?.count ? ` ${existingReaction.count}` : ""}
+                        <Text style={localStyles.reactionSummaryText}>
+                          {reaction.emoji}{reaction.count > 1 ? ` ${reaction.count}` : ""}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {reactionPickerMessageId === message.id ? (
+                  <View
+                    style={[
+                      localStyles.iMessageReactionPicker,
+                      message.isMe
+                        ? localStyles.iMessageReactionPickerMe
+                        : localStyles.iMessageReactionPickerOther,
+                    ]}
+                  >
+                    {quickReactions.map((emoji) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={localStyles.iMessageReactionButton}
+                        onPress={() => {
+                          onReact?.(message.id, emoji);
+                          setReactionPickerMessageId(null);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={localStyles.iMessageReactionText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+              </TouchableOpacity>
 
               <Text style={localStyles.messageTime}>{message.time}</Text>
             </View>
@@ -495,5 +540,58 @@ const localStyles = StyleSheet.create({
   },
   quickReactionTextActive: {
     color: "#10212b",
+  },
+  reactionSummaryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  reactionSummaryChip: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  reactionSummaryChipActive: {
+    backgroundColor: "#ffffff",
+  },
+  reactionSummaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  iMessageReactionPicker: {
+    position: "absolute",
+    top: -44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ffffff",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    zIndex: 20,
+  },
+  iMessageReactionPickerMe: {
+    right: 8,
+  },
+  iMessageReactionPickerOther: {
+    left: 8,
+  },
+  iMessageReactionButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iMessageReactionText: {
+    fontSize: 22,
   },
 });
