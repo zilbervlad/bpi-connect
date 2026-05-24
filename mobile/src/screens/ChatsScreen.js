@@ -1,11 +1,79 @@
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
-import { getThreadBadge } from "../data/threads";
+
+const FAVORITES_KEY = "bpi_connect_favorite_threads";
 
 export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
+  const [favoriteThreadIds, setFavoriteThreadIds] = useState([]);
+
+  useEffect(() => {
+    async function loadFavorites() {
+      try {
+        const saved = await AsyncStorage.getItem(FAVORITES_KEY);
+        if (saved) {
+          setFavoriteThreadIds(JSON.parse(saved));
+        }
+      } catch (error) {
+        console.log("Could not load favorite chats:", error.message);
+      }
+    }
+
+    loadFavorites();
+  }, []);
+
+  async function toggleFavorite(threadId) {
+    const stringId = String(threadId);
+
+    const nextFavorites = favoriteThreadIds.includes(stringId)
+      ? favoriteThreadIds.filter((id) => id !== stringId)
+      : [...favoriteThreadIds, stringId];
+
+    setFavoriteThreadIds(nextFavorites);
+
+    try {
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(nextFavorites));
+    } catch (error) {
+      console.log("Could not save favorite chats:", error.message);
+    }
+  }
+
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
+
+  const sortedThreads = useMemo(() => {
+    return [...threads].sort((a, b) => {
+      const aFav = favoriteThreadIds.includes(String(a.id));
+      const bFav = favoriteThreadIds.includes(String(b.id));
+
+      if (aFav !== bFav) return aFav ? -1 : 1;
+
+      const aStore = getStoreNumber(a);
+      const bStore = getStoreNumber(b);
+
+      if (a.type === "store" && b.type === "store" && aStore && bStore) {
+        return Number(aStore) - Number(bStore);
+      }
+
+      const typeOrder = {
+        company: 1,
+        area: 2,
+        role: 3,
+        store: 4,
+        direct: 5,
+        group: 6,
+      };
+
+      const aOrder = typeOrder[a.type] || 99;
+      const bOrder = typeOrder[b.type] || 99;
+
+      if (aOrder !== bOrder) return aOrder - bOrder;
+
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [threads, favoriteThreadIds]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -18,71 +86,89 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
       </View>
 
       <View style={localStyles.groupCard}>
-        {threads.length ? (
-          threads.map((thread, index) => (
-            <View key={thread.id}>
-              <View style={localStyles.threadRow}>
-                <TouchableOpacity
-                  style={localStyles.threadOpenArea}
-                  onPress={() => onOpenThread(thread)}
-                  activeOpacity={0.84}
-                >
-                  <ThreadAvatar thread={thread} />
+        {sortedThreads.length ? (
+          sortedThreads.map((thread, index) => {
+            const isFavorite = favoriteThreadIds.includes(String(thread.id));
 
-                  <View style={localStyles.threadMain}>
-                    <View style={localStyles.threadTop}>
-                      <Text style={localStyles.threadName} numberOfLines={1}>
-                        {thread.name}
-                      </Text>
+            return (
+              <View key={thread.id}>
+                <View style={localStyles.threadRow}>
+                  <TouchableOpacity
+                    style={localStyles.threadOpenArea}
+                    onPress={() => onOpenThread(thread)}
+                    activeOpacity={0.84}
+                  >
+                    <ThreadAvatar thread={thread} />
 
-                      <Text style={localStyles.threadTime}>
-                        {thread.lastTime}
-                      </Text>
+                    <View style={localStyles.threadMain}>
+                      <View style={localStyles.threadTop}>
+                        <Text style={localStyles.threadName} numberOfLines={1}>
+                          {thread.name}
+                        </Text>
+
+                        {thread.unread > 0 ? (
+                          <View style={localStyles.unreadBadge}>
+                            <Text style={localStyles.unreadText}>{thread.unread}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      <View style={localStyles.previewRow}>
+                        <Text style={localStyles.typePill}>
+                          {formatThreadType(thread.type)}
+                        </Text>
+
+                        <Text style={localStyles.threadPreview} numberOfLines={1}>
+                          {thread.lastMessage || "No messages yet"}
+                        </Text>
+                      </View>
                     </View>
+                  </TouchableOpacity>
 
-                    <View style={localStyles.previewRow}>
-                      <Text style={localStyles.typePill}>
-                        {formatThreadType(thread.type)}
-                      </Text>
+                  <View style={localStyles.rightRail}>
+                    <Text style={localStyles.threadTime}>{thread.lastTime}</Text>
 
-                      <Text style={localStyles.threadPreview} numberOfLines={1}>
-                        {thread.lastMessage || thread.subtitle || "No messages yet"}
-                      </Text>
+                    <View style={localStyles.iconRow}>
+                      <TouchableOpacity
+                        style={[
+                          localStyles.favoriteButton,
+                          isFavorite && localStyles.favoriteButtonActive,
+                        ]}
+                        onPress={() => toggleFavorite(thread.id)}
+                        activeOpacity={0.84}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Text style={localStyles.favoriteText}>
+                          {isFavorite ? "★" : "☆"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          localStyles.threadMuteButton,
+                          thread.muted && localStyles.threadMuteButtonActive,
+                        ]}
+                        onPressIn={() => onToggleMute?.(thread.id, !thread.muted)}
+                        activeOpacity={0.84}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Text style={localStyles.threadMuteText}>
+                          {thread.muted ? "🔕" : "🔔"}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </TouchableOpacity>
-
-                <View style={localStyles.rightRail}>
-                  {thread.unread > 0 ? (
-                    <View style={localStyles.unreadBadge}>
-                      <Text style={localStyles.unreadText}>{thread.unread}</Text>
-                    </View>
-                  ) : null}
-
-                  <TouchableOpacity
-                    style={[
-                      localStyles.threadMuteButton,
-                      thread.muted && localStyles.threadMuteButtonActive,
-                    ]}
-                    onPressIn={() => onToggleMute?.(thread.id, !thread.muted)}
-                    activeOpacity={0.84}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                    <Text style={localStyles.threadMuteText}>
-                      {thread.muted ? "🔕" : "🔔"}
-                    </Text>
-                  </TouchableOpacity>
                 </View>
-              </View>
 
-              {index < threads.length - 1 ? <View style={localStyles.divider} /> : null}
-            </View>
-          ))
+                {index < sortedThreads.length - 1 ? <View style={localStyles.divider} /> : null}
+              </View>
+            );
+          })
         ) : (
           <View style={localStyles.emptyState}>
             <Text style={localStyles.emptyTitle}>No chats yet</Text>
             <Text style={localStyles.emptyText}>
-              Groups and direct messages will show here once you create them.
+              Store, role, company, and direct chats will show here.
             </Text>
           </View>
         )}
@@ -97,23 +183,45 @@ function ThreadAvatar({ thread }) {
       thread.members.find((member) => member.id !== thread.currentUserId) ||
       thread.members[0];
 
-    return <UserAvatar user={otherMember} name={thread.name} size={32} />;
+    return <UserAvatar user={otherMember} name={thread.name} size={34} />;
   }
 
   return (
-    <View style={localStyles.avatar}>
-      <Text style={localStyles.avatarText}>{getThreadBadge(thread.type)}</Text>
+    <View style={[localStyles.avatar, thread.type === "store" && localStyles.storeAvatar]}>
+      <Text style={localStyles.avatarText}>{getAvatarLabel(thread)}</Text>
     </View>
   );
 }
 
+function getAvatarLabel(thread) {
+  if (thread.type === "store") {
+    const storeNumber = getStoreNumber(thread);
+    return storeNumber ? storeNumber.slice(-2) : "ST";
+  }
+
+  const map = {
+    company: "ALL",
+    area: "AR",
+    role: "RL",
+    group: "GR",
+  };
+
+  return map[thread.type] || "CH";
+}
+
+function getStoreNumber(thread) {
+  const match = String(thread.name || "").match(/\d+/);
+  return match ? match[0] : "";
+}
+
 function formatThreadType(type) {
   const map = {
-    company: "Co",
+    company: "Company",
     area: "Area",
     store: "Store",
     role: "Role",
     direct: "DM",
+    group: "Group",
   };
 
   return map[type] || "Chat";
@@ -152,13 +260,14 @@ const localStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#203044",
     overflow: "hidden",
+    marginBottom: 18,
   },
   threadRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 10,
-    minHeight: 48,
+    minHeight: 54,
   },
   threadOpenArea: {
     flex: 1,
@@ -167,16 +276,19 @@ const localStyles = StyleSheet.create({
     gap: 8,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ef1745",
   },
+  storeAvatar: {
+    backgroundColor: "#e91f3f",
+  },
   avatarText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   threadMain: {
@@ -190,14 +302,15 @@ const localStyles = StyleSheet.create({
   },
   threadName: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
     flex: 1,
   },
   threadTime: {
     color: "#8fa1b6",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
+    textAlign: "right",
   },
   previewRow: {
     flexDirection: "row",
@@ -210,7 +323,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#26364a",
     borderRadius: 999,
     overflow: "hidden",
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
     fontSize: 8,
     fontWeight: "900",
@@ -223,11 +336,32 @@ const localStyles = StyleSheet.create({
     flex: 1,
   },
   rightRail: {
-    width: 22,
+    width: 56,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 3,
+    marginLeft: 6,
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  favoriteButton: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    marginLeft: 4,
+  },
+  favoriteButtonActive: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  favoriteText: {
+    color: "#ffd166",
+    fontSize: 13,
+    fontWeight: "900",
   },
   threadMuteButton: {
     width: 21,
@@ -241,7 +375,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
   },
   threadMuteText: {
-    fontSize: 11,
+    fontSize: 10,
   },
   unreadBadge: {
     backgroundColor: "#ef1745",
@@ -260,7 +394,7 @@ const localStyles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#203044",
-    marginLeft: 50,
+    marginLeft: 52,
   },
   emptyState: {
     padding: 14,
