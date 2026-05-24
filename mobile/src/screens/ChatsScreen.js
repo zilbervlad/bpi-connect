@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { styles } from "../styles/styles";
@@ -9,6 +9,8 @@ const FAVORITES_KEY = "bpi_connect_favorite_threads";
 
 export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
   const [favoriteThreadIds, setFavoriteThreadIds] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
     async function loadFavorites() {
@@ -44,36 +46,56 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
 
   const sortedThreads = useMemo(() => {
-    return [...threads].sort((a, b) => {
-      const aFav = favoriteThreadIds.includes(String(a.id));
-      const bFav = favoriteThreadIds.includes(String(b.id));
+    const searchValue = searchText.trim().toLowerCase();
 
-      if (aFav !== bFav) return aFav ? -1 : 1;
+    return [...threads]
+      .filter((thread) => {
+        const isFavorite = favoriteThreadIds.includes(String(thread.id));
 
-      const aStore = getStoreNumber(a);
-      const bStore = getStoreNumber(b);
+        if (activeFilter === "favorites" && !isFavorite) return false;
+        if (activeFilter === "stores" && thread.type !== "store") return false;
+        if (activeFilter === "roles" && thread.type !== "role") return false;
+        if (activeFilter === "direct" && thread.type !== "direct") return false;
+        if (activeFilter === "company" && thread.type !== "company") return false;
 
-      if (a.type === "store" && b.type === "store" && aStore && bStore) {
-        return Number(aStore) - Number(bStore);
-      }
+        if (!searchValue) return true;
 
-      const typeOrder = {
-        company: 1,
-        area: 2,
-        role: 3,
-        store: 4,
-        direct: 5,
-        group: 6,
-      };
+        return (
+          String(thread.name || "").toLowerCase().includes(searchValue) ||
+          String(thread.lastMessage || "").toLowerCase().includes(searchValue) ||
+          String(thread.type || "").toLowerCase().includes(searchValue)
+        );
+      })
+      .sort((a, b) => {
+        const aFav = favoriteThreadIds.includes(String(a.id));
+        const bFav = favoriteThreadIds.includes(String(b.id));
 
-      const aOrder = typeOrder[a.type] || 99;
-      const bOrder = typeOrder[b.type] || 99;
+        if (aFav !== bFav) return aFav ? -1 : 1;
 
-      if (aOrder !== bOrder) return aOrder - bOrder;
+        const aStore = getStoreNumber(a);
+        const bStore = getStoreNumber(b);
 
-      return String(a.name || "").localeCompare(String(b.name || ""));
-    });
-  }, [threads, favoriteThreadIds]);
+        if (a.type === "store" && b.type === "store" && aStore && bStore) {
+          return Number(aStore) - Number(bStore);
+        }
+
+        const typeOrder = {
+          company: 1,
+          area: 2,
+          role: 3,
+          store: 4,
+          direct: 5,
+          group: 6,
+        };
+
+        const aOrder = typeOrder[a.type] || 99;
+        const bOrder = typeOrder[b.type] || 99;
+
+        if (aOrder !== bOrder) return aOrder - bOrder;
+
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+  }, [threads, favoriteThreadIds, searchText, activeFilter]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -83,6 +105,47 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
         <Text style={localStyles.heroSubtitle}>
           {threads.length} threads · {unreadCount} unread
         </Text>
+      </View>
+
+      <View style={localStyles.searchCard}>
+        <TextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search chats..."
+          placeholderTextColor="#7b8da0"
+          autoCapitalize="none"
+          style={localStyles.searchInput}
+        />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.filterRow}
+        >
+          {[
+            { label: "All", value: "all" },
+            { label: "★ Favorites", value: "favorites" },
+            { label: "Stores", value: "stores" },
+            { label: "Roles", value: "roles" },
+            { label: "Direct", value: "direct" },
+            { label: "Company", value: "company" },
+          ].map((filter) => {
+            const isActive = activeFilter === filter.value;
+
+            return (
+              <TouchableOpacity
+                key={filter.value}
+                style={[localStyles.filterPill, isActive && localStyles.filterPillActive]}
+                onPress={() => setActiveFilter(filter.value)}
+                activeOpacity={0.84}
+              >
+                <Text style={[localStyles.filterText, isActive && localStyles.filterTextActive]}>
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <View style={localStyles.groupCard}>
@@ -168,7 +231,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
           <View style={localStyles.emptyState}>
             <Text style={localStyles.emptyTitle}>No chats yet</Text>
             <Text style={localStyles.emptyText}>
-              Store, role, company, and direct chats will show here.
+              Try another search or filter.
             </Text>
           </View>
         )}
@@ -253,6 +316,47 @@ const localStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     marginTop: 4,
+  },
+  searchCard: {
+    backgroundColor: "#101d2c",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#203044",
+    padding: 8,
+    marginBottom: 8,
+    gap: 7,
+  },
+  searchInput: {
+    backgroundColor: "#0b1624",
+    borderWidth: 1,
+    borderColor: "#203044",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  filterRow: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  filterPill: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  filterPillActive: {
+    backgroundColor: "#ef1745",
+  },
+  filterText: {
+    color: "#9aacbf",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  filterTextActive: {
+    color: "#ffffff",
   },
   groupCard: {
     backgroundColor: "#101d2c",
