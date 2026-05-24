@@ -69,8 +69,9 @@ def create_app():
 
     @app.post("/dev/migrate-attachments")
     def migrate_attachments_table():
-        if not check_dev_admin_secret():
-            return jsonify({"success": False, "error": "Unauthorized."}), 401
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
 
         db.create_all()
 
