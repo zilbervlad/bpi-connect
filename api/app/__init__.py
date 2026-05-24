@@ -42,6 +42,71 @@ def create_app():
     CORS(app)
     db.init_app(app)
 
+    @app.get("/dev/push-tokens")
+    def dev_push_tokens():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        tokens = PushToken.query.order_by(PushToken.updated_at.desc()).all()
+
+        return jsonify({
+            "success": True,
+            "count": len(tokens),
+            "tokens": [
+                {
+                    "id": item.id,
+                    "user_id": item.user_id,
+                    "user": item.user.name if item.user else None,
+                    "email": item.user.email if item.user else None,
+                    "token_preview": f"{item.token[:24]}..." if item.token else None,
+                    "platform": item.platform,
+                    "device_name": item.device_name,
+                    "is_active": item.is_active,
+                    "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+                }
+                for item in tokens
+            ],
+        })
+
+
+    @app.post("/dev/test-push")
+    def dev_test_push():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+
+        if not user_id:
+            return jsonify({"success": False, "error": "user_id is required."}), 400
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        tokens = [
+            item.token
+            for item in PushToken.query.filter_by(user_id=user.id, is_active=True).all()
+        ]
+
+        result = send_expo_push_notifications(
+            tokens=tokens,
+            title="BPI Connect Test",
+            body="Push notifications are connected.",
+            data={"type": "test_push"},
+        )
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user(user),
+            "token_count": len(tokens),
+            "push_result": result,
+        })
+
+
     @app.get("/dev/email-config")
     def dev_email_config():
         auth_error = require_dev_admin_secret()
@@ -2157,7 +2222,9 @@ def create_app():
         messages = []
 
         for token in tokens:
-            if not token or not token.startswith("ExponentPushToken"):
+            if not token or not (
+                token.startswith("ExpoPushToken") or token.startswith("ExponentPushToken")
+            ):
                 continue
 
             messages.append({

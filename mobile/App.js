@@ -221,6 +221,16 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!selectedThreadId || !usingApi || !currentUser?.id) return undefined;
+
+    const interval = setInterval(() => {
+      refreshOpenThreadMessages(selectedThreadId);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedThreadId, usingApi, currentUser?.id, threads.length]);
+
   async function handleLogin(email, password) {
     setIsLoggingIn(true);
     setLoginError("");
@@ -367,6 +377,37 @@ export default function App() {
 
   function closeMessage() {
     setSelectedMessageId(null);
+  }
+
+  async function refreshOpenThreadMessages(threadId = selectedThreadId) {
+    if (!threadId || !usingApi || !currentUser?.id) return;
+
+    const thread = threads.find((item) => item.id === threadId);
+
+    if (!thread?.apiThread) return;
+
+    try {
+      const data = await fetchApiThreadMessages(thread.id, currentUser.id);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((item) =>
+          item.id === thread.id
+            ? {
+                ...item,
+                lastMessage: data.thread.last_message || item.lastMessage,
+                lastTime: formatApiTime(data.thread.last_time) || item.lastTime,
+                unread: data.thread.unread || 0,
+                members: data.thread.members || [],
+                memberNames: (data.thread.members || []).map((member) => member.name),
+                subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${(data.thread.members || []).length} ${(data.thread.members || []).length === 1 ? "member" : "members"}`,
+                messages: data.messages.map(mapApiThreadMessageToBubble),
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.log("Could not refresh open thread:", error.message);
+    }
   }
 
   async function openThread(threadOrId) {
