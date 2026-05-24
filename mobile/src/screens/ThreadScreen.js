@@ -8,6 +8,7 @@ import {
   TextInput,
   StyleSheet,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -51,7 +52,7 @@ export function ThreadScreen({
 
     const interval = setInterval(() => {
       onRefreshThread(thread.id);
-    }, 1000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [thread?.id, onRefreshThread]);
@@ -64,6 +65,18 @@ export function ThreadScreen({
 
     return () => clearTimeout(timer);
   }, [thread?.id, thread?.messages?.length]);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    return () => {
+      showSubscription.remove();
+    };
+  }, []);
 
   function handleSend() {
     if (!draft.trim()) return;
@@ -158,7 +171,14 @@ export function ThreadScreen({
           </View>
         </View>
 
-        <ScrollView style={localStyles.chatArea} contentContainerStyle={localStyles.chatContent}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={localStyles.chatArea}
+          contentContainerStyle={localStyles.chatContent}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={localStyles.threadInfo}>
             <Text style={localStyles.threadInfoTitle}>{thread.name}</Text>
             <Text style={localStyles.threadInfoText}>
