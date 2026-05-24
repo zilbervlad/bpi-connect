@@ -715,7 +715,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === "Update" && (
+        {(activeTab === "Broadcast" || activeTab === "Update") && (
           <BroadcastScreen
             user={currentUser}
             threads={threads}
