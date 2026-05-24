@@ -2142,10 +2142,90 @@ def create_app():
         db.session.add(attachment)
         db.session.commit()
 
+        notify_thread_members(thread, sender, message)
+
         return jsonify({
             "success": True,
             "message": serialize_thread_message(message, sender.id),
         }), 201
+
+
+    def send_expo_push_notifications(tokens, title, body, data=None):
+        if not tokens:
+            return {"sent": 0, "skipped": True}
+
+        messages = []
+
+        for token in tokens:
+            if not token or not token.startswith("ExponentPushToken"):
+                continue
+
+            messages.append({
+                "to": token,
+                "sound": "default",
+                "title": title,
+                "body": body,
+                "data": data or {},
+            })
+
+        if not messages:
+            return {"sent": 0, "skipped": True}
+
+        try:
+            response = requests.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                timeout=20,
+            )
+
+            return {
+                "sent": len(messages),
+                "status_code": response.status_code,
+                "response": response.text,
+            }
+        except Exception as error:
+            return {
+                "sent": 0,
+                "error": str(error),
+            }
+
+
+    def notify_thread_members(thread, sender, message):
+        member_user_ids = [
+            membership.user_id
+            for membership in ThreadMember.query.filter_by(thread_id=thread.id).all()
+            if membership.user_id != sender.id
+        ]
+
+        if not member_user_ids:
+            return {"sent": 0, "skipped": True}
+
+        tokens = [
+            item.token
+            for item in PushToken.query.filter(
+                PushToken.user_id.in_(member_user_ids),
+                PushToken.is_active == True,
+            ).all()
+        ]
+
+        preview = message.body or "New message"
+        if preview == "Photo":
+            preview = "Sent a photo"
+
+        return send_expo_push_notifications(
+            tokens=tokens,
+            title=f"{sender.name} in {thread.name}",
+            body=preview[:160],
+            data={
+                "type": "thread_message",
+                "thread_id": thread.id,
+                "message_id": message.id,
+            },
+        )
 
 
     @app.post("/api/threads/<int:thread_id>/messages")
