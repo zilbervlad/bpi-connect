@@ -350,3 +350,23 @@ export async function toggleApiThreadMessageReaction(messageId, userId, emoji = 
 
   return data;
 }
+
+export async function uploadApiUserAvatar(userId, imageData) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/avatar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      image_data: imageData,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not upload profile picture");
+  }
+
+  return data.user;
+}
