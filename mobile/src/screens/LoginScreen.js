@@ -65,6 +65,11 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             placeholder="name@bostonpie.com"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
+            autoComplete="off"
+            textContentType="none"
+            importantForAutofill="no"
+            autoCorrect={false}
+            spellCheck={false}
           />
 
           <Text style={localStyles.label}>Password</Text>
@@ -75,6 +80,12 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             placeholder="Password"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
+            autoComplete="off"
+            textContentType="none"
+            importantForAutofill="no"
+            autoCorrect={false}
+            spellCheck={false}
+            autoCapitalize="none"
           />
 
           <TouchableOpacity
