@@ -68,6 +68,114 @@ def sync_user_to_store_chat(user, store):
     return thread
 
 
+def get_company_thread_key():
+    return "company:company-announcements"
+
+
+def ensure_company_thread(created_by_user_id=None):
+    group_key = get_company_thread_key()
+
+    thread = Thread.query.filter_by(group_key=group_key).first()
+
+    if not thread:
+        thread = Thread(
+            thread_type="company",
+            name="Company Announcements",
+            group_key=group_key,
+            created_by_user_id=created_by_user_id,
+        )
+        db.session.add(thread)
+        db.session.flush()
+
+    return thread
+
+
+def get_area_thread_key(area):
+    safe_name = str(area.name).strip().lower().replace(" ", "-")
+    return f"area:{safe_name}"
+
+
+def ensure_area_thread(area, created_by_user_id=None):
+    if not area:
+        return None
+
+    group_key = get_area_thread_key(area)
+
+    thread = Thread.query.filter_by(group_key=group_key).first()
+
+    if not thread:
+        thread = Thread(
+            thread_type="area",
+            name=f"{area.name} Area",
+            group_key=group_key,
+            created_by_user_id=created_by_user_id,
+        )
+        db.session.add(thread)
+        db.session.flush()
+
+    return thread
+
+
+def get_role_thread_key(role):
+    return f"role:{str(role).strip().lower()}"
+
+
+def get_role_thread_name(role):
+    role_map = {
+        "admin": "Admins",
+        "hr": "HR",
+        "coach": "Coaches",
+        "supervisor": "Coaches",
+        "general_manager": "General Managers",
+        "manager": "MITs",
+        "tm": "TMs",
+    }
+
+    return role_map.get(str(role).strip().lower(), str(role).strip().title())
+
+
+def ensure_role_thread(role, created_by_user_id=None):
+    if not role:
+        return None
+
+    role_key = str(role).strip().lower()
+    group_key = get_role_thread_key(role_key)
+
+    thread = Thread.query.filter_by(group_key=group_key).first()
+
+    if not thread:
+        thread = Thread(
+            thread_type="role",
+            name=get_role_thread_name(role_key),
+            group_key=group_key,
+            created_by_user_id=created_by_user_id,
+        )
+        db.session.add(thread)
+        db.session.flush()
+
+    return thread
+
+
+def sync_user_to_default_chats(user):
+    if not user:
+        return
+
+    company_thread = ensure_company_thread(created_by_user_id=user.id)
+    ensure_thread_member(company_thread.id, user.id)
+
+    role_thread = ensure_role_thread(user.role, created_by_user_id=user.id)
+    if role_thread:
+        ensure_thread_member(role_thread.id, user.id)
+
+    if user.area:
+        area_thread = ensure_area_thread(user.area, created_by_user_id=user.id)
+        if area_thread:
+            ensure_thread_member(area_thread.id, user.id)
+
+    if user.store:
+        sync_user_to_store_chat(user, user.store)
+
+
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
@@ -82,6 +190,33 @@ def create_app():
 
     CORS(app)
     db.init_app(app)
+
+    @app.post("/dev/backfill-default-chats")
+    def dev_backfill_default_chats():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        users = User.query.filter_by(is_active=True).all()
+
+        before_memberships = ThreadMember.query.count()
+        before_threads = Thread.query.count()
+
+        for user in users:
+            sync_user_to_default_chats(user)
+
+        db.session.commit()
+
+        after_memberships = ThreadMember.query.count()
+        after_threads = Thread.query.count()
+
+        return jsonify({
+            "success": True,
+            "users_checked": len(users),
+            "threads_created": after_threads - before_threads,
+            "memberships_added": after_memberships - before_memberships,
+        })
+
 
     @app.post("/dev/backfill-store-chats")
     def dev_backfill_store_chats():
@@ -1671,6 +1806,7 @@ def create_app():
             db.session.add(existing)
 
         sync_user_to_store_chat(user, store)
+        sync_user_to_default_chats(user)
 
         db.session.commit()
 
