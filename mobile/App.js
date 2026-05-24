@@ -727,9 +727,14 @@ export default function App() {
           currentThreads.map((thread) => {
             if (thread.id !== threadId) return thread;
 
+            const existingMessages = thread.messages || [];
+            const alreadyExists = existingMessages.some(
+              (message) => String(message.id) === String(bubbleMessage.id)
+            );
+
             return {
               ...thread,
-              messages: [...thread.messages, bubbleMessage],
+              messages: alreadyExists ? existingMessages : [...existingMessages, bubbleMessage],
               lastMessage: body || "Photo",
               lastTime: "Now",
             };
@@ -759,9 +764,14 @@ export default function App() {
           currentThreads.map((thread) => {
             if (thread.id !== threadId) return thread;
 
+            const existingMessages = thread.messages || [];
+            const alreadyExists = existingMessages.some(
+              (message) => String(message.id) === String(bubbleMessage.id)
+            );
+
             return {
               ...thread,
-              messages: [...thread.messages, bubbleMessage],
+              messages: alreadyExists ? existingMessages : [...existingMessages, bubbleMessage],
               lastMessage: body,
               lastTime: "Now",
             };
