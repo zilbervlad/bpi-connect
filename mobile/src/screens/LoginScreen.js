@@ -11,8 +11,8 @@ import { StatusBar } from "expo-status-bar";
 import { requestApiPasswordReset } from "../api/client";
 
 export function LoginScreen({ onLogin, errorMessage, isLoading }) {
-  const [email, setEmail] = useState("vlad@bostonpie.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [resetMessage, setResetMessage] = useState("");
   const [isResetting, setIsResetting] = useState(false);
 
