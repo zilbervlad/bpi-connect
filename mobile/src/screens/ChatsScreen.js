@@ -1,7 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 
 import { styles } from "../styles/styles";
-import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 
@@ -10,65 +9,79 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
-      <HeaderBlock
-        eyebrow="CHATS"
-        title="Messages"
-        subtitle={`${threads.length} threads · ${unreadCount} unread`}
-      />
+      <View style={localStyles.heroCard}>
+        <Text style={localStyles.heroEyebrow}>CHATS</Text>
+        <Text style={localStyles.heroTitle}>Messages</Text>
+        <Text style={localStyles.heroSubtitle}>
+          {threads.length} threads · {unreadCount} unread
+        </Text>
+      </View>
 
-      <View style={localStyles.threadList}>
+      <View style={localStyles.groupCard}>
         {threads.length ? (
-          threads.map((thread) => (
-            <TouchableOpacity
-              key={thread.id}
-              style={localStyles.threadRow}
-              onPress={() => onOpenThread(thread)}
-              activeOpacity={0.84}
-            >
-              <ThreadAvatar thread={thread} />
+          threads.map((thread, index) => (
+            <View key={thread.id}>
+              <View style={localStyles.threadRow}>
+                <TouchableOpacity
+                  style={localStyles.threadOpenArea}
+                  onPress={() => onOpenThread(thread)}
+                  activeOpacity={0.84}
+                >
+                  <ThreadAvatar thread={thread} />
 
-              <View style={localStyles.threadMain}>
-                <View style={localStyles.threadTop}>
-                  <Text style={localStyles.threadName} numberOfLines={1}>
-                    {thread.name}
-                  </Text>
-                  <Text style={localStyles.threadTime}>{thread.lastTime}</Text>
+                  <View style={localStyles.threadMain}>
+                    <View style={localStyles.threadTop}>
+                      <Text style={localStyles.threadName} numberOfLines={1}>
+                        {thread.name}
+                      </Text>
+
+                      <Text style={localStyles.threadTime}>
+                        {thread.lastTime}
+                      </Text>
+                    </View>
+
+                    <View style={localStyles.previewRow}>
+                      <Text style={localStyles.typePill}>
+                        {formatThreadType(thread.type)}
+                      </Text>
+
+                      <Text style={localStyles.threadPreview} numberOfLines={1}>
+                        {thread.lastMessage || thread.subtitle || "No messages yet"}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={localStyles.rightRail}>
+                  {thread.unread > 0 ? (
+                    <View style={localStyles.unreadBadge}>
+                      <Text style={localStyles.unreadText}>{thread.unread}</Text>
+                    </View>
+                  ) : null}
 
                   <TouchableOpacity
-                    style={[localStyles.threadMuteButton, thread.muted && localStyles.threadMuteButtonActive]}
+                    style={[
+                      localStyles.threadMuteButton,
+                      thread.muted && localStyles.threadMuteButtonActive,
+                    ]}
                     onPressIn={() => onToggleMute?.(thread.id, !thread.muted)}
                     activeOpacity={0.84}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <Text style={[localStyles.threadMuteText, thread.muted && localStyles.threadMuteTextActive]}>
+                    <Text style={localStyles.threadMuteText}>
                       {thread.muted ? "🔕" : "🔔"}
                     </Text>
                   </TouchableOpacity>
                 </View>
-
-                <View style={localStyles.metaRow}>
-                  <Text style={localStyles.typePill}>{formatThreadType(thread.type)}</Text>
-                  <Text style={localStyles.threadSubtitle} numberOfLines={1}>
-                    {thread.subtitle}
-                  </Text>
-                </View>
-
-                <Text style={localStyles.threadPreview} numberOfLines={1}>
-                  {thread.lastMessage || "No messages yet"}
-                </Text>
               </View>
 
-              {thread.unread > 0 ? (
-                <View style={localStyles.unreadBadge}>
-                  <Text style={localStyles.unreadText}>{thread.unread}</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
+              {index < threads.length - 1 ? <View style={localStyles.divider} /> : null}
+            </View>
           ))
         ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No chats yet</Text>
-            <Text style={styles.emptyText}>
+          <View style={localStyles.emptyState}>
+            <Text style={localStyles.emptyTitle}>No chats yet</Text>
+            <Text style={localStyles.emptyText}>
               Groups and direct messages will show here once you create them.
             </Text>
           </View>
@@ -80,8 +93,11 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
 
 function ThreadAvatar({ thread }) {
   if (thread.type === "direct" && thread.members?.length) {
-    const otherMember = thread.members.find((member) => member.name !== thread.name) || thread.members[0];
-    return <UserAvatar user={otherMember} name={thread.name} size={50} />;
+    const otherMember =
+      thread.members.find((member) => member.id !== thread.currentUserId) ||
+      thread.members[0];
+
+    return <UserAvatar user={otherMember} name={thread.name} size={32} />;
   }
 
   return (
@@ -92,136 +108,173 @@ function ThreadAvatar({ thread }) {
 }
 
 function formatThreadType(type) {
-  const labels = {
-    company: "Company",
-    store: "Store",
+  const map = {
+    company: "Co",
     area: "Area",
-    group: "Group",
-    direct: "Direct",
+    store: "Store",
+    role: "Role",
+    direct: "DM",
   };
 
-  return labels[type] || "Group";
+  return map[type] || "Chat";
 }
 
 const localStyles = StyleSheet.create({
-  threadList: {
-    gap: 12,
-    paddingBottom: 96,
+  heroCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  heroEyebrow: {
+    color: "#ef1745",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: "#10212b",
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -1.5,
+  },
+  heroSubtitle: {
+    color: "#64748b",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  groupCard: {
+    backgroundColor: "#101d2c",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#203044",
+    overflow: "hidden",
   },
   threadRow: {
-    backgroundColor: "#101d2d",
-    borderRadius: 26,
-    padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minHeight: 48,
+  },
+  threadOpenArea: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 19,
-    backgroundColor: "#e91f3f",
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#ef1745",
   },
   avatarText: {
     color: "#ffffff",
-    fontSize: 17,
+    fontSize: 10,
     fontWeight: "900",
   },
   threadMain: {
     flex: 1,
+    minWidth: 0,
   },
   threadTop: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 5,
+    gap: 6,
   },
   threadName: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900",
     flex: 1,
-    letterSpacing: -0.3,
   },
   threadTime: {
     color: "#8fa1b6",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 5,
-  },
-  typePill: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    color: "#dbe7f3",
     fontSize: 10,
     fontWeight: "900",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 1,
+  },
+  typePill: {
+    color: "#ffffff",
+    backgroundColor: "#26364a",
     borderRadius: 999,
     overflow: "hidden",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    fontSize: 8,
+    fontWeight: "900",
     textTransform: "uppercase",
   },
-  threadSubtitle: {
-    color: "#9cadbf",
+  threadPreview: {
+    color: "#9aacbf",
     fontSize: 11,
     fontWeight: "800",
     flex: 1,
   },
-  threadPreview: {
-    color: "#c2cfde",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  unreadBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#e91f3f",
+  rightRail: {
+    width: 22,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 7,
+    gap: 2,
+    marginLeft: 4,
+  },
+  threadMuteButton: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadMuteButtonActive: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  threadMuteText: {
+    fontSize: 11,
+  },
+  unreadBadge: {
+    backgroundColor: "#ef1745",
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   unreadText: {
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 8,
     fontWeight: "900",
   },
-  mutedPill: {
-    color: "#8fa1b6",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 999,
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 10,
+  divider: {
+    height: 1,
+    backgroundColor: "#203044",
+    marginLeft: 50,
+  },
+  emptyState: {
+    padding: 14,
+  },
+  emptyTitle: {
+    color: "#ffffff",
+    fontSize: 16,
     fontWeight: "900",
-    textTransform: "uppercase",
   },
-  threadMuteButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  threadMuteButtonActive: {
-    backgroundColor: "rgba(16,33,43,0.92)",
-  },
-  threadMuteText: {
-    fontSize: 17,
-  },
-  threadMuteTextActive: {
-    fontSize: 17,
+  emptyText: {
+    color: "#9aacbf",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginTop: 4,
   },
 });
