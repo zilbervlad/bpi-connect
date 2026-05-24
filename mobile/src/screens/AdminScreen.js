@@ -26,6 +26,8 @@ import {
   deleteApiArea,
   createApiStore,
   updateApiStore,
+  createApiThread,
+  updateApiThread,
 } from "../api/client";
 
 const roles = [
@@ -76,6 +78,8 @@ export function AdminScreen({ user }) {
   const [newStoreNumber, setNewStoreNumber] = useState("");
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreArea, setNewStoreArea] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupType, setNewGroupType] = useState("group");
 
   const canManage = ["Admin", "HR"].includes(user.role);
 
@@ -183,6 +187,34 @@ export function AdminScreen({ user }) {
       await loadAdminData();
     } catch (error) {
       setErrorMessage(error.message || "Could not create invite.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleCreateGroup() {
+    setErrorMessage("");
+    setStatusMessage("");
+
+    if (!newGroupName.trim()) {
+      setErrorMessage("Group name is required.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await createApiThread({
+        name: newGroupName.trim(),
+        threadType: newGroupType,
+        createdByUserId: user.id,
+      });
+
+      setNewGroupName("");
+      setStatusMessage("Group created.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not create group.");
     } finally {
       setIsLoading(false);
     }
@@ -445,6 +477,7 @@ export function AdminScreen({ user }) {
         <AdminTab label="People" value="people" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Add" value="invite" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Stores" value="stores" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Groups" value="groups" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Areas" value="areas" activeSection={activeSection} setActiveSection={setActiveSection} />
       </View>
 
@@ -708,6 +741,50 @@ export function AdminScreen({ user }) {
           ) : (
             <Text style={localStyles.emptyText}>No stores created yet.</Text>
           )}
+        </View>
+      )}
+
+      {activeSection === "groups" && (
+        <View style={localStyles.card}>
+          <Text style={localStyles.sectionHeading}>Groups</Text>
+
+          <View style={localStyles.formCard}>
+            <Text style={localStyles.formTitle}>Create Group</Text>
+
+            <TextInput
+              value={newGroupName}
+              onChangeText={setNewGroupName}
+              placeholder="Group name"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+            />
+
+            <Text style={localStyles.label}>Group Type</Text>
+            <PillGrid
+              options={[
+                { label: "Group", value: "group" },
+                { label: "Company", value: "company" },
+                { label: "Store", value: "store" },
+                { label: "Area", value: "area" },
+              ]}
+              selectedValue={newGroupType}
+              onSelect={setNewGroupType}
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+              onPress={handleCreateGroup}
+              disabled={isLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isLoading ? "Creating Group..." : "Create Group"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={localStyles.emptyText}>
+            Groups created here will appear in Chats after refresh/login. Member management comes next.
+          </Text>
         </View>
       )}
 

@@ -401,3 +401,43 @@ export async function deleteApiArea(areaId) {
 
   return data;
 }
+
+export async function createApiThread({ name, threadType = "group", createdByUserId }) {
+  const response = await fetch(`${API_BASE_URL}/api/threads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      thread_type: threadType,
+      created_by_user_id: createdByUserId,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not create group");
+  }
+
+  return data.thread;
+}
+
+export async function updateApiThread(threadId, updates) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not update group");
+  }
+
+  return data.thread;
+}
