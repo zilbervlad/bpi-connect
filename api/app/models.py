@@ -29,6 +29,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(180), unique=True, nullable=True)
+    avatar_url = db.Column(db.Text, nullable=True)
     role = db.Column(db.String(50), nullable=False)
     store_id = db.Column(db.Integer, db.ForeignKey("stores.id"), nullable=True)
     area_id = db.Column(db.Integer, db.ForeignKey("areas.id"), nullable=True)
