@@ -21,6 +21,7 @@ from app.models import (
     MessageRecipient,
     Thread,
     ThreadMember,
+    ThreadFavorite,
     ThreadMessage,
     ThreadMessageAck,
     ThreadMessageAttachment,
@@ -456,6 +457,11 @@ def create_app():
 
         db.create_all()
 
+        try:
+            ThreadFavorite.__table__.create(db.engine, checkfirst=True)
+        except Exception:
+            pass
+
         return jsonify({
             "success": True,
             "message": "Push token table migrated.",
@@ -507,6 +513,11 @@ def create_app():
             return auth_error
 
         db.create_all()
+
+        try:
+            ThreadFavorite.__table__.create(db.engine, checkfirst=True)
+        except Exception:
+            pass
 
         return jsonify({
             "success": True,
@@ -564,6 +575,11 @@ def create_app():
         db.drop_all()
         db.create_all()
 
+        try:
+            ThreadFavorite.__table__.create(db.engine, checkfirst=True)
+        except Exception:
+            pass
+
         company = Area(name="Company")
         db.session.add(company)
         db.session.flush()
@@ -597,6 +613,11 @@ def create_app():
         db.session.remove()
         db.drop_all()
         db.create_all()
+
+        try:
+            ThreadFavorite.__table__.create(db.engine, checkfirst=True)
+        except Exception:
+            pass
 
         north = Area(name="North Area")
         company = Area(name="Company")

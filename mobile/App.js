@@ -23,6 +23,7 @@ import {
   acknowledgeApiThreadMessage,
   saveApiUserPushToken,
   setApiThreadMuted,
+  setApiThreadFavorite,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -126,6 +127,7 @@ function mapApiThreadToAppThread(apiThread) {
     lastTime: formatApiTime(apiThread.last_time),
     unread: apiThread.unread || 0,
     muted: Boolean(apiThread.muted),
+    favorite: Boolean(apiThread.favorite),
     members,
     memberNames: members.map((member) => member.name),
     messages: [],
@@ -557,6 +559,42 @@ export default function App() {
     }
   }
 
+  async function handleToggleThreadFavorite(threadId, favorite) {
+    if (!currentUser?.id) return;
+
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        thread.id === threadId ? { ...thread, favorite } : thread
+      )
+    );
+
+    if (!usingApi) return;
+
+    try {
+      const updatedThread = await setApiThreadFavorite(threadId, currentUser.id, favorite);
+      const mappedThread = mapApiThreadToAppThread(updatedThread);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === threadId
+            ? {
+                ...thread,
+                favorite: Boolean(mappedThread.favorite),
+              }
+            : thread
+        )
+      );
+    } catch (error) {
+      console.log("Could not toggle thread favorite:", error.message);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === threadId ? { ...thread, favorite: !favorite } : thread
+        )
+      );
+    }
+  }
+
   function closeThread() {
     setSelectedThreadId(null);
   }
@@ -852,6 +890,7 @@ export default function App() {
             threads={threads}
             onOpenThread={openThread}
             onToggleMute={handleToggleThreadMute}
+            onToggleFavorite={handleToggleThreadFavorite}
           />
         )}
 

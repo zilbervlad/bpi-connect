@@ -1,47 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 
-const FAVORITES_KEY = "bpi_connect_favorite_threads";
-
-export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
-  const [favoriteThreadIds, setFavoriteThreadIds] = useState([]);
+export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavorite }) {
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
-
-  useEffect(() => {
-    async function loadFavorites() {
-      try {
-        const saved = await AsyncStorage.getItem(FAVORITES_KEY);
-        if (saved) {
-          setFavoriteThreadIds(JSON.parse(saved));
-        }
-      } catch (error) {
-        console.log("Could not load favorite chats:", error.message);
-      }
-    }
-
-    loadFavorites();
-  }, []);
-
-  async function toggleFavorite(threadId) {
-    const stringId = String(threadId);
-
-    const nextFavorites = favoriteThreadIds.includes(stringId)
-      ? favoriteThreadIds.filter((id) => id !== stringId)
-      : [...favoriteThreadIds, stringId];
-
-    setFavoriteThreadIds(nextFavorites);
-
-    try {
-      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(nextFavorites));
-    } catch (error) {
-      console.log("Could not save favorite chats:", error.message);
-    }
-  }
 
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
 
@@ -50,7 +14,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
 
     return [...threads]
       .filter((thread) => {
-        const isFavorite = favoriteThreadIds.includes(String(thread.id));
+        const isFavorite = Boolean(thread.favorite);
 
         if (activeFilter === "favorites" && !isFavorite) return false;
         if (activeFilter === "stores" && thread.type !== "store") return false;
@@ -67,8 +31,8 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
         );
       })
       .sort((a, b) => {
-        const aFav = favoriteThreadIds.includes(String(a.id));
-        const bFav = favoriteThreadIds.includes(String(b.id));
+        const aFav = Boolean(a.favorite);
+        const bFav = Boolean(b.favorite);
 
         if (aFav !== bFav) return aFav ? -1 : 1;
 
@@ -95,7 +59,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
 
         return String(a.name || "").localeCompare(String(b.name || ""));
       });
-  }, [threads, favoriteThreadIds, searchText, activeFilter]);
+  }, [threads, searchText, activeFilter]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -151,7 +115,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
       <View style={localStyles.groupCard}>
         {sortedThreads.length ? (
           sortedThreads.map((thread, index) => {
-            const isFavorite = favoriteThreadIds.includes(String(thread.id));
+            const isFavorite = Boolean(thread.favorite);
 
             return (
               <View key={thread.id}>
@@ -197,7 +161,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
                           localStyles.favoriteButton,
                           isFavorite && localStyles.favoriteButtonActive,
                         ]}
-                        onPress={() => toggleFavorite(thread.id)}
+                        onPress={() => onToggleFavorite?.(thread.id, !thread.favorite)}
                         activeOpacity={0.84}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >

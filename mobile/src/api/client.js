@@ -258,3 +258,15 @@ export async function saveApiUserPushToken(userId, token, platform = "ios", devi
     }),
   });
 }
+
+export async function setApiThreadFavorite(threadId, userId, favorite) {
+  const data = await apiRequest(`/api/threads/${threadId}/favorite`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      favorite,
+    }),
+  });
+
+  return data.thread;
+}

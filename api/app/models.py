@@ -107,6 +107,18 @@ class Thread(db.Model):
     created_by = db.relationship("User", backref="created_threads")
 
 
+class ThreadFavorite(db.Model):
+    __tablename__ = "thread_favorites"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("threads.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    thread = db.relationship("Thread", backref="favorites")
+    user = db.relationship("User", backref="thread_favorites")
+
+
 class ThreadMember(db.Model):
     __tablename__ = "thread_members"
 
