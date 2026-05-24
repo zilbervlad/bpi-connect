@@ -206,10 +206,22 @@ export default function App() {
 
         if (savedUserJson) {
           const savedUser = JSON.parse(savedUserJson);
-          setCurrentUser(savedUser);
+
+          if (!savedUser?.id) {
+            await AsyncStorage.removeItem(SAVED_USER_KEY);
+            return;
+          }
+
+          const restoredUser = {
+            ...savedUser,
+            apiUser: true,
+          };
+
+          setCurrentUser(restoredUser);
           setIsLoggedIn(true);
-          await reloadDataForUser(savedUser);
-          registerPushTokenForUser(savedUser);
+          setActiveTab("Home");
+          await reloadDataForUser(restoredUser);
+          await registerPushTokenForUser(restoredUser);
         }
       } catch (error) {
         console.log("Could not load saved user:", error.message);
@@ -335,12 +347,19 @@ export default function App() {
       const apiUser = await loginApiUser(email, password);
       const mappedUser = mapApiUserToDemoUser(apiUser);
 
-      setCurrentUser(mappedUser);
+      const savedUser = {
+        ...mappedUser,
+        apiUser: true,
+      };
+
+      setCurrentUser(savedUser);
       setIsLoggedIn(true);
       setActiveTab("Home");
 
-      await reloadDataForUser(mappedUser);
-      await registerPushTokenForUser(mappedUser);
+      await AsyncStorage.setItem(SAVED_USER_KEY, JSON.stringify(savedUser));
+
+      await reloadDataForUser(savedUser);
+      await registerPushTokenForUser(savedUser);
     } catch (error) {
       setLoginError(error.message || "Could not sign in.");
     } finally {
@@ -413,6 +432,7 @@ export default function App() {
     }
 
     setIsLoggedIn(false);
+    setCurrentUser(demoUsers[0]);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
     setStartingRecipient(null);
