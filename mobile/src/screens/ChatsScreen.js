@@ -5,7 +5,7 @@ import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 
-export function ChatsScreen({ threads, onOpenThread }) {
+export function ChatsScreen({ threads, onOpenThread, onToggleMute }) {
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
 
   return (
@@ -33,6 +33,17 @@ export function ChatsScreen({ threads, onOpenThread }) {
                     {thread.name}
                   </Text>
                   <Text style={localStyles.threadTime}>{thread.lastTime}</Text>
+
+                  <TouchableOpacity
+                    style={[localStyles.threadMuteButton, thread.muted && localStyles.threadMuteButtonActive]}
+                    onPressIn={() => onToggleMute?.(thread.id, !thread.muted)}
+                    activeOpacity={0.84}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={[localStyles.threadMuteText, thread.muted && localStyles.threadMuteTextActive]}>
+                      {thread.muted ? "🔕" : "🔔"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={localStyles.metaRow}>
@@ -183,5 +194,34 @@ const localStyles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 11,
     fontWeight: "900",
+  },
+  mutedPill: {
+    color: "#8fa1b6",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  threadMuteButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  threadMuteButtonActive: {
+    backgroundColor: "rgba(16,33,43,0.92)",
+  },
+  threadMuteText: {
+    fontSize: 17,
+  },
+  threadMuteTextActive: {
+    fontSize: 17,
   },
 });
