@@ -157,6 +157,7 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     acknowledged: Boolean(apiMessage.acknowledged),
     reactions: apiMessage.reactions || [],
     attachments: apiMessage.attachments || [],
+    status: "sent",
   };
 }
 
@@ -495,10 +496,21 @@ export default function App() {
           (message) => String(message.id) === String(incomingMessage.id)
         );
 
+        const withoutMatchingPending =
+          incomingMessage.isMe
+            ? existingMessages.filter(
+                (message) =>
+                  !(
+                    message.status === "sending" &&
+                    String(message.body || "") === String(incomingMessage.body || "")
+                  )
+              )
+            : existingMessages;
+
         const nextMessages =
           isOpenThread && !alreadyExists
-            ? [...existingMessages, incomingMessage]
-            : existingMessages;
+            ? [...withoutMatchingPending, { ...incomingMessage, status: "sent" }]
+            : withoutMatchingPending;
 
         return {
           ...thread,
@@ -705,6 +717,25 @@ export default function App() {
     setSelectedThreadId(null);
   }
 
+  async function retryFailedThreadMessage(threadId, failedMessage) {
+    if (!failedMessage?.retryBody) return;
+
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+
+        return {
+          ...thread,
+          messages: (thread.messages || []).filter(
+            (message) => String(message.id) !== String(failedMessage.id)
+          ),
+        };
+      })
+    );
+
+    await sendThreadMessage(threadId, failedMessage.retryBody, Boolean(failedMessage.requiresAck));
+  }
+
   async function sendThreadImageMessage(threadId, imageData, body = "", metadata = {}) {
     if (usingApi && currentUser?.apiUser) {
       try {
@@ -750,10 +781,55 @@ export default function App() {
   }
 
   async function sendThreadMessage(threadId, body, requiresAck = false) {
+    const cleanBody = String(body || "").trim();
+    if (!cleanBody) return;
+
     if (usingApi && currentUser?.apiUser) {
+      const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const pendingMessage = {
+        id: pendingId,
+        sender: currentUser.name,
+        senderUser: currentUser,
+        senderRole: currentUser.role,
+        body: cleanBody,
+        text: cleanBody,
+        time: "Now",
+        isMe: true,
+        requiresAck,
+        responded: false,
+        acknowledged: false,
+        reactions: [],
+        attachments: [],
+        status: "sending",
+        retryBody: cleanBody,
+      };
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) => {
+          if (thread.id !== threadId) return thread;
+
+          return {
+            ...thread,
+            messages: [...(thread.messages || []), pendingMessage],
+            lastMessage: cleanBody,
+            lastTime: "Now",
+          };
+        })
+      );
+
       try {
-        const apiMessageResponse = await sendApiThreadMessage(threadId, currentUser.id, body, requiresAck);
-        const bubbleMessage = mapApiThreadMessageToBubble(apiMessageResponse);
+        const apiMessageResponse = await sendApiThreadMessage(
+          threadId,
+          currentUser.id,
+          cleanBody,
+          requiresAck
+        );
+
+        const bubbleMessage = {
+          ...mapApiThreadMessageToBubble(apiMessageResponse),
+          status: "sent",
+        };
 
         if (!bubbleMessage.body && !bubbleMessage.attachments?.length) {
           await refreshOpenThreadMessages(threadId);
@@ -765,14 +841,18 @@ export default function App() {
             if (thread.id !== threadId) return thread;
 
             const existingMessages = thread.messages || [];
-            const alreadyExists = existingMessages.some(
+            const withoutPending = existingMessages.filter(
+              (message) => String(message.id) !== String(pendingId)
+            );
+
+            const alreadyExists = withoutPending.some(
               (message) => String(message.id) === String(bubbleMessage.id)
             );
 
             return {
               ...thread,
-              messages: alreadyExists ? existingMessages : [...existingMessages, bubbleMessage],
-              lastMessage: body,
+              messages: alreadyExists ? withoutPending : [...withoutPending, bubbleMessage],
+              lastMessage: cleanBody,
               lastTime: "Now",
             };
           })
@@ -781,6 +861,28 @@ export default function App() {
         return;
       } catch (error) {
         console.log("Could not send API thread message:", error.message);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((thread) => {
+            if (thread.id !== threadId) return thread;
+
+            return {
+              ...thread,
+              messages: (thread.messages || []).map((message) =>
+                String(message.id) === String(pendingId)
+                  ? {
+                      ...message,
+                      status: "failed",
+                      failed: true,
+                      errorMessage: error.message || "Could not send",
+                    }
+                  : message
+              ),
+            };
+          })
+        );
+
+        return;
       }
     }
 
@@ -792,126 +894,21 @@ export default function App() {
           id: `m-${Date.now()}`,
           sender: currentUser.name,
           senderRole: currentUser.role,
-          body,
+          body: cleanBody,
+          text: cleanBody,
           time: "Now",
           isMe: true,
+          status: "sent",
         };
 
         return {
           ...thread,
-          messages: [...thread.messages, newMessage],
-          lastMessage: body,
+          lastMessage: cleanBody,
           lastTime: "Now",
+          messages: [...(thread.messages || []), newMessage],
         };
       })
     );
-  }
-
-  async function acknowledgeMessage(messageId) {
-    setMessages((currentMessages) =>
-      currentMessages.map((item) =>
-        item.id === messageId
-          ? { ...item, responded: true, unread: false }
-          : item
-      )
-    );
-
-    if (usingApi && currentUser?.apiUser) {
-      try {
-        await acknowledgeApiMessage(messageId, currentUser.id);
-      } catch (error) {
-        console.log("Could not acknowledge:", error.message);
-      }
-    }
-  }
-
-  function changeTab(tab) {
-    const safeTabMap = {
-      Inbox: "Chats",
-      Announcements: "Chats",
-      Update: "Broadcast",
-      Compose: "People",
-    };
-
-    const nextTab = safeTabMap[tab] || tab;
-
-    setSelectedMessageId(null);
-    setSelectedThreadId(null);
-
-    if (nextTab !== "People") {
-      setStartingRecipient(null);
-    }
-
-    setActiveTab(nextTab);
-  }
-
-  function switchUser(user) {
-    setCurrentUser(user);
-    setSelectedMessageId(null);
-    setSelectedThreadId(null);
-    setStartingRecipient(null);
-    setActiveTab("Home");
-    reloadDataForUser(user);
-  }
-
-  async function startMessageToRecipient(recipient) {
-    setStartingRecipient(recipient);
-    setSelectedMessageId(null);
-    setSelectedThreadId(null);
-
-    if (usingApi && currentUser?.apiUser && recipient?.id) {
-      try {
-        const apiThread = await findOrCreateDirectThread(currentUser.id, recipient.id);
-        const mappedThread = mapApiThreadToAppThread(apiThread);
-
-        const threadMessages = await fetchApiThreadMessages(apiThread.id, currentUser.id);
-        mappedThread.messages = threadMessages.messages.map(mapApiThreadMessageToBubble);
-
-        setThreads((currentThreads) => {
-          const exists = currentThreads.some((thread) => thread.id === mappedThread.id);
-
-          if (exists) {
-            return currentThreads.map((thread) =>
-              thread.id === mappedThread.id ? mappedThread : thread
-            );
-          }
-
-          return [mappedThread, ...currentThreads];
-        });
-
-        setSelectedThreadId(mappedThread.id);
-        setActiveTab("Chats");
-        return;
-      } catch (error) {
-        console.log("Could not open direct API thread:", error.message);
-      }
-    }
-
-    setActiveTab("Compose");
-  }
-
-  async function sendUpdate({ title, body, targetGroup, requiresAck }) {
-    const targetThread = threads.find(
-      (thread) =>
-        String(thread.id) === String(targetGroup) ||
-        String(thread.id) === String(targetGroup?.threadId) ||
-        thread.groupKey === targetGroup?.threadGroupKey
-    );
-
-    if (!targetThread || !body?.trim()) return;
-
-    const cleanTitle = title?.trim();
-    const cleanBody = body.trim();
-
-    const formattedBody =
-      cleanTitle && cleanTitle !== targetThread.name
-        ? `${cleanTitle}\n\n${cleanBody}`
-        : cleanBody;
-
-    await sendThreadMessage(targetThread.id, formattedBody, requiresAck);
-
-    setSelectedThreadId(targetThread.id);
-    setActiveTab("Chats");
   }
 
   function sendPrivateMessage({ recipient, body }) {
@@ -973,6 +970,7 @@ export default function App() {
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
+        onRetryThreadMessage={retryFailedThreadMessage}
         onRefreshThread={refreshOpenThreadMessages}
         onReact={handleReactToThreadMessage}
         onAcknowledge={handleAcknowledgeThreadMessage}

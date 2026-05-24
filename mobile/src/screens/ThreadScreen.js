@@ -26,6 +26,7 @@ export function ThreadScreen({
   onBack,
   onSendThreadMessage,
   onSendThreadImageMessage,
+  onRetryThreadMessage,
   onRefreshThread,
   onReact,
   onAcknowledge,
@@ -234,6 +235,21 @@ export function ThreadScreen({
                     {message.body}
                   </Text>
                 ) : null}
+                {message.isMe && message.status === "sending" ? (
+                  <Text style={localStyles.messageStatusText}>Sending…</Text>
+                ) : null}
+
+                {message.isMe && message.status === "failed" ? (
+                  <TouchableOpacity
+                    onPress={() => onRetryThreadMessage?.(thread.id, message)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[localStyles.messageStatusText, localStyles.messageStatusFailed]}>
+                      Failed — tap to retry
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
                 {message.reactions?.length ? (
                   <View style={localStyles.reactionSummaryRow}>
                     {message.reactions.map((reaction) => (
@@ -686,6 +702,16 @@ const localStyles = StyleSheet.create({
   },
   quickReactionTextActive: {
     color: "#10212b",
+  },
+  messageStatusText: {
+    color: "#8fa1b6",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 5,
+    textAlign: "right",
+  },
+  messageStatusFailed: {
+    color: "#ef1745",
   },
   reactionSummaryRow: {
     flexDirection: "row",
