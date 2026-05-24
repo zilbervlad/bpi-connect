@@ -1933,6 +1933,7 @@ def serialize_thread_message(message, user_id=None):
         "acknowledged": acknowledged,
         "created_at": message.created_at.isoformat(),
         "is_me": message.sender_user_id == user_id if user_id else False,
+        "reactions": serialize_message_reactions(message, user_id),
     }
 
 def serialize_store(store):

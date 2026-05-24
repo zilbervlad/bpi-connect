@@ -362,10 +362,10 @@ export default function App() {
     setSelectedThreadId(null);
   }
 
-  async function sendThreadMessage(threadId, body) {
+  async function sendThreadMessage(threadId, body, requiresAck = false) {
     if (usingApi && currentUser?.apiUser) {
       try {
-        const apiMessage = await sendApiThreadMessage(threadId, currentUser.id, body);
+        const apiMessage = await sendApiThreadMessage(threadId, currentUser.id, body, requiresAck);
         const bubbleMessage = mapApiThreadMessageToBubble(apiMessage);
 
         setThreads((currentThreads) =>
@@ -494,7 +494,7 @@ export default function App() {
     const formattedBody = `${title}\n\n${body}`;
 
     if (targetThread) {
-      await sendThreadMessage(targetThread.id, formattedBody);
+      await sendThreadMessage(targetThread.id, formattedBody, requiresAck);
       setSelectedThreadId(targetThread.id);
       setActiveTab("Chats");
       return;

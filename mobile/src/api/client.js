@@ -84,7 +84,7 @@ export async function fetchApiThreadMessages(threadId, userId) {
   return data;
 }
 
-export async function sendApiThreadMessage(threadId, senderUserId, body) {
+export async function sendApiThreadMessage(threadId, senderUserId, body, requiresAck = false) {
   const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/messages`, {
     method: "POST",
     headers: {
@@ -93,6 +93,7 @@ export async function sendApiThreadMessage(threadId, senderUserId, body) {
     body: JSON.stringify({
       sender_user_id: senderUserId,
       body,
+      requires_ack: requiresAck,
     }),
   });
 
@@ -437,6 +438,41 @@ export async function updateApiThread(threadId, updates) {
 
   if (!response.ok || !data.success) {
     throw new Error(data.error || "Could not update group");
+  }
+
+  return data.thread;
+}
+
+export async function addApiThreadMember(threadId, userId, memberRole = "member") {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/members`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      member_role: memberRole,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not add group member");
+  }
+
+  return data.thread;
+}
+
+export async function removeApiThreadMember(threadId, userId) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/members/${userId}`, {
+    method: "DELETE",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not remove group member");
   }
 
   return data.thread;
