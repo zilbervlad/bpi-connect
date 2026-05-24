@@ -1308,6 +1308,98 @@ def create_app():
         return jsonify({"success": True})
 
 
+    @app.post("/api/threads")
+    def create_thread():
+        data = request.get_json() or {}
+
+        name = (data.get("name") or "").strip()
+        thread_type = (data.get("thread_type") or "group").strip()
+        store_number = (data.get("store_number") or "").strip()
+        area = (data.get("area") or "").strip()
+
+        if not name:
+            return jsonify({
+                "success": False,
+                "error": "Thread name is required.",
+            }), 400
+
+        existing = Thread.query.filter(db.func.lower(Thread.name) == name.lower()).first()
+        if existing:
+            return jsonify({
+                "success": False,
+                "error": "A group with that name already exists.",
+            }), 409
+
+        thread = Thread(
+            name=name,
+            thread_type=thread_type,
+            store_number=store_number or None,
+            area=area or None,
+            is_active=True,
+        )
+
+        db.session.add(thread)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread),
+        }), 201
+
+
+    @app.patch("/api/threads/<int:thread_id>")
+    def update_thread(thread_id):
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        data = request.get_json() or {}
+
+        if "name" in data:
+            name = (data.get("name") or "").strip()
+
+            if not name:
+                return jsonify({
+                    "success": False,
+                    "error": "Thread name cannot be blank.",
+                }), 400
+
+            existing = Thread.query.filter(
+                db.func.lower(Thread.name) == name.lower(),
+                Thread.id != thread.id,
+            ).first()
+
+            if existing:
+                return jsonify({
+                    "success": False,
+                    "error": "Another group already has that name.",
+                }), 409
+
+            thread.name = name
+
+        if "thread_type" in data:
+            thread.thread_type = (data.get("thread_type") or thread.thread_type).strip()
+
+        if "store_number" in data:
+            store_number = (data.get("store_number") or "").strip()
+            thread.store_number = store_number or None
+
+        if "area" in data:
+            area = (data.get("area") or "").strip()
+            thread.area = area or None
+
+        if "is_active" in data:
+            thread.is_active = bool(data.get("is_active"))
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread),
+        })
+
+
     @app.get("/api/threads")
     def list_threads():
         user_id = request.args.get("user_id", type=int)
