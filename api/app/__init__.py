@@ -1517,6 +1517,50 @@ def create_app():
             "thread": serialize_thread(thread, user_id=sender.id),
         })
 
+    @app.post("/api/thread-messages/<int:message_id>/ack")
+    def acknowledge_thread_message(message_id):
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        message = ThreadMessage.query.get(message_id)
+        user = User.query.get(user_id)
+
+        if not message:
+            return jsonify({"success": False, "error": "Message not found."}), 404
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        if not message.requires_ack:
+            return jsonify({
+                "success": False,
+                "error": "This message does not require acknowledgment.",
+            }), 400
+
+        existing = ThreadMessageAck.query.filter_by(
+            thread_message_id=message.id,
+            user_id=user.id,
+        ).first()
+
+        if not existing:
+            db.session.add(ThreadMessageAck(
+                thread_message_id=message.id,
+                user_id=user.id,
+            ))
+            db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": serialize_thread_message(message, user.id),
+        })
+
+
     @app.post("/api/thread-messages/<int:message_id>/reactions")
     def toggle_thread_message_reaction(message_id):
         data = request.get_json() or {}
