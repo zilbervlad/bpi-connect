@@ -18,6 +18,7 @@ import {
   markApiThreadRead,
   findOrCreateDirectThread,
   loginApiUser,
+  toggleApiThreadMessageReaction,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -34,6 +35,7 @@ import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { AdminScreen } from "./src/screens/AdminScreen";
+import { MoreScreen } from "./src/screens/MoreScreen";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -62,7 +64,7 @@ function mapApiUserToDemoUser(apiUser) {
 }
 
 function mapApiMessageToAppMessage(apiMessage) {
-  const acknowledged = Boolean(apiMessage.acknowledged_at);
+  const responded = Boolean(apiMessage.responded_at);
   const unread = !apiMessage.read_at;
 
   return {
@@ -75,7 +77,7 @@ function mapApiMessageToAppMessage(apiMessage) {
     time: "API",
     body: apiMessage.body,
     requiresAck: apiMessage.requires_ack,
-    acknowledged,
+    responded,
     unread,
   };
 }
@@ -130,7 +132,7 @@ function mapApiThreadMessageToBubble(apiMessage) {
     time: formatApiTime(apiMessage.created_at),
     isMe: Boolean(apiMessage.is_me),
     requiresAck: apiMessage.requires_ack,
-    acknowledged: apiMessage.acknowledged,
+    responded: apiMessage.responded,
   };
 }
 
@@ -153,7 +155,7 @@ export default function App() {
 
   const unreadCount = threads.reduce((total, thread) => total + thread.unread, 0);
   const ackCount = messages.filter(
-    (message) => message.requiresAck && !message.acknowledged
+    (message) => message.requiresAck && !message.responded
   ).length;
 
   useEffect(() => {
@@ -177,6 +179,31 @@ export default function App() {
       setLoginError(error.message || "Could not sign in.");
     } finally {
       setIsLoggingIn(false);
+    }
+  }
+
+  async function handleReactToThreadMessage(messageId, emoji = "👍") {
+    if (!selectedThreadId || !currentUser?.id) return;
+
+    try {
+      const result = await toggleApiThreadMessageReaction(messageId, currentUser.id, emoji);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) => {
+          if (thread.id !== selectedThreadId) return thread;
+
+          return {
+            ...thread,
+            messages: thread.messages.map((message) =>
+              message.id === messageId
+                ? { ...message, reactions: result.reactions || [] }
+                : message
+            ),
+          };
+        })
+      );
+    } catch (error) {
+      console.log("Could not update reaction:", error.message);
     }
   }
 
@@ -346,7 +373,7 @@ export default function App() {
     setMessages((currentMessages) =>
       currentMessages.map((item) =>
         item.id === messageId
-          ? { ...item, acknowledged: true, unread: false }
+          ? { ...item, responded: true, unread: false }
           : item
       )
     );
@@ -416,7 +443,7 @@ export default function App() {
     setActiveTab("Compose");
   }
 
-  async function sendBroadcast({ title, body, targetGroup, requiresAck }) {
+  async function sendUpdate({ title, body, targetGroup, requiresAck }) {
     const targetThread = threads.find(
       (thread) => thread.groupKey === targetGroup.threadGroupKey
     );
@@ -439,7 +466,7 @@ export default function App() {
       time: "Just now",
       body: `${body}\n\nTarget: ${targetGroup.label}`,
       requiresAck,
-      acknowledged: false,
+      responded: false,
       unread: true,
     };
 
@@ -530,8 +557,13 @@ export default function App() {
             unreadCount={unreadCount}
             ackCount={ackCount}
             messages={messages}
-            onOpenMessage={openMessage}
-            onGoInbox={() => changeTab("Chats")}
+            threads={threads}
+            onOpenInbox={() => changeTab("Inbox")}
+            onOpenChats={() => changeTab("Chats")}
+            onOpenThread={(threadId) => openThread(threadId)}
+            onOpenPeople={() => changeTab("People")}
+            onOpenSend={() => changeTab("Broadcast")}
+            onOpenAdmin={() => changeTab("Admin")}
           />
         )}
 
@@ -577,10 +609,21 @@ export default function App() {
           />
         )}
 
-        {activeTab === "Broadcast" && (
+        {activeTab === "Update" && (
           <BroadcastScreen
             user={currentUser}
-            onSendBroadcast={sendBroadcast}
+            onSendUpdate={sendUpdate}
+          />
+        )}
+
+        {activeTab === "More" && (
+          <MoreScreen
+            user={currentUser}
+            unreadCount={unreadCount}
+            ackCount={ackCount}
+            onOpenAdmin={() => changeTab("Admin")}
+            onOpenProfile={() => changeTab("Profile")}
+            onLogout={handleLogout}
           />
         )}
 
