@@ -21,6 +21,25 @@ import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 import { setActiveNotificationThreadId } from "../services/pushNotifications";
 
+function getSeenStatusText(message) {
+  const seenByCount = Number(message.seenByCount || 0);
+  const deliveredToCount = Number(message.deliveredToCount || 0);
+
+  if (!message.isMe || message.status === "sending" || message.status === "failed") {
+    return "";
+  }
+
+  if (seenByCount <= 0) {
+    return "";
+  }
+
+  if (deliveredToCount <= 1) {
+    return "Seen";
+  }
+
+  return `Seen by ${seenByCount}`;
+}
+
 export function ThreadScreen({
   thread,
   onBack,

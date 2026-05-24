@@ -157,6 +157,8 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     requiresAck: Boolean(apiMessage.requires_ack),
     responded: Boolean(apiMessage.responded),
     acknowledged: Boolean(apiMessage.acknowledged),
+    seenByCount: Number(apiMessage.seen_by_count || apiMessage.seen_count || 0),
+    deliveredToCount: Number(apiMessage.delivered_to_count || 0),
     reactions: apiMessage.reactions || [],
     attachments: apiMessage.attachments || [],
     status: "sent",
@@ -275,6 +277,10 @@ export default function App() {
 
     socket.on("thread_typing_stopped", (payload) => {
       handleRealtimeTypingStopped(payload);
+    });
+
+    socket.on("thread_read_updated", (payload) => {
+      handleRealtimeThreadReadUpdated(payload);
     });
 
     socket.on("thread_typing", (payload) => {
@@ -588,6 +594,21 @@ export default function App() {
       user_id: currentUser.id,
       thread_id: threadId,
     });
+  }
+
+  async function handleRealtimeThreadReadUpdated(payload) {
+    if (!payload?.thread_id || !currentUser?.id) return;
+
+    if (Number(payload.user_id) === Number(currentUser.id)) return;
+
+    const threadId = payload.thread_id;
+    const isOpenThread = Number(selectedThreadIdRef.current) === Number(threadId);
+
+    if (isOpenThread) {
+      await refreshOpenThreadMessages(threadId);
+    } else {
+      await refreshThreadList();
+    }
   }
 
   async function handleRealtimeThreadMessage(payload) {

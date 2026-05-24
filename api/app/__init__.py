@@ -2975,6 +2975,17 @@ def create_app():
 
         thread = Thread.query.get(thread_id)
 
+        socketio.emit(
+            "thread_read_updated",
+            {
+                "thread_id": int(thread_id),
+                "user_id": int(user_id),
+                "last_read_at": membership.last_read_at.isoformat(),
+            },
+            room=f"thread:{thread_id}",
+            include_self=False,
+        )
+
         return jsonify({
             "success": True,
             "thread": serialize_thread(thread, user_id=user_id) if thread else None,
@@ -3285,12 +3296,31 @@ def serialize_thread_message_attachment(attachment):
 
 def serialize_thread_message(message, user_id=None):
     acknowledged = False
+    seen_by_count = 0
+    delivered_to_count = 0
 
     if user_id:
         acknowledged = ThreadMessageAck.query.filter_by(
             thread_message_id=message.id,
             user_id=user_id,
         ).first() is not None
+
+    try:
+        delivered_to_count = ThreadMember.query.filter(
+            ThreadMember.thread_id == message.thread_id,
+            ThreadMember.user_id != message.sender_user_id,
+        ).count()
+
+        seen_by_count = ThreadMember.query.filter(
+            ThreadMember.thread_id == message.thread_id,
+            ThreadMember.user_id != message.sender_user_id,
+            ThreadMember.last_read_at.isnot(None),
+            ThreadMember.last_read_at >= message.created_at,
+        ).count()
+    except Exception:
+        db.session.rollback()
+        seen_by_count = 0
+        delivered_to_count = 0
 
     return {
         "id": message.id,
@@ -3301,6 +3331,9 @@ def serialize_thread_message(message, user_id=None):
         "acknowledged": acknowledged,
         "created_at": message.created_at.isoformat(),
         "is_me": message.sender_user_id == user_id if user_id else False,
+        "seen_by_count": seen_by_count,
+        "seen_count": seen_by_count,
+        "delivered_to_count": delivered_to_count,
         "reactions": serialize_message_reactions(message, user_id),
         "attachments": [serialize_thread_message_attachment(item) for item in message.attachments],
     }
