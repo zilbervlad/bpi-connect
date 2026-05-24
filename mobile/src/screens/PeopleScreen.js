@@ -149,6 +149,11 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
                 onChangeText={setSearch}
                 placeholder="Search name, role, email, or store..."
                 placeholderTextColor="#7b8da0"
+                autoCorrect={false}
+                spellCheck={false}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
                 autoCapitalize="none"
                 style={localStyles.searchInput}
               />

@@ -173,6 +173,84 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const sendUpdate = async ({ title, body, targetGroup, requiresAck }) => {
+    if (!currentUser?.id || !targetGroup || !body?.trim()) {
+      console.log("Cannot send update: missing current user, target thread, or body.");
+      return;
+    }
+
+    const selectedThread = threads.find(
+      (thread) => String(thread.id) === String(targetGroup)
+    );
+
+    const messageBody = title?.trim()
+      ? `${title.trim()}\n\n${body.trim()}`
+      : body.trim();
+
+    try {
+      await sendApiThreadMessage({
+        threadId: targetGroup,
+        userId: currentUser.id,
+        body: messageBody,
+        requiresAck: !!requiresAck,
+      });
+
+      if (typeof refreshThreadList === "function") {
+        await refreshThreadList();
+      }
+
+      await openThread(targetGroup);
+    } catch (error) {
+      console.log("Failed object-style send update, trying positional send:", error);
+
+      try {
+        await sendApiThreadMessage(targetGroup, currentUser.id, messageBody, {
+          requiresAck: !!requiresAck,
+        });
+
+        if (typeof refreshThreadList === "function") {
+          await refreshThreadList();
+        }
+
+        await openThread(targetGroup);
+      } catch (secondError) {
+        console.log("Failed to send update:", secondError);
+      }
+    }
+  };
+
+  const startMessageToRecipient = async (recipient) => {
+    if (!recipient?.id || !currentUser?.id) {
+      console.log("Cannot start message: missing current user or recipient.");
+      return;
+    }
+
+    try {
+      const result = await findOrCreateDirectThread(currentUser.id, recipient.id);
+
+      const threadId =
+        result?.id ||
+        result?.thread_id ||
+        result?.thread?.id ||
+        result?.data?.id ||
+        result?.data?.thread_id ||
+        result?.data?.thread?.id;
+
+      if (!threadId) {
+        console.log("Direct thread returned no thread id:", result);
+        return;
+      }
+
+      if (typeof refreshThreadList === "function") {
+        await refreshThreadList();
+      }
+
+      await openThread(threadId);
+    } catch (error) {
+      console.log("Failed to start direct message:", error);
+    }
+  };
   const [currentUser, setCurrentUser] = useState(demoUsers[0]);
   const [messages, setMessages] = useState(starterMessages);
   const [threads, setThreads] = useState(starterThreads);

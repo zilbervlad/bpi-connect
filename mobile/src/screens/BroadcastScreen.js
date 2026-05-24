@@ -128,6 +128,11 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
           onChangeText={setTitle}
           placeholder={selectedTarget?.name || "Update title"}
           placeholderTextColor="#7b8da0"
+          autoCorrect={false}
+          spellCheck={false}
+          autoComplete="off"
+          textContentType="none"
+          importantForAutofill="no"
           style={localStyles.input}
         />
 
@@ -137,6 +142,11 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
           onChangeText={setBody}
           placeholder="Type the update..."
           placeholderTextColor="#7b8da0"
+          autoCorrect={false}
+          spellCheck={false}
+          autoComplete="off"
+          textContentType="none"
+          importantForAutofill="no"
           style={[localStyles.input, localStyles.bodyInput]}
           multiline
         />
