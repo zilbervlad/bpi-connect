@@ -233,6 +233,21 @@ export default function App() {
     return () => clearInterval(interval);
   }, [selectedThreadId, usingApi, currentUser?.id]);
 
+  useEffect(() => {
+    if (activeTab !== "Chats" || selectedThreadId || !usingApi || !currentUser?.id) {
+      return undefined;
+    }
+
+    // refreshThreadList interval
+    refreshThreadList();
+
+    const interval = setInterval(() => {
+      refreshThreadList();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, selectedThreadId, usingApi, currentUser?.id]);
+
   async function handleLogin(email, password) {
     setIsLoggingIn(true);
     setLoginError("");
@@ -379,6 +394,28 @@ export default function App() {
 
   function closeMessage() {
     setSelectedMessageId(null);
+  }
+
+  async function refreshThreadList() {
+    if (!usingApi || !currentUser?.id) return;
+
+    try {
+      const loadedThreads = await fetchApiThreads(currentUser.id);
+      const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
+
+      setThreads((currentThreads) =>
+        mappedThreads.map((freshThread) => {
+          const existingThread = currentThreads.find((item) => item.id === freshThread.id);
+
+          return {
+            ...freshThread,
+            messages: existingThread?.messages || freshThread.messages || [],
+          };
+        })
+      );
+    } catch (error) {
+      console.log("Could not refresh thread list:", error.message);
+    }
   }
 
   async function refreshOpenThreadMessages(threadId = selectedThreadId) {
