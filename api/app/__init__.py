@@ -2207,11 +2207,12 @@ def create_app():
         db.session.add(attachment)
         db.session.commit()
 
-        notify_thread_members(thread, sender, message)
+        push_result = notify_thread_members(thread, sender, message)
 
         return jsonify({
             "success": True,
             "message": serialize_thread_message(message, sender.id),
+            "push_result": push_result,
         }), 201
 
 
@@ -2334,9 +2335,12 @@ def create_app():
         db.session.add(message)
         db.session.commit()
 
+        push_result = notify_thread_members(thread, sender, message)
+
         return jsonify({
             "success": True,
             "message": serialize_thread_message(message, user_id=sender.id),
+            "push_result": push_result,
         }), 201
 
     @app.post("/api/threads/<int:thread_id>/read")
