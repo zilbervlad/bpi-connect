@@ -2393,7 +2393,24 @@ def create_app():
                     .filter(ThreadMember.user_id == user_id)
                 )
 
-        threads = query.order_by(Thread.created_at.desc()).all()
+        latest_message_subquery = (
+            db.session.query(
+                ThreadMessage.thread_id.label("thread_id"),
+                db.func.max(ThreadMessage.created_at).label("last_activity_at"),
+            )
+            .group_by(ThreadMessage.thread_id)
+            .subquery()
+        )
+
+        threads = (
+            query
+            .outerjoin(latest_message_subquery, Thread.id == latest_message_subquery.c.thread_id)
+            .order_by(
+                db.func.coalesce(latest_message_subquery.c.last_activity_at, Thread.created_at).desc(),
+                Thread.created_at.desc(),
+            )
+            .all()
+        )
 
         return jsonify({
             "success": True,
@@ -2868,7 +2885,13 @@ def create_app():
             user_id=sender.id,
         ).first()
 
-        if not membership:
+        sender_role = (sender.role or "").strip().lower()
+        sender_can_access_group_thread = (
+            sender_role in ["admin", "hr"]
+            and thread.thread_type != "direct"
+        )
+
+        if not membership and not sender_can_access_group_thread:
             return jsonify({"success": False, "error": "Sender is not a member of this thread."}), 403
 
         message = ThreadMessage(
