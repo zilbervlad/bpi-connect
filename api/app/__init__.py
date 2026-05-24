@@ -463,6 +463,107 @@ def create_app():
         }
 
 
+    @socketio.on("thread_typing")
+    def socket_thread_typing(data):
+        if not isinstance(data, dict):
+            return {"success": False, "error": "Invalid payload."}
+
+        user_id = data.get("user_id")
+        thread_id = data.get("thread_id")
+        is_typing = bool(data.get("is_typing"))
+
+        if not user_id or not thread_id:
+            return {"success": False, "error": "user_id and thread_id are required."}
+
+        user = User.query.get(user_id)
+        thread = Thread.query.get(thread_id)
+
+        if not user or not thread:
+            return {"success": False, "error": "User or thread not found."}
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user.id,
+        ).first()
+
+        if not membership:
+            return {"success": False, "error": "User is not a thread member."}
+
+        socketio.emit(
+            "thread_typing",
+            {
+                "thread_id": thread.id,
+                "user_id": user.id,
+                "user_name": user.name,
+                "is_typing": is_typing,
+            },
+            room=f"thread:{thread.id}",
+            skip_sid=request.sid,
+        )
+
+        return {"success": True}
+
+
+    @socketio.on("typing_started")
+    def socket_typing_started(data):
+        user_id = data.get("user_id") if isinstance(data, dict) else None
+        thread_id = data.get("thread_id") if isinstance(data, dict) else None
+
+        if not user_id or not thread_id:
+            return {"success": False, "error": "user_id and thread_id are required."}
+
+        user = User.query.get(user_id)
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread_id,
+            user_id=user_id,
+        ).first()
+
+        if not user or not membership:
+            return {"success": False, "error": "User is not a member of this thread."}
+
+        socketio.emit(
+            "thread_typing_started",
+            {
+                "thread_id": int(thread_id),
+                "user": serialize_user(user),
+            },
+            room=f"thread:{thread_id}",
+            include_self=False,
+        )
+
+        return {"success": True}
+
+
+    @socketio.on("typing_stopped")
+    def socket_typing_stopped(data):
+        user_id = data.get("user_id") if isinstance(data, dict) else None
+        thread_id = data.get("thread_id") if isinstance(data, dict) else None
+
+        if not user_id or not thread_id:
+            return {"success": False, "error": "user_id and thread_id are required."}
+
+        user = User.query.get(user_id)
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread_id,
+            user_id=user_id,
+        ).first()
+
+        if not user or not membership:
+            return {"success": False, "error": "User is not a member of this thread."}
+
+        socketio.emit(
+            "thread_typing_stopped",
+            {
+                "thread_id": int(thread_id),
+                "user": serialize_user(user),
+            },
+            room=f"thread:{thread_id}",
+            include_self=False,
+        )
+
+        return {"success": True}
+
+
     @app.get("/")
     def health():
         return jsonify({

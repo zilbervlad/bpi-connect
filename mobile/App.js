@@ -177,6 +177,7 @@ export default function App() {
   const [startingRecipient, setStartingRecipient] = useState(null);
   const [apiUsers, setApiUsers] = useState([]);
   const [usingApi, setUsingApi] = useState(false);
+  const [typingByThread, setTypingByThread] = useState({});
 
   const socketRef = useRef(null);
   const selectedThreadIdRef = useRef(selectedThreadId);
@@ -266,12 +267,25 @@ export default function App() {
       handleRealtimeThreadMessage(payload);
     });
 
+    socket.on("thread_typing_started", (payload) => {
+      handleRealtimeTypingStarted(payload);
+    });
+
+    socket.on("thread_typing_stopped", (payload) => {
+      handleRealtimeTypingStopped(payload);
+    });
+
+    socket.on("thread_typing", (payload) => {
+      handleRealtimeThreadTyping(payload);
+    });
+
     socket.on("connect_error", (error) => {
       console.log("Realtime connect error:", error.message);
     });
 
     return () => {
       socket.off("thread_message_created");
+      socket.off("thread_typing");
       socket.disconnect();
       socketRef.current = null;
     };
@@ -464,6 +478,114 @@ export default function App() {
 
   function closeMessage() {
     setSelectedMessageId(null);
+  }
+
+  function handleRealtimeThreadTyping(payload) {
+    if (!payload?.thread_id || !payload?.user_id) return;
+    if (Number(payload.user_id) === Number(currentUser?.id)) return;
+
+    const threadId = String(payload.thread_id);
+
+    setTypingByThread((current) => {
+      const currentUsers = current[threadId] || {};
+      const nextUsers = { ...currentUsers };
+
+      if (payload.is_typing) {
+        nextUsers[payload.user_id] = payload.user_name || "Someone";
+      } else {
+        delete nextUsers[payload.user_id];
+      }
+
+      return {
+        ...current,
+        [threadId]: nextUsers,
+      };
+    });
+
+    if (payload.is_typing) {
+      setTimeout(() => {
+        setTypingByThread((current) => {
+          const currentUsers = current[threadId] || {};
+          if (!currentUsers[payload.user_id]) return current;
+
+          const nextUsers = { ...currentUsers };
+          delete nextUsers[payload.user_id];
+
+          return {
+            ...current,
+            [threadId]: nextUsers,
+          };
+        });
+      }, 2500);
+    }
+  }
+
+  function sendTypingStatus(threadId, isTyping) {
+    if (!socketRef.current?.connected || !currentUser?.id) return;
+
+    socketRef.current.emit("thread_typing", {
+      thread_id: threadId,
+      user_id: currentUser.id,
+      is_typing: isTyping,
+    });
+  }
+
+  function handleRealtimeTypingStarted(payload) {
+    if (!payload?.thread_id || !payload?.user?.id) return;
+
+    if (Number(payload.user.id) === Number(currentUser?.id)) return;
+
+    setTypingByThread((current) => ({
+      ...current,
+      [payload.thread_id]: {
+        userId: payload.user.id,
+        name: payload.user.name || "Someone",
+        updatedAt: Date.now(),
+      },
+    }));
+
+    setTimeout(() => {
+      setTypingByThread((current) => {
+        const currentTyping = current[payload.thread_id];
+
+        if (!currentTyping || currentTyping.userId !== payload.user.id) {
+          return current;
+        }
+
+        if (Date.now() - currentTyping.updatedAt < 2500) {
+          return current;
+        }
+
+        const next = { ...current };
+        delete next[payload.thread_id];
+        return next;
+      });
+    }, 3000);
+  }
+
+  function handleRealtimeTypingStopped(payload) {
+    if (!payload?.thread_id || !payload?.user?.id) return;
+
+    setTypingByThread((current) => {
+      const currentTyping = current[payload.thread_id];
+
+      if (!currentTyping || currentTyping.userId !== payload.user.id) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[payload.thread_id];
+      return next;
+    });
+  }
+
+  function emitThreadTyping(threadId, isTyping) {
+    if (!socketRef.current?.connected || !currentUser?.id || !threadId) return;
+
+    socketRef.current.emit(isTyping ? "typing_started" : "typing_stopped", {
+      user_id: currentUser.id,
+      thread_id: threadId,
+    });
   }
 
   async function handleRealtimeThreadMessage(payload) {
@@ -784,6 +906,8 @@ export default function App() {
     const cleanBody = String(body || "").trim();
     if (!cleanBody) return;
 
+    emitThreadTyping(threadId, false);
+
     if (usingApi && currentUser?.apiUser) {
       const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -971,6 +1095,8 @@ export default function App() {
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
         onRetryThreadMessage={retryFailedThreadMessage}
+        onTypingChange={sendTypingStatus}
+        typingUsers={Object.values(typingByThread[String(selectedThread.id)] || {})}
         onRefreshThread={refreshOpenThreadMessages}
         onReact={handleReactToThreadMessage}
         onAcknowledge={handleAcknowledgeThreadMessage}
