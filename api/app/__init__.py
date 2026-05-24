@@ -2366,16 +2366,34 @@ def create_app():
     def list_threads():
         user_id = request.args.get("user_id", type=int)
 
-        query = Thread.query.order_by(Thread.created_at.desc())
+        user = User.query.get(user_id) if user_id else None
+        role = (user.role or "").strip().lower() if user else ""
+
+        query = Thread.query
 
         if user_id:
-            query = (
-                query
-                .join(ThreadMember)
-                .filter(ThreadMember.user_id == user_id)
-            )
+            if role in ["admin", "hr"]:
+                # Admin/HR should see all group threads without needing explicit membership.
+                # Direct messages should still only show when the user is a member.
+                direct_thread_ids = [
+                    membership.thread_id
+                    for membership in ThreadMember.query.filter_by(user_id=user_id).all()
+                ]
 
-        threads = query.all()
+                query = query.filter(
+                    db.or_(
+                        Thread.thread_type != "direct",
+                        Thread.id.in_(direct_thread_ids),
+                    )
+                )
+            else:
+                query = (
+                    query
+                    .join(ThreadMember)
+                    .filter(ThreadMember.user_id == user_id)
+                )
+
+        threads = query.order_by(Thread.created_at.desc()).all()
 
         return jsonify({
             "success": True,
