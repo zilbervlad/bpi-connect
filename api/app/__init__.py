@@ -2412,6 +2412,29 @@ def create_app():
             .all()
         )
 
+        if user_id and role in ["admin", "hr"]:
+            membership_added = False
+
+            for thread in threads:
+                if thread.thread_type == "direct":
+                    continue
+
+                membership = ThreadMember.query.filter_by(
+                    thread_id=thread.id,
+                    user_id=user_id,
+                ).first()
+
+                if not membership:
+                    db.session.add(ThreadMember(
+                        thread_id=thread.id,
+                        user_id=user_id,
+                        member_role="admin",
+                    ))
+                    membership_added = True
+
+            if membership_added:
+                db.session.commit()
+
         return jsonify({
             "success": True,
             "threads": [serialize_thread(thread, user_id=user_id) for thread in threads],
