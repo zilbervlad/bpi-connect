@@ -185,6 +185,7 @@ export default function App() {
 
   const socketRef = useRef(null);
   const selectedThreadIdRef = useRef(selectedThreadId);
+  const locallyReadThreadIdsRef = useRef(new Set());
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
@@ -619,6 +620,10 @@ export default function App() {
     const threadId = payload.thread_id;
     const isOpenThread = Number(selectedThreadIdRef.current) === Number(threadId);
 
+    if (!isOpenThread && !incomingMessage.isMe) {
+      locallyReadThreadIdsRef.current.delete(String(threadId));
+    }
+
     setThreads((currentThreads) => {
       const existingThread = currentThreads.find((thread) => Number(thread.id) === Number(threadId));
 
@@ -692,12 +697,13 @@ export default function App() {
           );
 
           const isOpenThread = String(freshThread.id) === String(openThreadId);
+          const wasLocallyRead = locallyReadThreadIdsRef.current.has(String(freshThread.id));
 
           return {
             ...freshThread,
             messages: existingThread?.messages || freshThread.messages || [],
             unreadAtOpen: existingThread?.unreadAtOpen || 0,
-            unread: isOpenThread ? 0 : freshThread.unread || 0,
+            unread: isOpenThread || wasLocallyRead ? 0 : freshThread.unread || 0,
           };
         })
       );
@@ -738,6 +744,8 @@ export default function App() {
 
   async function markThreadReadAndClear(threadId) {
     if (!threadId) return;
+
+    locallyReadThreadIdsRef.current.add(String(threadId));
 
     setThreads((currentThreads) =>
       currentThreads.map((thread) =>
