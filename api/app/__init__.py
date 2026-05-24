@@ -25,6 +25,7 @@ from app.models import (
     ThreadMessageAck,
     ThreadMessageAttachment,
     ThreadMessageReaction,
+    PushToken,
 )
 def create_app():
     app = Flask(__name__)
@@ -66,6 +67,20 @@ def create_app():
             }), 403
 
         return None
+
+
+    @app.post("/dev/migrate-push-tokens")
+    def migrate_push_tokens_table():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        db.create_all()
+
+        return jsonify({
+            "success": True,
+            "message": "Push token table migrated.",
+        })
 
 
     @app.post("/dev/migrate-password-reset")
@@ -1019,6 +1034,56 @@ def create_app():
         return jsonify({
             "success": True,
             "user": serialize_user(user),
+        })
+
+
+    @app.post("/api/users/<int:user_id>/push-token")
+    def save_user_push_token(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        data = request.get_json() or {}
+        token = (data.get("token") or "").strip()
+        platform = (data.get("platform") or "").strip() or None
+        device_name = (data.get("device_name") or "").strip() or None
+
+        if not token:
+            return jsonify({
+                "success": False,
+                "error": "Push token is required.",
+            }), 400
+
+        existing = PushToken.query.filter_by(token=token).first()
+
+        if existing:
+            existing.user_id = user.id
+            existing.platform = platform
+            existing.device_name = device_name
+            existing.is_active = True
+        else:
+            existing = PushToken(
+                user_id=user.id,
+                token=token,
+                platform=platform,
+                device_name=device_name,
+                is_active=True,
+            )
+            db.session.add(existing)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "push_token": {
+                "id": existing.id,
+                "user_id": existing.user_id,
+                "token": existing.token,
+                "platform": existing.platform,
+                "device_name": existing.device_name,
+                "is_active": existing.is_active,
+            },
         })
 
 

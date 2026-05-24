@@ -136,6 +136,21 @@ class ThreadMessage(db.Model):
     sender = db.relationship("User", backref="thread_messages_sent")
 
 
+class PushToken(db.Model):
+    __tablename__ = "push_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    token = db.Column(db.Text, nullable=False, unique=True)
+    platform = db.Column(db.String(40), nullable=True)
+    device_name = db.Column(db.String(160), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship("User", backref="push_tokens")
+
+
 class ThreadMessageAttachment(db.Model):
     __tablename__ = "thread_message_attachments"
 
