@@ -1415,12 +1415,17 @@ def create_app():
                         ).all()
                     ]
 
-                    query = query.filter(
-                        db.or_(
-                            User.area_id == viewer.area_id,
-                            User.store_id.in_(oversight_store_ids) if oversight_store_ids else False,
+                    if oversight_store_ids:
+                        query = query.filter(
+                            db.or_(
+                                User.area_id == viewer.area_id,
+                                User.store_id.in_(oversight_store_ids),
+                            )
                         )
-                    )
+                    elif viewer.area_id:
+                        query = query.filter(User.area_id == viewer.area_id)
+                    else:
+                        query = query.filter(User.id == viewer.id)
                 else:
                     if viewer.store_id:
                         query = query.filter(User.store_id == viewer.store_id)
