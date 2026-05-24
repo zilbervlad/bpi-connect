@@ -71,6 +71,7 @@ export function AdminScreen({ user }) {
   const [inviteRole, setInviteRole] = useState("tm");
   const [inviteStoreNumber, setInviteStoreNumber] = useState("");
   const [inviteArea, setInviteArea] = useState("");
+  const [detailStoreNumber, setDetailStoreNumber] = useState("");
   const [createdInvite, setCreatedInvite] = useState(null);
   const [resentInvite, setResentInvite] = useState(null);
   const [passwordResetResult, setPasswordResetResult] = useState(null);
@@ -150,6 +151,7 @@ export function AdminScreen({ user }) {
     try {
       const detail = await fetchApiUserDetail(userId);
       setSelectedUser(detail);
+      setDetailStoreNumber(detail.store || detail.store_number || "");
       setResentInvite(null);
       setPasswordResetResult(null);
       setActiveSection("detail");
@@ -884,33 +886,40 @@ export function AdminScreen({ user }) {
           <Text style={localStyles.label}>Role</Text>
           <PillGrid options={roles} selectedValue={selectedUser.role} onSelect={handleChangeRole} />
 
-          {shouldShowPrimaryStoreControls(selectedUser.role) && (
-            <>
-              <Text style={localStyles.label}>Primary Store</Text>
-              <PillGrid
-                options={stores.map((store) => ({
-                  label: `Store ${store.store_number}`,
-                  value: store.store_number,
-                }))}
-                selectedValue={selectedUser.store}
-                onSelect={(storeNumber) => handleAssignStore("primary", storeNumber)}
-              />
-            </>
-          )}
+          <View style={localStyles.detailSection}>
+            <Text style={localStyles.sectionMiniTitle}>Store Assignment</Text>
 
-          {shouldShowOversightControls(selectedUser.role) && (
-            <>
-              <Text style={localStyles.label}>Oversight Stores</Text>
-              <PillGrid
-                options={stores.map((store) => ({
-                  label: `Store ${store.store_number}`,
-                  value: store.store_number,
-                }))}
-                selectedValue=""
-                onSelect={(storeNumber) => handleAssignStore("oversight", storeNumber)}
-              />
-            </>
-          )}
+            <TextInput
+              value={detailStoreNumber}
+              onChangeText={setDetailStoreNumber}
+              placeholder="Store #"
+              placeholderTextColor="#7b8da0"
+              keyboardType="number-pad"
+              style={localStyles.input}
+            />
+
+            <View style={localStyles.actionRow}>
+              {shouldShowPrimaryStoreControls(selectedUser.role) ? (
+                <TouchableOpacity
+                  style={localStyles.compactPrimaryButton}
+                  onPress={() => handleAssignStore("primary", detailStoreNumber.trim())}
+                  disabled={!detailStoreNumber.trim() || isLoading}
+                >
+                  <Text style={localStyles.compactPrimaryText}>Set Primary</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {shouldShowOversightControls(selectedUser.role) ? (
+                <TouchableOpacity
+                  style={localStyles.compactSecondaryButton}
+                  onPress={() => handleAssignStore("oversight", detailStoreNumber.trim())}
+                  disabled={!detailStoreNumber.trim() || isLoading}
+                >
+                  <Text style={localStyles.compactSecondaryText}>Add Oversight</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
 
           {!selectedUser.invite_accepted_at && (
             <View style={localStyles.resendInviteBlock}>
@@ -1506,6 +1515,50 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
+  },
+  detailSection: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 8,
+    marginTop: 7,
+    marginBottom: 7,
+  },
+  sectionMiniTitle: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 6,
+  },
+  compactPrimaryButton: {
+    flex: 1,
+    backgroundColor: "#ef1745",
+    borderRadius: 999,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  compactPrimaryText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  compactSecondaryButton: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 999,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  compactSecondaryText: {
+    color: "#10212b",
+    fontSize: 11,
+    fontWeight: "900",
   },
   resendInviteBlock: {
     marginBottom: 7,
