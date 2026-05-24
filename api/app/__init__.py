@@ -1004,7 +1004,7 @@ def create_app():
         folder = "bpi-connect/avatars"
         public_id = f"user-{user.id}-{timestamp}"
 
-        signature_payload = f"folder={folder}&public_id={public_id}&timestamp={timestamp}{api_secret}"
+        signature_payload = f"folder={folder}&overwrite=true&public_id={public_id}&timestamp={timestamp}{api_secret}"
         signature = hashlib.sha1(signature_payload.encode("utf-8")).hexdigest()
 
         response = requests.post(
