@@ -1314,8 +1314,7 @@ def create_app():
 
         name = (data.get("name") or "").strip()
         thread_type = (data.get("thread_type") or "group").strip()
-        store_number = (data.get("store_number") or "").strip()
-        area = (data.get("area") or "").strip()
+        created_by_user_id = data.get("created_by_user_id")
 
         if not name:
             return jsonify({
@@ -1323,33 +1322,79 @@ def create_app():
                 "error": "Thread name is required.",
             }), 400
 
-        existing = Thread.query.filter(db.func.lower(Thread.name) == name.lower()).first()
+        base_key = (
+            data.get("group_key")
+            or f"{thread_type}:{name.lower().replace(' ', '-')}"
+        )
+        group_key = "".join(
+            char if char.isalnum() or char in [":", "-", "_"] else "-"
+            for char in base_key.lower()
+        )
+
+        existing = Thread.query.filter_by(group_key=group_key).first()
         if existing:
             return jsonify({
                 "success": False,
-                "error": "A group with that name already exists.",
+                "error": "A group with that key already exists.",
             }), 409
 
         thread = Thread(
             name=name,
             thread_type=thread_type,
-            store_number=store_number or None,
-            area=area or None,
-            is_active=True,
+            group_key=group_key,
+            created_by_user_id=created_by_user_id,
         )
 
         db.session.add(thread)
+        db.session.flush()
+
+        if created_by_user_id:
+            creator = User.query.get(created_by_user_id)
+            if creator:
+                db.session.add(ThreadMember(
+                    thread_id=thread.id,
+                    user_id=creator.id,
+                    member_role="owner",
+                ))
+
         db.session.commit()
 
         return jsonify({
             "success": True,
-            "thread": serialize_thread(thread),
+            "thread": serialize_thread(thread, created_by_user_id),
         }), 201
 
 
     @app.patch("/api/threads/<int:thread_id>")
     def update_thread(thread_id):
         thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        data = request.get_json() or {}
+
+        if "name" in data:
+            name = (data.get("name") or "").strip()
+
+            if not name:
+                return jsonify({
+                    "success": False,
+                    "error": "Thread name cannot be blank.",
+                }), 400
+
+            thread.name = name
+
+        if "thread_type" in data:
+            thread.thread_type = (data.get("thread_type") or thread.thread_type).strip()
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread),
+        })
+
 
         if not thread:
             return jsonify({"success": False, "error": "Thread not found."}), 404
