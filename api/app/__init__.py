@@ -15,6 +15,7 @@ from app.models import (
     Area,
     Store,
     User,
+    UserStoreAssignment,
     Message,
     MessageRecipient,
     Thread,
@@ -23,9 +24,7 @@ from app.models import (
     ThreadMessageAck,
     ThreadMessageAttachment,
     ThreadMessageReaction,
-) UserStoreAssignment, ThreadMessageReaction
-
-
+)
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
