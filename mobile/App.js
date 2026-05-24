@@ -682,16 +682,22 @@ export default function App() {
 
     try {
       const loadedThreads = await fetchApiThreads(currentUser.id);
-
       const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
+      const openThreadId = selectedThreadIdRef.current;
 
       setThreads((currentThreads) =>
         mappedThreads.map((freshThread) => {
-          const existingThread = currentThreads.find((item) => item.id === freshThread.id);
+          const existingThread = currentThreads.find(
+            (item) => String(item.id) === String(freshThread.id)
+          );
+
+          const isOpenThread = String(freshThread.id) === String(openThreadId);
 
           return {
             ...freshThread,
             messages: existingThread?.messages || freshThread.messages || [],
+            unreadAtOpen: existingThread?.unreadAtOpen || 0,
+            unread: isOpenThread ? 0 : freshThread.unread || 0,
           };
         })
       );
