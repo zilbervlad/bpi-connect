@@ -2734,6 +2734,12 @@ def create_app():
         if not membership:
             return jsonify({"success": False, "error": "Thread membership not found."}), 404
 
+        if not ensure_thread_favorites_table():
+            return jsonify({
+                "success": False,
+                "error": "Could not prepare favorites table.",
+            }), 500
+
         existing = ThreadFavorite.query.filter_by(
             thread_id=thread.id,
             user_id=user_id,
@@ -3036,6 +3042,15 @@ def serialize_message(message, user_id=None):
         "acknowledged_at": recipient.acknowledged_at.isoformat() if recipient and recipient.acknowledged_at else None,
     }
 
+def ensure_thread_favorites_table():
+    try:
+        ThreadFavorite.__table__.create(db.engine, checkfirst=True)
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
+
+
 def serialize_thread(thread, user_id=None):
     last_message = (
         ThreadMessage.query
@@ -3046,6 +3061,7 @@ def serialize_thread(thread, user_id=None):
 
     membership = None
     unread_count = 0
+    favorite = False
 
     if user_id:
         membership = ThreadMember.query.filter_by(
@@ -3061,6 +3077,16 @@ def serialize_thread(thread, user_id=None):
 
             unread_count = message_query.filter(ThreadMessage.sender_user_id != user_id).count()
 
+        if ensure_thread_favorites_table():
+            try:
+                favorite = ThreadFavorite.query.filter_by(
+                    thread_id=thread.id,
+                    user_id=user_id,
+                ).first() is not None
+            except Exception:
+                db.session.rollback()
+                favorite = False
+
     return {
         "id": thread.id,
         "thread_type": thread.thread_type,
@@ -3072,12 +3098,7 @@ def serialize_thread(thread, user_id=None):
         "unread": unread_count,
         "members": [serialize_user(member.user) for member in thread.members],
         "muted": membership.muted if membership else False,
-        "favorite": bool(
-            user_id and ThreadFavorite.query.filter_by(
-                thread_id=thread.id,
-                user_id=user_id,
-            ).first()
-        ),
+        "favorite": favorite,
     }
 
 
