@@ -35,9 +35,31 @@ export function ThreadScreen({
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageCaption, setPendingImageCaption] = useState("");
   const scrollViewRef = useRef(null);
+  const previousMessageCountRef = useRef(thread?.messages?.length || 0);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const quickReactions = ["👍", "❤️", "😂", "👀", "✅"];
+
+  function scrollToLatest(animated = true) {
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated });
+    });
+  }
+
+  function handleChatScroll(event) {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom =
+      contentSize.height - (layoutMeasurement.height + contentOffset.y);
+
+    const nearBottom = distanceFromBottom < 90;
+    setIsNearBottom(nearBottom);
+
+    if (nearBottom) {
+      setHasNewMessages(false);
+    }
+  }
 
   useEffect(() => {
     setActiveNotificationThreadId(thread?.id);
@@ -58,19 +80,41 @@ export function ThreadScreen({
     return () => clearInterval(interval);
   }, [thread?.id, onRefreshThread]);
 
-  // auto-scroll to bottom when chat loads or messages update
+  // Land on latest when opening a thread
   useEffect(() => {
+    previousMessageCountRef.current = thread?.messages?.length || 0;
+    setIsNearBottom(true);
+    setHasNewMessages(false);
+
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 120);
+      scrollToLatest(false);
+    }, 150);
 
     return () => clearTimeout(timer);
-  }, [thread?.id, thread?.messages?.length]);
+  }, [thread?.id]);
+
+  // New messages: auto-scroll only if user is already near bottom
+  useEffect(() => {
+    const currentCount = thread?.messages?.length || 0;
+    const previousCount = previousMessageCountRef.current;
+    const messageAdded = currentCount > previousCount;
+
+    previousMessageCountRef.current = currentCount;
+
+    if (!messageAdded) return;
+
+    if (isNearBottom) {
+      setHasNewMessages(false);
+      setTimeout(() => scrollToLatest(true), 80);
+    } else {
+      setHasNewMessages(true);
+    }
+  }, [thread?.messages?.length, isNearBottom]);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        scrollToLatest(true);
       }, 100);
     });
 
@@ -176,8 +220,9 @@ export function ThreadScreen({
           ref={scrollViewRef}
           style={localStyles.chatArea}
           contentContainerStyle={localStyles.chatContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          onLayout={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
+          onScroll={handleChatScroll}
+          scrollEventThrottle={80}
+          onLayout={() => scrollToLatest(false)}
           keyboardShouldPersistTaps="handled"
         >
           <View style={localStyles.threadInfo}>
@@ -334,6 +379,20 @@ export function ThreadScreen({
               </TouchableOpacity>
             </View>
           </View>
+        ) : null}
+
+        {hasNewMessages ? (
+          <TouchableOpacity
+            style={localStyles.newMessagesButton}
+            onPress={() => {
+              setHasNewMessages(false);
+              setIsNearBottom(true);
+              scrollToLatest(true);
+            }}
+            activeOpacity={0.9}
+          >
+            <Text style={localStyles.newMessagesButtonText}>↓ New messages</Text>
+          </TouchableOpacity>
         ) : null}
 
         <View style={localStyles.composer}>
@@ -579,6 +638,24 @@ const localStyles = StyleSheet.create({
   pendingSendText: {
     color: "#ffffff",
     fontSize: 13,
+    fontWeight: "900",
+  },
+  newMessagesButton: {
+    alignSelf: "center",
+    backgroundColor: "#ef1745",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginBottom: 7,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  newMessagesButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
     fontWeight: "900",
   },
   composer: {
