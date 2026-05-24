@@ -552,14 +552,17 @@ export default function App() {
   }
 
   async function reloadDataForUser(user) {
-    if (!usingApi || !user?.apiUser) return;
+    if (!user?.id) return;
 
     try {
+      const loadedUsers = await fetchApiUsers();
       const loadedMessages = await fetchApiMessages(user.id);
       const loadedThreads = await fetchApiThreads(user.id);
 
+      setApiUsers(loadedUsers.map(mapApiUserToDemoUser));
       setMessages(loadedMessages.map(mapApiMessageToAppMessage));
       setThreads(loadedThreads.map(mapApiThreadToAppThread));
+      setUsingApi(true);
     } catch (error) {
       console.log("Could not reload user data:", error.message);
     }
