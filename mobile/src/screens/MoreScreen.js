@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
+import { UserAvatar } from "../components/UserAvatar";
 
 export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenProfile, onLogout }) {
   const canOpenAdmin = ["Admin", "HR"].includes(user.role);
@@ -14,9 +15,7 @@ export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenPro
       />
 
       <View style={localStyles.profileCard}>
-        <View style={localStyles.avatar}>
-          <Text style={localStyles.avatarText}>{user.name.charAt(0)}</Text>
-        </View>
+        <UserAvatar user={user} size={58} />
 
         <View style={localStyles.profileMain}>
           <Text style={localStyles.profileName}>{user.name}</Text>

@@ -10,6 +10,7 @@ import {
 
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
+import { UserAvatar } from "../components/UserAvatar";
 
 const roleLabels = {
   admin: "Admin",
@@ -227,9 +228,7 @@ function PersonRow({ person, currentUser, onStartMessage }) {
 
   return (
     <View style={localStyles.personRow}>
-      <View style={localStyles.avatar}>
-        <Text style={localStyles.avatarText}>{person.name.charAt(0)}</Text>
-      </View>
+      <UserAvatar user={person} size={44} />
 
       <View style={localStyles.personMain}>
         <Text style={localStyles.personName}>{person.name}</Text>

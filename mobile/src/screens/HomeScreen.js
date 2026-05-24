@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { styles } from "../styles/styles";
+import { UserAvatar } from "../components/UserAvatar";
 
 export function HomeScreen({
   user,
@@ -25,9 +26,7 @@ export function HomeScreen({
             <Text style={localStyles.greeting}>{getGreeting()}, {firstName(user.name)}</Text>
           </View>
 
-          <View style={localStyles.avatar}>
-            <Text style={localStyles.avatarText}>{user.name.charAt(0)}</Text>
-          </View>
+          <UserAvatar user={user} size={36} />
         </View>
 
         <Text style={localStyles.subtitle}>
