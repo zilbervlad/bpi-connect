@@ -99,6 +99,9 @@ def ensure_area_thread(area, created_by_user_id=None):
     if not area:
         return None
 
+    if str(area.name or "").strip().lower() == "company":
+        return None
+
     group_key = get_area_thread_key(area)
 
     thread = Thread.query.filter_by(group_key=group_key).first()
@@ -231,6 +234,38 @@ def create_app():
 
     CORS(app)
     db.init_app(app)
+
+    @app.post("/dev/remove-company-area-chat")
+    def dev_remove_company_area_chat():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        thread = Thread.query.filter_by(group_key="area:company").first()
+
+        if not thread:
+            thread = Thread.query.filter(
+                db.func.lower(Thread.name) == "company area"
+            ).first()
+
+        if not thread:
+            return jsonify({
+                "success": True,
+                "removed": False,
+                "message": "Company Area chat was not found.",
+            })
+
+        ThreadMember.query.filter_by(thread_id=thread.id).delete()
+        ThreadMessage.query.filter_by(thread_id=thread.id).delete()
+        db.session.delete(thread)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "removed": True,
+            "message": "Company Area chat removed.",
+        })
+
 
     @app.post("/dev/backfill-default-chats")
     def dev_backfill_default_chats():
