@@ -11,8 +11,19 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
-from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck,
-    ThreadMessageAttachment, UserStoreAssignment, ThreadMessageReaction
+from app.models import (
+    Area,
+    Store,
+    User,
+    Message,
+    MessageRecipient,
+    Thread,
+    ThreadMember,
+    ThreadMessage,
+    ThreadMessageAck,
+    ThreadMessageAttachment,
+    ThreadMessageReaction,
+) UserStoreAssignment, ThreadMessageReaction
 
 
 def create_app():
