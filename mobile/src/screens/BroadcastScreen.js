@@ -11,37 +11,46 @@ import {
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 
-export function BroadcastScreen({ user, threads = [], onSendUpdate }) {
-  const availableGroups = useMemo(() => {
+export function BroadcastScreen({ user, threads, onSendUpdate }) {
+  const availableTargets = useMemo(() => {
     return threads
       .filter((thread) => thread.type !== "direct")
-      .map((thread) => ({
-        id: thread.id,
-        label: thread.name,
-        description: thread.subtitle || formatThreadType(thread.type),
-        threadId: thread.id,
-        threadGroupKey: thread.groupKey,
-        type: thread.type,
-        memberCount: thread.members?.length || 0,
-      }));
+      .sort((a, b) => {
+        const order = {
+          company: 1,
+          area: 2,
+          store: 3,
+          role: 4,
+          group: 5,
+        };
+
+        const orderA = order[a.type] || 99;
+        const orderB = order[b.type] || 99;
+
+        if (orderA !== orderB) return orderA - orderB;
+
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
   }, [threads]);
 
-  const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [targetThreadId, setTargetThreadId] = useState(
+    availableTargets[0]?.id || ""
+  );
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [requiresAck, setRequiresAck] = useState(false);
 
-  const selectedGroup =
-    availableGroups.find((group) => group.id === selectedGroupId) ||
-    availableGroups[0];
+  const selectedTarget =
+    availableTargets.find((thread) => String(thread.id) === String(targetThreadId)) ||
+    availableTargets[0];
 
   function handleSend() {
-    if (!selectedGroup || !title.trim() || !body.trim()) return;
+    if (!selectedTarget || !body.trim()) return;
 
-    onSendUpdate({
-      title: title.trim(),
+    onSendUpdate?.({
+      title: title.trim() || selectedTarget.name,
       body: body.trim(),
-      targetGroup: selectedGroup,
+      targetGroup: selectedTarget.id,
       requiresAck,
     });
 
@@ -55,67 +64,69 @@ export function BroadcastScreen({ user, threads = [], onSendUpdate }) {
       <HeaderBlock
         eyebrow="SEND"
         title="Send Update"
-        subtitle={`${user.role} access · post into a real group chat.`}
+        subtitle="Post to company, area, store, and role chats."
       />
 
       <View style={localStyles.card}>
-        <Text style={localStyles.label}>Group thread</Text>
+        <Text style={localStyles.sectionTitle}>Target</Text>
 
-        {availableGroups.length ? (
-          <View style={localStyles.groupGrid}>
-            {availableGroups.map((group) => {
-              const isSelected = selectedGroup?.id === group.id;
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.targetRow}
+        >
+          {availableTargets.map((thread) => {
+            const isActive = String(selectedTarget?.id) === String(thread.id);
 
-              return (
-                <TouchableOpacity
-                  key={group.id}
-                  style={[localStyles.groupChip, isSelected && localStyles.groupChipActive]}
-                  onPress={() => setSelectedGroupId(group.id)}
-                  activeOpacity={0.84}
+            return (
+              <TouchableOpacity
+                key={thread.id}
+                style={[
+                  localStyles.targetPill,
+                  isActive && localStyles.targetPillActive,
+                ]}
+                onPress={() => setTargetThreadId(thread.id)}
+                activeOpacity={0.84}
+              >
+                <Text
+                  style={[
+                    localStyles.targetType,
+                    isActive && localStyles.targetTypeActive,
+                  ]}
                 >
-                  <View style={localStyles.groupHeader}>
-                    <Text
-                      style={[
-                        localStyles.groupChipTitle,
-                        isSelected && localStyles.groupChipTitleActive,
-                      ]}
-                    >
-                      {group.label}
-                    </Text>
+                  {formatThreadType(thread.type)}
+                </Text>
+                <Text
+                  style={[
+                    localStyles.targetName,
+                    isActive && localStyles.targetNameActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {thread.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-                    <Text style={[localStyles.typePill, isSelected && localStyles.typePillActive]}>
-                      {formatThreadType(group.type)}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      localStyles.groupChipText,
-                      isSelected && localStyles.groupChipTextActive,
-                    ]}
-                  >
-                    {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={localStyles.emptyCard}>
-            <Text style={localStyles.emptyTitle}>No groups yet</Text>
+        {!availableTargets.length ? (
+          <View style={localStyles.emptyBox}>
             <Text style={localStyles.emptyText}>
-              Create a group in Admin first, then come back to send updates.
+              No group chats available yet. Create store/company/role chats first.
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       <View style={localStyles.card}>
-        <Text style={localStyles.label}>Subject</Text>
+        <Text style={localStyles.sectionTitle}>Message</Text>
+
+        <Text style={localStyles.label}>Title</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Example: Weekend operations reminder"
+          placeholder={selectedTarget?.name || "Update title"}
           placeholderTextColor="#7b8da0"
           style={localStyles.input}
         />
@@ -124,11 +135,10 @@ export function BroadcastScreen({ user, threads = [], onSendUpdate }) {
         <TextInput
           value={body}
           onChangeText={setBody}
-          placeholder="Write the update..."
+          placeholder="Type the update..."
           placeholderTextColor="#7b8da0"
-          style={[localStyles.input, localStyles.textArea]}
+          style={[localStyles.input, localStyles.bodyInput]}
           multiline
-          textAlignVertical="top"
         />
 
         <TouchableOpacity
@@ -136,193 +146,258 @@ export function BroadcastScreen({ user, threads = [], onSendUpdate }) {
           onPress={() => setRequiresAck((current) => !current)}
           activeOpacity={0.84}
         >
-          <View style={[localStyles.checkCircle, requiresAck && localStyles.checkCircleActive]}>
-            <Text style={localStyles.checkText}>{requiresAck ? "✓" : ""}</Text>
+          <View style={[localStyles.checkbox, requiresAck && localStyles.checkboxActive]}>
+            <Text style={localStyles.checkboxText}>{requiresAck ? "✓" : ""}</Text>
           </View>
 
-          <View style={localStyles.ackMain}>
-            <Text style={localStyles.ackTitle}>Needs Response</Text>
-            <Text style={localStyles.ackText}>
-              Ask team members to acknowledge this update.
+          <View style={localStyles.ackTextWrap}>
+            <Text style={[localStyles.ackTitle, requiresAck && localStyles.ackTitleActive]}>
+              Require acknowledgement
+            </Text>
+            <Text style={[localStyles.ackSubtitle, requiresAck && localStyles.ackSubtitleActive]}>
+              Useful for important updates managers/TMs need to confirm.
             </Text>
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.primaryButton,
-            (!selectedGroup || !title.trim() || !body.trim()) && localStyles.disabledButton,
+            localStyles.sendButton,
+            (!body.trim() || !selectedTarget) && localStyles.sendButtonDisabled,
           ]}
           onPress={handleSend}
-          disabled={!selectedGroup || !title.trim() || !body.trim()}
-          activeOpacity={0.86}
+          disabled={!body.trim() || !selectedTarget}
+          activeOpacity={0.84}
         >
-          <Text style={styles.primaryButtonText}>Post to Group</Text>
+          <Text style={localStyles.sendButtonText}>
+            Send to {selectedTarget?.name || "Group"}
+          </Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={localStyles.previewCard}>
+        <Text style={localStyles.previewLabel}>Preview</Text>
+        <Text style={localStyles.previewTarget}>
+          {selectedTarget ? selectedTarget.name : "No target selected"}
+        </Text>
+        <Text style={localStyles.previewTitle}>
+          {title.trim() || selectedTarget?.name || "Update"}
+        </Text>
+        <Text style={localStyles.previewBody}>
+          {body.trim() || "Your message preview will appear here."}
+        </Text>
+        {requiresAck ? <Text style={localStyles.previewAck}>ACK REQUIRED</Text> : null}
       </View>
     </ScrollView>
   );
 }
 
 function formatThreadType(type) {
-  const labels = {
+  const map = {
     company: "Company",
-    store: "Store",
     area: "Area",
+    store: "Store",
+    role: "Role",
     group: "Group",
   };
 
-  return labels[type] || "Group";
+  return map[type] || "Chat";
 }
 
 const localStyles = StyleSheet.create({
   card: {
-    backgroundColor: "#101d2d",
-    borderRadius: 18,
-    padding: 12,
+    backgroundColor: "#101d2c",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#203044",
+    padding: 9,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
     marginBottom: 7,
+  },
+  targetRow: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  targetPill: {
+    width: 116,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+  },
+  targetPillActive: {
+    backgroundColor: "#ef1745",
+    borderColor: "#ef1745",
+  },
+  targetType: {
+    color: "#8fa1b6",
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  targetTypeActive: {
+    color: "#ffd5dd",
+  },
+  targetName: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  targetNameActive: {
+    color: "#ffffff",
   },
   label: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  groupGrid: {
-    gap: 5,
-  },
-  groupChip: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 20,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  groupChipActive: {
-    backgroundColor: "#e91f3f",
-    borderColor: "#e91f3f",
-  },
-  groupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 5,
-    marginBottom: 6,
-  },
-  groupChipTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-    flex: 1,
-  },
-  groupChipTitleActive: {
-    color: "#ffffff",
-  },
-  groupChipText: {
-    color: "#9cadbf",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  groupChipTextActive: {
-    color: "#ffe2e8",
-  },
-  typePill: {
-    color: "#dbe7f3",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 999,
-    overflow: "hidden",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    color: "#8fa1b6",
     fontSize: 10,
     fontWeight: "900",
+    letterSpacing: 0.5,
     textTransform: "uppercase",
-  },
-  typePillActive: {
-    color: "#e91f3f",
-    backgroundColor: "#ffffff",
-  },
-  emptyCard: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
-    padding: 8,
-  },
-  emptyTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  emptyText: {
-    color: "#9cadbf",
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 4,
+    marginBottom: 4,
+    marginTop: 5,
   },
   input: {
-    backgroundColor: "#ffffff",
-    color: "#10212b",
-    borderRadius: 18,
-    paddingHorizontal: 9,
-    paddingVertical: 13,
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 7,
+    backgroundColor: "#0b1624",
+    borderWidth: 1,
+    borderColor: "#203044",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
   },
-  textArea: {
-    minHeight: 126,
+  bodyInput: {
+    minHeight: 92,
+    textAlignVertical: "top",
+    lineHeight: 18,
   },
   ackRow: {
     flexDirection: "row",
-    gap: 7,
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
-    padding: 13,
-    marginBottom: 7,
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+    padding: 8,
+    marginTop: 8,
   },
   ackRowActive: {
-    backgroundColor: "rgba(233,31,63,0.16)",
-    borderColor: "rgba(233,31,63,0.42)",
+    backgroundColor: "rgba(239,23,69,0.16)",
+    borderColor: "rgba(239,23,69,0.6)",
   },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#8fa1b6",
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    backgroundColor: "#0b1624",
+    borderWidth: 1,
+    borderColor: "#32465f",
     alignItems: "center",
     justifyContent: "center",
   },
-  checkCircleActive: {
-    backgroundColor: "#e91f3f",
-    borderColor: "#e91f3f",
+  checkboxActive: {
+    backgroundColor: "#ef1745",
+    borderColor: "#ef1745",
   },
-  checkText: {
+  checkboxText: {
     color: "#ffffff",
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "900",
   },
-  ackMain: {
+  ackTextWrap: {
     flex: 1,
   },
   ackTitle: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "900",
   },
-  ackText: {
-    color: "#9cadbf",
+  ackTitleActive: {
+    color: "#ffffff",
+  },
+  ackSubtitle: {
+    color: "#8fa1b6",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  ackSubtitleActive: {
+    color: "#ffd5dd",
+  },
+  sendButton: {
+    backgroundColor: "#ef1745",
+    borderRadius: 999,
+    paddingVertical: 10,
+    alignItems: "center",
+    marginTop: 9,
+  },
+  sendButtonDisabled: {
+    opacity: 0.45,
+  },
+  sendButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  previewCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 10,
+    marginBottom: 10,
+  },
+  previewLabel: {
+    color: "#ef1745",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  previewTarget: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 3,
+  },
+  previewTitle: {
+    color: "#10212b",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  previewBody: {
+    color: "#526273",
     fontSize: 12,
     fontWeight: "700",
-    marginTop: 2,
+    lineHeight: 18,
+    marginTop: 4,
   },
-  disabledButton: {
-    opacity: 0.5,
+  previewAck: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ffe4e8",
+    color: "#991b2f",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 9,
+    fontWeight: "900",
+    marginTop: 7,
+  },
+  emptyBox: {
+    padding: 8,
+  },
+  emptyText: {
+    color: "#9aacbf",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

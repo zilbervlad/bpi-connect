@@ -707,34 +707,25 @@ export default function App() {
   async function sendUpdate({ title, body, targetGroup, requiresAck }) {
     const targetThread = threads.find(
       (thread) =>
-        thread.id === targetGroup.threadId ||
-        thread.groupKey === targetGroup.threadGroupKey
+        String(thread.id) === String(targetGroup) ||
+        String(thread.id) === String(targetGroup?.threadId) ||
+        thread.groupKey === targetGroup?.threadGroupKey
     );
 
-    const formattedBody = `${title}\n\n${body}`;
+    if (!targetThread || !body?.trim()) return;
 
-    if (targetThread) {
-      await sendThreadMessage(targetThread.id, formattedBody, requiresAck);
-      setSelectedThreadId(targetThread.id);
-      setActiveTab("Chats");
-      return;
-    }
+    const cleanTitle = title?.trim();
+    const cleanBody = body.trim();
 
-    const newMessage = {
-      id: Date.now(),
-      type: "announcement",
-      priority: requiresAck ? "RESPONSE" : "UPDATE",
-      title,
-      from: `${currentUser.role} · ${currentUser.name}`,
-      time: "Just now",
-      body: `${body}\n\nTarget: ${targetGroup.label}`,
-      requiresAck,
-      responded: false,
-      unread: true,
-    };
+    const formattedBody =
+      cleanTitle && cleanTitle !== targetThread.name
+        ? `${cleanTitle}\n\n${cleanBody}`
+        : cleanBody;
 
-    setMessages((currentMessages) => [newMessage, ...currentMessages]);
-    setActiveTab("Inbox");
+    await sendThreadMessage(targetThread.id, formattedBody, requiresAck);
+
+    setSelectedThreadId(targetThread.id);
+    setActiveTab("Chats");
   }
 
   function sendPrivateMessage({ recipient, body }) {
