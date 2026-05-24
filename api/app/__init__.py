@@ -2973,7 +2973,12 @@ def create_app():
         membership.last_read_at = datetime.utcnow()
         db.session.commit()
 
-        return jsonify({"success": True})
+        thread = Thread.query.get(thread_id)
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread, user_id=user_id) if thread else None,
+        })
 
     @app.post("/api/thread-messages/<int:thread_message_id>/acknowledge")
     def acknowledge_thread_message(thread_message_id):

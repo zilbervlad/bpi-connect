@@ -649,7 +649,7 @@ export default function App() {
 
     if (isOpenThread && !incomingMessage.isMe && usingApi && currentUser?.id) {
       try {
-        await markApiThreadRead(threadId, currentUser.id);
+        await markThreadReadAndClear(threadId);
       } catch (error) {
         console.log("Could not mark realtime message read:", error.message);
       }
@@ -684,7 +684,7 @@ export default function App() {
 
     try {
       const data = await fetchApiThreadMessages(threadId, currentUser.id);
-      await markApiThreadRead(threadId, currentUser.id);
+      await markThreadReadAndClear(threadId);
       const mappedMessages = data.messages.map(mapApiThreadMessageToBubble);
       const members = data.thread.members || [];
 
@@ -709,6 +709,41 @@ export default function App() {
     }
   }
 
+  async function markThreadReadAndClear(threadId) {
+    if (!threadId) return;
+
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        Number(thread.id) === Number(threadId)
+          ? {
+              ...thread,
+              unread: 0,
+              unreadAtOpen: thread.unreadAtOpen || thread.unread || 0,
+            }
+          : thread
+      )
+    );
+
+    if (!usingApi || !currentUser?.id) return;
+
+    try {
+      await markApiThreadRead(threadId, currentUser.id);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          Number(thread.id) === Number(threadId)
+            ? {
+                ...thread,
+                unread: 0,
+              }
+            : thread
+        )
+      );
+    } catch (error) {
+      console.log("Could not mark thread read:", error.message);
+    }
+  }
+
   async function openThread(threadOrId) {
     const thread =
       typeof threadOrId === "object"
@@ -717,12 +752,14 @@ export default function App() {
 
     if (!thread) return;
 
+    const unreadAtOpen = thread.unread || 0;
+
     setThreads((currentThreads) =>
       currentThreads.map((item) =>
-        item.id === thread.id
+        Number(item.id) === Number(thread.id)
           ? {
               ...item,
-              unreadAtOpen: item.unread || 0,
+              unreadAtOpen,
               unread: 0,
             }
           : item
@@ -730,6 +767,7 @@ export default function App() {
     );
 
     setSelectedThreadId(thread.id);
+    markThreadReadAndClear(thread.id);
 
     if (usingApi && thread.apiThread && currentUser?.id) {
       try {
@@ -750,13 +788,7 @@ export default function App() {
           )
         );
 
-        await markApiThreadRead(thread.id, currentUser.id);
-
-        setThreads((currentThreads) =>
-          currentThreads.map((item) =>
-            item.id === thread.id ? { ...item, unread: 0 } : item
-          )
-        );
+        await markThreadReadAndClear(thread.id);
       } catch (error) {
         console.log("Could not load thread messages:", error.message);
       }
