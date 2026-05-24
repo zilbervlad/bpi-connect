@@ -1002,6 +1002,10 @@ def create_app():
         if "role" in data:
             user.role = (data.get("role") or "").strip().lower() or user.role
 
+        if "avatar_url" in data:
+            avatar_url = (data.get("avatar_url") or "").strip()
+            user.avatar_url = avatar_url or None
+
         if "is_active" in data:
             user.is_active = bool(data.get("is_active"))
 
@@ -1520,6 +1524,7 @@ def serialize_user(user):
         "id": user.id,
         "name": user.name,
         "email": user.email,
+        "avatar_url": user.avatar_url,
         "role": user.role,
         "store": user.store.store_number if user.store else None,
         "store_name": user.store.name if user.store else None,
