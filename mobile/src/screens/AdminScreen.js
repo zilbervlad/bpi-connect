@@ -493,14 +493,9 @@ export function AdminScreen({ user }) {
       <HeaderBlock
         eyebrow="ADMIN"
         title="Admin"
-        subtitle="People, stores, access, and groups."
+        subtitle={`${users.filter((item) => item.is_active).length} active users · ${stores.length} stores · ${areas.length} areas`}
       />
 
-      <View style={localStyles.statsGrid}>
-        <StatCard label="Active" value={users.filter((item) => item.is_active).length} />
-        <StatCard label="Stores" value={stores.length} />
-        <StatCard label="Areas" value={areas.length} />
-      </View>
 
       <View style={localStyles.navCard}>
         <AdminTab label="Users" value="people" activeSection={activeSection} setActiveSection={setActiveSection} />
