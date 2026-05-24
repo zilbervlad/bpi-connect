@@ -879,7 +879,7 @@ export function AdminScreen({ user }) {
           </TouchableOpacity>
 
           <View style={localStyles.detailHeader}>
-            <UserAvatar user={selectedUser} size={58} />
+            <UserAvatar user={selectedUser} size={38} />
             <View style={localStyles.detailMain}>
               <Text style={localStyles.detailName}>{selectedUser.name}</Text>
               <Text style={localStyles.detailMeta}>{selectedUser.email}</Text>
@@ -1137,18 +1137,18 @@ function formatRole(role) {
 const localStyles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
-    gap: 10,
+    gap: 5,
     marginBottom: 14,
   },
   statCard: {
     flex: 1,
     backgroundColor: "#ffffff",
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 16,
+    padding: 9,
   },
   statValue: {
     color: "#10212b",
-    fontSize: 30,
+    fontSize: 23,
     fontWeight: "900",
     letterSpacing: -1,
   },
@@ -1161,7 +1161,7 @@ const localStyles = StyleSheet.create({
   },
   navCard: {
     backgroundColor: "#101d2d",
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 7,
     marginBottom: 14,
     flexDirection: "row",
@@ -1172,7 +1172,7 @@ const localStyles = StyleSheet.create({
   navPill: {
     flex: 1,
     borderRadius: 17,
-    paddingVertical: 11,
+    paddingVertical: 6,
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
   },
@@ -1189,23 +1189,23 @@ const localStyles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#101d2d",
-    borderRadius: 28,
-    padding: 18,
-    marginBottom: 18,
+    borderRadius: 18,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   formCard: {
     backgroundColor: "#07111f",
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   formTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "900",
     marginBottom: 12,
   },
@@ -1227,7 +1227,7 @@ const localStyles = StyleSheet.create({
   input: {
     backgroundColor: "#eef5f8",
     borderRadius: 16,
-    paddingHorizontal: 14,
+    paddingHorizontal: 9,
     paddingVertical: 13,
     color: "#10212b",
     fontSize: 15,
@@ -1238,17 +1238,17 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 18,
     paddingHorizontal: 15,
-    paddingVertical: 14,
+    paddingVertical: 7,
     color: "#10212b",
     fontSize: 15,
     fontWeight: "700",
-    marginBottom: 16,
+    marginBottom: 7,
   },
   pillGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 7,
   },
   pill: {
     borderRadius: 999,
@@ -1272,14 +1272,14 @@ const localStyles = StyleSheet.create({
   },
   peopleSplit: {
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 18,
+    gap: 5,
+    marginBottom: 7,
   },
   miniStat: {
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 18,
-    padding: 14,
+    padding: 8,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -1298,7 +1298,7 @@ const localStyles = StyleSheet.create({
   userRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 6,
     backgroundColor: "rgba(255,255,255,0.045)",
     borderRadius: 18,
     padding: 12,
@@ -1363,7 +1363,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 16,
     padding: 13,
-    marginTop: 10,
+    marginTop: 5,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -1374,12 +1374,12 @@ const localStyles = StyleSheet.create({
     textAlign: "center",
   },
   deactivatedBlock: {
-    marginTop: 12,
+    marginTop: 5,
   },
   qrWrap: {
     backgroundColor: "#ffffff",
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 16,
+    padding: 9,
     alignSelf: "center",
     marginBottom: 14,
     shadowColor: "#000",
@@ -1392,18 +1392,18 @@ const localStyles = StyleSheet.create({
     color: "#991b2f",
     fontSize: 12,
     fontWeight: "800",
-    marginTop: 10,
+    marginTop: 5,
     lineHeight: 17,
   },
   inviteCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 22,
-    padding: 16,
-    marginTop: 16,
+    borderRadius: 16,
+    padding: 9,
+    marginTop: 7,
   },
   inviteTitle: {
     color: "#10212b",
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "900",
     marginBottom: 4,
   },
@@ -1428,7 +1428,7 @@ const localStyles = StyleSheet.create({
   storeCard: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
-    padding: 14,
+    padding: 8,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -1436,7 +1436,7 @@ const localStyles = StyleSheet.create({
   simpleRow: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 18,
-    padding: 14,
+    padding: 8,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -1444,7 +1444,7 @@ const localStyles = StyleSheet.create({
   smallDangerButton: {
     backgroundColor: "#ffe4e8",
     borderRadius: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 9,
     alignSelf: "flex-start",
     marginBottom: 12,
@@ -1463,7 +1463,7 @@ const localStyles = StyleSheet.create({
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 6,
     marginBottom: 12,
     alignItems: "center",
   },
@@ -1481,21 +1481,21 @@ const localStyles = StyleSheet.create({
   },
   detailHeader: {
     flexDirection: "row",
-    gap: 14,
+    gap: 6,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 8,
   },
   detailAvatar: {
     width: 58,
     height: 58,
-    borderRadius: 22,
+    borderRadius: 16,
     backgroundColor: "#e91f3f",
     alignItems: "center",
     justifyContent: "center",
   },
   detailAvatarText: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "900",
   },
   detailMain: {
@@ -1514,17 +1514,17 @@ const localStyles = StyleSheet.create({
     marginTop: 3,
   },
   resendInviteBlock: {
-    marginBottom: 18,
+    marginBottom: 7,
   },
   resendResultCard: {
     backgroundColor: "#ffffff",
     borderRadius: 20,
-    padding: 14,
-    marginTop: 12,
+    padding: 8,
+    marginTop: 5,
   },
   resendResultTitle: {
     color: "#10212b",
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "900",
     marginBottom: 4,
   },
@@ -1538,7 +1538,7 @@ const localStyles = StyleSheet.create({
   assignmentRow: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 18,
-    padding: 14,
+    padding: 8,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -1549,7 +1549,7 @@ const localStyles = StyleSheet.create({
   removeButton: {
     backgroundColor: "#ffe4e8",
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 9,
   },
   removeButtonText: {

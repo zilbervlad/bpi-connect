@@ -15,7 +15,7 @@ export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenPro
       />
 
       <View style={localStyles.profileCard}>
-        <UserAvatar user={user} size={58} />
+        <UserAvatar user={user} size={38} />
 
         <View style={localStyles.profileMain}>
           <Text style={localStyles.profileName}>{user.name}</Text>
@@ -67,24 +67,24 @@ export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenPro
 const localStyles = StyleSheet.create({
   profileCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 28,
-    padding: 18,
+    borderRadius: 18,
+    padding: 12,
     marginBottom: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 8,
   },
   avatar: {
     width: 58,
     height: 58,
-    borderRadius: 22,
+    borderRadius: 16,
     backgroundColor: "#e91f3f",
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: {
     color: "#ffffff",
-    fontSize: 24,
+    fontSize: 15,
     fontWeight: "900",
   },
   profileMain: {
@@ -92,7 +92,7 @@ const localStyles = StyleSheet.create({
   },
   profileName: {
     color: "#10212b",
-    fontSize: 24,
+    fontSize: 15,
     fontWeight: "900",
     letterSpacing: -0.8,
   },
@@ -104,14 +104,14 @@ const localStyles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 7,
     marginBottom: 14,
   },
   statBox: {
     flex: 1,
     backgroundColor: "#101d2d",
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -130,15 +130,15 @@ const localStyles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#101d2d",
-    borderRadius: 28,
-    padding: 18,
+    borderRadius: 18,
+    padding: 12,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   sectionTitle: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: -0.7,
     marginBottom: 10,
@@ -146,8 +146,8 @@ const localStyles = StyleSheet.create({
   row: {
     backgroundColor: "rgba(255,255,255,0.055)",
     borderRadius: 18,
-    padding: 15,
-    marginTop: 10,
+    padding: 12,
+    marginTop: 5,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -167,13 +167,13 @@ const localStyles = StyleSheet.create({
   },
   chevron: {
     color: "#9cadbf",
-    fontSize: 28,
+    fontSize: 15,
     fontWeight: "500",
   },
   signOutButton: {
     backgroundColor: "#ffe4e8",
     borderRadius: 20,
-    paddingVertical: 15,
+    paddingVertical: 6,
     alignItems: "center",
     marginBottom: 110,
   },

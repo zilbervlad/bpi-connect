@@ -297,8 +297,8 @@ function getStoreLabel(person) {
 const localStyles = StyleSheet.create({
   searchCard: {
     backgroundColor: "#101d2d",
-    borderRadius: 26,
-    padding: 16,
+    borderRadius: 18,
+    padding: 12,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -307,7 +307,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 18,
     paddingHorizontal: 15,
-    paddingVertical: 14,
+    paddingVertical: 6,
     color: "#10212b",
     fontSize: 15,
     fontWeight: "800",
@@ -319,7 +319,7 @@ const localStyles = StyleSheet.create({
   },
   filterChip: {
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 9,
     paddingVertical: 9,
     backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
@@ -339,18 +339,18 @@ const localStyles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 7,
     marginBottom: 14,
   },
   summaryBox: {
     flex: 1,
     backgroundColor: "#ffffff",
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 16,
+    padding: 9,
   },
   summaryNumber: {
     color: "#10212b",
-    fontSize: 30,
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: -1,
   },
@@ -363,8 +363,8 @@ const localStyles = StyleSheet.create({
   },
   groupCard: {
     backgroundColor: "#101d2d",
-    borderRadius: 28,
-    padding: 16,
+    borderRadius: 18,
+    padding: 12,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -374,7 +374,7 @@ const localStyles = StyleSheet.create({
   },
   groupTitle: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: -0.7,
   },
@@ -387,11 +387,11 @@ const localStyles = StyleSheet.create({
   personRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 7,
     backgroundColor: "rgba(255,255,255,0.045)",
     borderRadius: 18,
     padding: 12,
-    marginTop: 10,
+    marginTop: 5,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.075)",
   },
@@ -431,7 +431,7 @@ const localStyles = StyleSheet.create({
   messageButton: {
     backgroundColor: "#ffffff",
     borderRadius: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 9,
   },
   messageButtonText: {
