@@ -1,4 +1,5 @@
 import os
+import requests
 from datetime import datetime
 from secrets import token_urlsafe
 
@@ -367,11 +368,18 @@ def create_app():
         db.session.add(user)
         db.session.commit()
 
+        app_invite_base_url = os.getenv("APP_INVITE_BASE_URL", "bpi-connect://accept-invite").strip().rstrip("/")
+        invite_url = f"{app_invite_base_url}/{invite_token}"
+
+        email_result = send_invite_email(user, invite_url)
+
         return jsonify({
             "success": True,
             "user": serialize_user(user),
             "invite_token": invite_token,
-            "invite_url": f"bpi-connect://accept-invite/{invite_token}",
+            "invite_url": invite_url,
+            "invite_email_sent": email_result.get("sent", False),
+            "invite_email_error": email_result.get("error"),
         }), 201
 
 
@@ -1129,6 +1137,84 @@ def create_app():
         return jsonify({"success": True})
 
     return app
+
+
+
+def send_invite_email(user, invite_url):
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    invite_email_from = os.getenv("INVITE_EMAIL_FROM", "BPI Connect <onboarding@resend.dev>").strip()
+
+    if not resend_api_key:
+        return {
+            "sent": False,
+            "error": "RESEND_API_KEY is not configured.",
+        }
+
+    if not user.email:
+        return {
+            "sent": False,
+            "error": "User email is missing.",
+        }
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; color: #10212b; line-height: 1.5; max-width: 560px;">
+      <h2 style="margin-bottom: 8px;">You’re invited to BPI Connect</h2>
+      <p>Hi {user.name},</p>
+      <p>You’ve been invited to join BPI Connect for Boston Pie team communication.</p>
+      <p style="margin: 24px 0;">
+        <a href="{invite_url}" style="background:#e91f3f;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:bold;display:inline-block;">
+          Set up your account
+        </a>
+      </p>
+      <p>If the button does not work, copy and paste this link:</p>
+      <p style="word-break: break-all; color:#526273;">{invite_url}</p>
+      <p style="color:#697b8d;font-size:13px;margin-top:24px;">
+        This invite was sent by Boston Pie, Inc.
+      </p>
+    </div>
+    """
+
+    text_body = f"""Hi {user.name},
+
+You’ve been invited to join BPI Connect for Boston Pie team communication.
+
+Set up your account:
+{invite_url}
+
+This invite was sent by Boston Pie, Inc.
+"""
+
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": invite_email_from,
+            "to": [user.email],
+            "subject": "You’re invited to BPI Connect",
+            "html": html,
+            "text": text_body,
+        },
+        timeout=12,
+    )
+
+    if response.status_code >= 400:
+        return {
+            "sent": False,
+            "error": response.text,
+        }
+
+    try:
+        data = response.json()
+    except Exception:
+        data = {}
+
+    return {
+        "sent": True,
+        "provider_response": data,
+    }
 
 
 def serialize_user(user):
