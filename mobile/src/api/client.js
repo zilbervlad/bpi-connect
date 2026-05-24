@@ -558,3 +558,25 @@ export async function sendApiUserPasswordReset(userId) {
 
   return data;
 }
+
+export async function saveApiUserPushToken(userId, token, metadata = {}) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/push-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      token,
+      platform: metadata.platform,
+      device_name: metadata.deviceName,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not save push token");
+  }
+
+  return data.push_token;
+}

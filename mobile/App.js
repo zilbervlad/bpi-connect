@@ -21,6 +21,7 @@ import {
   loginApiUser,
   toggleApiThreadMessageReaction,
   acknowledgeApiThreadMessage,
+  saveApiUserPushToken,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -38,6 +39,7 @@ import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { AdminScreen } from "./src/screens/AdminScreen";
 import { MoreScreen } from "./src/screens/MoreScreen";
+import { registerForPushNotificationsAsync } from "./src/services/pushNotifications";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -183,6 +185,7 @@ export default function App() {
           const savedUser = JSON.parse(savedUserJson);
           setCurrentUser(savedUser);
           setIsLoggedIn(true);
+          registerPushTokenForUser(savedUser);
         }
       } catch (error) {
         console.log("Could not load saved user:", error.message);
@@ -195,6 +198,28 @@ export default function App() {
   useEffect(() => {
     loadApiData();
   }, []);
+
+  async function registerPushTokenForUser(user) {
+    if (!user?.id || !user?.apiUser) return;
+
+    try {
+      const result = await registerForPushNotificationsAsync();
+
+      if (!result.token) {
+        console.log("Push token not registered:", result.error);
+        return;
+      }
+
+      await saveApiUserPushToken(user.id, result.token, {
+        platform: result.platform,
+        deviceName: result.deviceName,
+      });
+
+      console.log("Push token registered.");
+    } catch (error) {
+      console.log("Could not register push token:", error.message);
+    }
+  }
 
   async function handleLogin(email, password) {
     setIsLoggingIn(true);
@@ -209,6 +234,7 @@ export default function App() {
       setActiveTab("Home");
 
       await reloadDataForUser(mappedUser);
+      await registerPushTokenForUser(mappedUser);
     } catch (error) {
       setLoginError(error.message || "Could not sign in.");
     } finally {
