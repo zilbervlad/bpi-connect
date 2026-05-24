@@ -133,6 +133,22 @@ class ThreadMessage(db.Model):
     sender = db.relationship("User", backref="thread_messages_sent")
 
 
+class ThreadMessageAttachment(db.Model):
+    __tablename__ = "thread_message_attachments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_message_id = db.Column(db.Integer, db.ForeignKey("thread_messages.id"), nullable=False)
+    file_type = db.Column(db.String(40), nullable=False, default="image")
+    url = db.Column(db.Text, nullable=False)
+    thumbnail_url = db.Column(db.Text, nullable=True)
+    original_filename = db.Column(db.String(255), nullable=True)
+    mime_type = db.Column(db.String(120), nullable=True)
+    size_bytes = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    thread_message = db.relationship("ThreadMessage", backref="attachments")
+
+
 class ThreadMessageAck(db.Model):
     __tablename__ = "thread_message_acks"
 

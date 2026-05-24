@@ -11,7 +11,8 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
-from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck, UserStoreAssignment, ThreadMessageReaction
+from app.models import Area, Store, User, Message, MessageRecipient, Thread, ThreadMember, ThreadMessage, ThreadMessageAck,
+    ThreadMessageAttachment, UserStoreAssignment, ThreadMessageReaction
 
 
 def create_app():
@@ -54,6 +55,19 @@ def create_app():
             }), 403
 
         return None
+
+
+    @app.post("/dev/migrate-attachments")
+    def migrate_attachments_table():
+        if not check_dev_admin_secret():
+            return jsonify({"success": False, "error": "Unauthorized."}), 401
+
+        db.create_all()
+
+        return jsonify({
+            "success": True,
+            "message": "Attachment tables migrated.",
+        })
 
 
     @app.get("/dev/tables")
@@ -1703,6 +1717,107 @@ def create_app():
             "messages": [serialize_thread_message(message, user_id=user_id) for message in messages],
         })
 
+    @app.post("/api/threads/<int:thread_id>/messages/image")
+    def create_thread_image_message(thread_id):
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        data = request.get_json() or {}
+        sender_user_id = data.get("sender_user_id")
+        body = (data.get("body") or "").strip()
+        image_data = data.get("image_data")
+        mime_type = (data.get("mime_type") or "image/jpeg").strip()
+        original_filename = (data.get("original_filename") or "chat-image.jpg").strip()
+        requires_ack = bool(data.get("requires_ack", False))
+
+        if not sender_user_id:
+            return jsonify({"success": False, "error": "sender_user_id is required."}), 400
+
+        if not image_data:
+            return jsonify({"success": False, "error": "image_data is required."}), 400
+
+        sender = User.query.get(sender_user_id)
+
+        if not sender:
+            return jsonify({"success": False, "error": "Sender not found."}), 404
+
+        cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+        api_key = os.getenv("CLOUDINARY_API_KEY", "").strip()
+        api_secret = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+
+        if not cloud_name or not api_key or not api_secret:
+            return jsonify({
+                "success": False,
+                "error": "Cloudinary is not configured.",
+            }), 500
+
+        timestamp = int(time.time())
+        folder = "bpi-connect/chat-images"
+        public_id = f"thread-{thread.id}-user-{sender.id}-{timestamp}"
+
+        signature_payload = f"folder={folder}&overwrite=true&public_id={public_id}&timestamp={timestamp}{api_secret}"
+        signature = hashlib.sha1(signature_payload.encode("utf-8")).hexdigest()
+
+        upload_response = requests.post(
+            f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload",
+            data={
+                "file": image_data,
+                "api_key": api_key,
+                "timestamp": timestamp,
+                "signature": signature,
+                "folder": folder,
+                "public_id": public_id,
+                "overwrite": "true",
+            },
+            timeout=45,
+        )
+
+        if upload_response.status_code >= 400:
+            return jsonify({
+                "success": False,
+                "error": upload_response.text,
+            }), 500
+
+        uploaded = upload_response.json()
+        image_url = uploaded.get("secure_url")
+
+        if not image_url:
+            return jsonify({
+                "success": False,
+                "error": "Upload succeeded but no secure_url was returned.",
+            }), 500
+
+        message = ThreadMessage(
+            thread_id=thread.id,
+            sender_user_id=sender.id,
+            body=body or "Photo",
+            requires_ack=requires_ack,
+        )
+
+        db.session.add(message)
+        db.session.flush()
+
+        attachment = ThreadMessageAttachment(
+            thread_message_id=message.id,
+            file_type="image",
+            url=image_url,
+            thumbnail_url=image_url,
+            original_filename=original_filename,
+            mime_type=mime_type,
+            size_bytes=uploaded.get("bytes"),
+        )
+
+        db.session.add(attachment)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": serialize_thread_message(message, sender.id),
+        }), 201
+
+
     @app.post("/api/threads/<int:thread_id>/messages")
     def create_thread_message(thread_id):
         data = request.get_json() or {}
@@ -1959,6 +2074,19 @@ def serialize_thread(thread, user_id=None):
     }
 
 
+def serialize_thread_message_attachment(attachment):
+    return {
+        "id": attachment.id,
+        "file_type": attachment.file_type,
+        "url": attachment.url,
+        "thumbnail_url": attachment.thumbnail_url,
+        "original_filename": attachment.original_filename,
+        "mime_type": attachment.mime_type,
+        "size_bytes": attachment.size_bytes,
+        "created_at": attachment.created_at.isoformat() if attachment.created_at else None,
+    }
+
+
 def serialize_thread_message(message, user_id=None):
     acknowledged = False
 
@@ -1978,6 +2106,7 @@ def serialize_thread_message(message, user_id=None):
         "created_at": message.created_at.isoformat(),
         "is_me": message.sender_user_id == user_id if user_id else False,
         "reactions": serialize_message_reactions(message, user_id),
+        "attachments": [serialize_thread_message_attachment(item) for item in message.attachments],
     }
 
 def serialize_store(store):
