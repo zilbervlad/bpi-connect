@@ -1130,6 +1130,13 @@ export default function App() {
     setActiveTab("Chats");
   }
 
+  function changeTab(nextTab) {
+    setActiveTab(nextTab);
+    setSelectedMessageId(null);
+    setSelectedThreadId(null);
+    setStartingRecipient(null);
+  }
+
   const profileUsers = usingApi && apiUsers.length ? apiUsers : demoUsers;
 
   if (!isLoggedIn) {
