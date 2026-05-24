@@ -409,6 +409,278 @@ def create_app():
         }), 201
 
 
+    @app.get("/invite/<invite_token>")
+    def invite_setup_page(invite_token):
+        user = User.query.filter_by(invite_token=invite_token).first()
+
+        if not user:
+            return """
+            <!doctype html>
+            <html>
+              <head>
+                <title>BPI Connect Invite</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <style>
+                  body { margin:0; font-family: Arial, sans-serif; background:#07111f; color:#fff; display:flex; min-height:100vh; align-items:center; justify-content:center; padding:22px; }
+                  .card { max-width:440px; width:100%; background:#fff; color:#10212b; border-radius:28px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.28); }
+                  .badge { background:#e91f3f; color:#fff; width:72px; height:72px; border-radius:24px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:24px; margin-bottom:18px; }
+                  h1 { font-size:32px; line-height:1.05; margin:0 0 10px; letter-spacing:-1px; }
+                  p { color:#526273; line-height:1.45; font-size:15px; }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <div class="badge">BPI</div>
+                  <h1>Invite not found</h1>
+                  <p>This invite link is invalid or has already been removed. Please ask your manager or HR for a new invite.</p>
+                </div>
+              </body>
+            </html>
+            """, 404
+
+        if user.invite_accepted_at:
+            return """
+            <!doctype html>
+            <html>
+              <head>
+                <title>BPI Connect Invite</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <style>
+                  body { margin:0; font-family: Arial, sans-serif; background:#07111f; color:#fff; display:flex; min-height:100vh; align-items:center; justify-content:center; padding:22px; }
+                  .card { max-width:440px; width:100%; background:#fff; color:#10212b; border-radius:28px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.28); }
+                  .badge { background:#e91f3f; color:#fff; width:72px; height:72px; border-radius:24px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:24px; margin-bottom:18px; }
+                  h1 { font-size:32px; line-height:1.05; margin:0 0 10px; letter-spacing:-1px; }
+                  p { color:#526273; line-height:1.45; font-size:15px; }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <div class="badge">BPI</div>
+                  <h1>Account already set up</h1>
+                  <p>This BPI Connect account has already been activated. Open the BPI Connect app and sign in.</p>
+                </div>
+              </body>
+            </html>
+            """
+
+        return f"""
+        <!doctype html>
+        <html>
+          <head>
+            <title>Set up BPI Connect</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              * {{ box-sizing:border-box; }}
+              body {{
+                margin:0;
+                font-family: Arial, sans-serif;
+                background: radial-gradient(circle at top left, #152337 0, #07111f 46%, #030912 100%);
+                color:#fff;
+                min-height:100vh;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                padding:22px;
+              }}
+              .card {{
+                max-width:460px;
+                width:100%;
+                background:#ffffff;
+                color:#10212b;
+                border-radius:32px;
+                padding:30px;
+                box-shadow:0 24px 70px rgba(0,0,0,.32);
+              }}
+              .badge {{
+                background:#e91f3f;
+                color:#fff;
+                width:76px;
+                height:76px;
+                border-radius:26px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-weight:900;
+                font-size:25px;
+                margin-bottom:20px;
+              }}
+              .eyebrow {{
+                color:#e91f3f;
+                font-weight:900;
+                letter-spacing:3px;
+                font-size:12px;
+                margin-bottom:8px;
+              }}
+              h1 {{
+                font-size:34px;
+                line-height:1.04;
+                margin:0 0 10px;
+                letter-spacing:-1.4px;
+              }}
+              .sub {{
+                color:#526273;
+                line-height:1.45;
+                font-size:15px;
+                margin:0 0 20px;
+              }}
+              .person {{
+                background:#eef5f8;
+                border-radius:18px;
+                padding:14px;
+                margin-bottom:18px;
+              }}
+              .person strong {{
+                display:block;
+                font-size:16px;
+                margin-bottom:3px;
+              }}
+              .person span {{
+                color:#697b8d;
+                font-size:13px;
+                font-weight:700;
+              }}
+              label {{
+                display:block;
+                font-size:12px;
+                font-weight:900;
+                text-transform:uppercase;
+                letter-spacing:.8px;
+                margin:12px 0 7px;
+              }}
+              input {{
+                width:100%;
+                border:0;
+                background:#eef5f8;
+                border-radius:16px;
+                padding:14px;
+                font-size:16px;
+                font-weight:700;
+                color:#10212b;
+                outline:none;
+              }}
+              button {{
+                width:100%;
+                border:0;
+                background:#e91f3f;
+                color:#fff;
+                border-radius:18px;
+                padding:15px;
+                font-size:16px;
+                font-weight:900;
+                margin-top:20px;
+                cursor:pointer;
+              }}
+              .error {{
+                display:none;
+                background:#ffe4e8;
+                color:#991b2f;
+                border-radius:14px;
+                padding:12px;
+                font-weight:800;
+                font-size:13px;
+                margin-top:14px;
+              }}
+              .success {{
+                display:none;
+                background:#dcfce7;
+                color:#166534;
+                border-radius:14px;
+                padding:12px;
+                font-weight:800;
+                font-size:13px;
+                margin-top:14px;
+              }}
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <div class="badge">BPI</div>
+              <div class="eyebrow">BPI CONNECT</div>
+              <h1>Set up your account</h1>
+              <p class="sub">Create your password to activate BPI Connect.</p>
+
+              <div class="person">
+                <strong>{user.name}</strong>
+                <span>{user.email}</span>
+              </div>
+
+              <form id="inviteForm">
+                <label>Password</label>
+                <input id="password" type="password" placeholder="Create password" minlength="8" required />
+
+                <label>Confirm password</label>
+                <input id="confirmPassword" type="password" placeholder="Confirm password" minlength="8" required />
+
+                <div id="error" class="error"></div>
+                <div id="success" class="success"></div>
+
+                <button id="submitButton" type="submit">Activate Account</button>
+              </form>
+            </div>
+
+            <script>
+              const form = document.getElementById("inviteForm");
+              const errorBox = document.getElementById("error");
+              const successBox = document.getElementById("success");
+              const button = document.getElementById("submitButton");
+
+              form.addEventListener("submit", async (event) => {{
+                event.preventDefault();
+
+                errorBox.style.display = "none";
+                successBox.style.display = "none";
+
+                const password = document.getElementById("password").value;
+                const confirmPassword = document.getElementById("confirmPassword").value;
+
+                if (password.length < 8) {{
+                  errorBox.textContent = "Password must be at least 8 characters.";
+                  errorBox.style.display = "block";
+                  return;
+                }}
+
+                if (password !== confirmPassword) {{
+                  errorBox.textContent = "Passwords do not match.";
+                  errorBox.style.display = "block";
+                  return;
+                }}
+
+                button.disabled = true;
+                button.textContent = "Activating...";
+
+                try {{
+                  const response = await fetch("/api/invites/accept", {{
+                    method: "POST",
+                    headers: {{ "Content-Type": "application/json" }},
+                    body: JSON.stringify({{
+                      invite_token: "{invite_token}",
+                      password: password
+                    }})
+                  }});
+
+                  const data = await response.json();
+
+                  if (!response.ok || !data.success) {{
+                    throw new Error(data.error || "Could not activate account.");
+                  }}
+
+                  successBox.textContent = "Account activated. You can now open BPI Connect and sign in.";
+                  successBox.style.display = "block";
+                  form.reset();
+                  button.textContent = "Account Activated";
+                }} catch (error) {{
+                  errorBox.textContent = error.message || "Could not activate account.";
+                  errorBox.style.display = "block";
+                  button.disabled = false;
+                  button.textContent = "Activate Account";
+                }}
+              }});
+            </script>
+          </body>
+        </html>
+        """
+
+
     @app.post("/api/invites/accept")
     def accept_invite():
         data = request.get_json() or {}
