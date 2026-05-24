@@ -523,3 +523,38 @@ export async function sendApiThreadImageMessage(threadId, senderUserId, imageDat
 
   return data.message;
 }
+
+export async function requestApiPasswordReset(email) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not request password reset");
+  }
+
+  return data;
+}
+
+export async function sendApiUserPasswordReset(userId) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/send-password-reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not send password reset");
+  }
+
+  return data;
+}
