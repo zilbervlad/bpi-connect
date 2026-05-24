@@ -329,3 +329,24 @@ export async function updateApiStore(storeId, updates) {
 
   return data.store;
 }
+
+export async function toggleApiThreadMessageReaction(messageId, userId, emoji = "👍") {
+  const response = await fetch(`${API_BASE_URL}/api/thread-messages/${messageId}/reactions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      emoji,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not update reaction");
+  }
+
+  return data;
+}

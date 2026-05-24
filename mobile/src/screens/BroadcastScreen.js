@@ -12,7 +12,7 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { getVisibleRecipientGroups } from "../data/recipientGroups";
 
-export function BroadcastScreen({ user, onSendBroadcast }) {
+export function UpdateScreen({ user, onSendUpdate }) {
   const availableGroups = useMemo(() => getVisibleRecipientGroups(user), [user]);
   const [selectedGroupId, setSelectedGroupId] = useState(
     availableGroups[0]?.id || null
@@ -28,7 +28,7 @@ export function BroadcastScreen({ user, onSendBroadcast }) {
   function handleSend() {
     if (!selectedGroup || !title.trim() || !body.trim()) return;
 
-    onSendBroadcast({
+    onSendUpdate({
       title: title.trim(),
       body: body.trim(),
       targetGroup: selectedGroup,

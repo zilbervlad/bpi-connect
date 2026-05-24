@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ const roles = [
   { label: "Manager", value: "manager" },
   { label: "General Manager", value: "general_manager" },
   { label: "Coach", value: "coach" },
+  { label: "Supervisor", value: "supervisor" },
   { label: "HR", value: "hr" },
   { label: "Admin", value: "admin" },
 ];
@@ -38,64 +39,71 @@ const roleLabels = {
   manager: "Manager",
   general_manager: "General Manager",
   coach: "Coach",
+  supervisor: "Supervisor",
   hr: "HR",
   admin: "Admin",
 };
 
 export function AdminScreen({ user }) {
-  const [activeSection, setActiveSection] = useState("invite");
+  const [activeSection, setActiveSection] = useState("people");
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [newAreaName, setNewAreaName] = useState("");
-  const [newStoreNumber, setNewStoreNumber] = useState("");
-  const [newStoreName, setNewStoreName] = useState("");
-  const [newStoreArea, setNewStoreArea] = useState("");
-  const [showInactiveUsers, setShowInactiveUsers] = useState(false);
-  const [peopleSearch, setPeopleSearch] = useState("");
-  const [peopleRoleFilter, setPeopleRoleFilter] = useState("all");
-  const [peopleStoreFilter, setPeopleStoreFilter] = useState("all");
   const [selectedUser, setSelectedUser] = useState(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("tm");
-  const [storeNumber, setStoreNumber] = useState("3001");
-  const [area, setArea] = useState("North Area");
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const [peopleRoleFilter, setPeopleRoleFilter] = useState("all");
+  const [peopleStoreFilter, setPeopleStoreFilter] = useState("all");
+  const [showInactiveUsers, setShowInactiveUsers] = useState(false);
+
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("tm");
+  const [inviteStoreNumber, setInviteStoreNumber] = useState("");
+  const [inviteArea, setInviteArea] = useState("");
   const [createdInvite, setCreatedInvite] = useState(null);
 
-  const canInvite = ["Admin", "HR"].includes(user.role);
+  const [newAreaName, setNewAreaName] = useState("");
+  const [newStoreNumber, setNewStoreNumber] = useState("");
+  const [newStoreName, setNewStoreName] = useState("");
+  const [newStoreArea, setNewStoreArea] = useState("");
 
-  const filteredUsers = users.filter((item) => {
-    const searchValue = peopleSearch.trim().toLowerCase();
-    const matchesSearch =
-      !searchValue ||
-      item.name?.toLowerCase().includes(searchValue) ||
-      item.email?.toLowerCase().includes(searchValue) ||
-      item.role?.toLowerCase().includes(searchValue);
+  const canManage = ["Admin", "HR"].includes(user.role);
 
-    const matchesRole =
-      peopleRoleFilter === "all" || item.role === peopleRoleFilter;
+  const filteredUsers = useMemo(() => {
+    return users.filter((item) => {
+      const searchValue = peopleSearch.trim().toLowerCase();
 
-    const matchesStore =
-      peopleStoreFilter === "all" ||
-      item.store === peopleStoreFilter ||
-      item.store_name === `Store ${peopleStoreFilter}`;
+      const matchesSearch =
+        !searchValue ||
+        item.name?.toLowerCase().includes(searchValue) ||
+        item.email?.toLowerCase().includes(searchValue) ||
+        item.role?.toLowerCase().includes(searchValue);
 
-    return matchesSearch && matchesRole && matchesStore;
-  });
+      const matchesRole =
+        peopleRoleFilter === "all" || item.role === peopleRoleFilter;
+
+      const matchesStore =
+        peopleStoreFilter === "all" ||
+        item.store === peopleStoreFilter ||
+        item.store_name === `Store ${peopleStoreFilter}`;
+
+      return matchesSearch && matchesRole && matchesStore;
+    });
+  }, [users, peopleSearch, peopleRoleFilter, peopleStoreFilter]);
 
   const activeUsers = filteredUsers.filter((item) => item.is_active);
   const inactiveUsers = filteredUsers.filter((item) => !item.is_active);
 
   useEffect(() => {
-    if (canInvite) {
+    if (canManage) {
       loadAdminData();
     }
-  }, [canInvite]);
+  }, [canManage]);
 
   async function loadAdminData() {
     setErrorMessage("");
@@ -111,12 +119,13 @@ export function AdminScreen({ user }) {
       setStores(loadedStores);
       setAreas(loadedAreas);
 
-      if (loadedStores[0]?.store_number) {
-        setStoreNumber(loadedStores[0].store_number);
+      if (loadedStores[0]?.store_number && !inviteStoreNumber) {
+        setInviteStoreNumber(loadedStores[0].store_number);
       }
 
-      if (loadedAreas[0]?.name && !newStoreArea) {
-        setNewStoreArea(loadedAreas[0].name);
+      if (loadedAreas[0]?.name) {
+        if (!inviteArea) setInviteArea(loadedAreas[0].name);
+        if (!newStoreArea) setNewStoreArea(loadedAreas[0].name);
       }
     } catch (error) {
       setErrorMessage(error.message || "Could not load admin data.");
@@ -144,7 +153,7 @@ export function AdminScreen({ user }) {
     setStatusMessage("");
     setCreatedInvite(null);
 
-    if (!name.trim() || !email.trim() || !role) {
+    if (!inviteName.trim() || !inviteEmail.trim() || !inviteRole) {
       setErrorMessage("Name, email, and role are required.");
       return;
     }
@@ -153,108 +162,21 @@ export function AdminScreen({ user }) {
 
     try {
       const invite = await createInviteApiUser({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role,
-        storeNumber: shouldShowStore(role) ? storeNumber : "",
-        area,
+        name: inviteName.trim(),
+        email: inviteEmail.trim().toLowerCase(),
+        role: inviteRole,
+        storeNumber: shouldShowPrimaryStoreControls(inviteRole) ? inviteStoreNumber : "",
+        area: inviteArea,
       });
 
       setCreatedInvite(invite);
       setStatusMessage("Invite created.");
-      setName("");
-      setEmail("");
-      setRole("tm");
+      setInviteName("");
+      setInviteEmail("");
+      setInviteRole("tm");
       await loadAdminData();
     } catch (error) {
       setErrorMessage(error.message || "Could not create invite.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleToggleActive() {
-    if (!selectedUser) return;
-
-    setErrorMessage("");
-    setStatusMessage("");
-    setIsLoading(true);
-
-    try {
-      const updated = await updateApiUser(selectedUser.id, {
-        is_active: !selectedUser.is_active,
-      });
-
-      setSelectedUser(updated);
-      setStatusMessage(updated.is_active ? "User reactivated." : "User deactivated.");
-      await loadAdminData();
-    } catch (error) {
-      setErrorMessage(error.message || "Could not update user.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleChangeRole(nextRole) {
-    if (!selectedUser) return;
-
-    setErrorMessage("");
-    setStatusMessage("");
-    setIsLoading(true);
-
-    try {
-      const updated = await updateApiUser(selectedUser.id, { role: nextRole });
-      setSelectedUser(updated);
-      setStatusMessage("Role updated.");
-      await loadAdminData();
-    } catch (error) {
-      setErrorMessage(error.message || "Could not update role.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleAssignStore(assignmentType, nextStoreNumber) {
-    if (!selectedUser) return;
-
-    setErrorMessage("");
-    setStatusMessage("");
-    setIsLoading(true);
-
-    try {
-      const updated = await addApiUserStoreAssignment(selectedUser.id, {
-        storeNumber: nextStoreNumber,
-        assignmentType,
-      });
-
-      setSelectedUser(updated);
-      setStatusMessage(
-        assignmentType === "primary"
-          ? `Primary store set to ${nextStoreNumber}.`
-          : `Oversight store ${nextStoreNumber} added.`
-      );
-      await loadAdminData();
-    } catch (error) {
-      setErrorMessage(error.message || "Could not assign store.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleRemoveAssignment(assignmentId) {
-    if (!selectedUser) return;
-
-    setErrorMessage("");
-    setStatusMessage("");
-    setIsLoading(true);
-
-    try {
-      const updated = await removeApiUserStoreAssignment(selectedUser.id, assignmentId);
-      setSelectedUser(updated);
-      setStatusMessage("Store assignment removed.");
-      await loadAdminData();
-    } catch (error) {
-      setErrorMessage(error.message || "Could not remove assignment.");
     } finally {
       setIsLoading(false);
     }
@@ -328,7 +250,94 @@ export function AdminScreen({ user }) {
     }
   }
 
-  if (!canInvite) {
+  async function handleToggleActive() {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      const updated = await updateApiUser(selectedUser.id, {
+        is_active: !selectedUser.is_active,
+      });
+
+      setSelectedUser(updated);
+      setStatusMessage(updated.is_active ? "User reactivated." : "User deactivated.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not update user.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleChangeRole(nextRole) {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      const updated = await updateApiUser(selectedUser.id, { role: nextRole });
+      setSelectedUser(updated);
+      setStatusMessage("Role updated.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not update role.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleAssignStore(assignmentType, storeNumber) {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      const updated = await addApiUserStoreAssignment(selectedUser.id, {
+        storeNumber,
+        assignmentType,
+      });
+
+      setSelectedUser(updated);
+      setStatusMessage(
+        assignmentType === "primary"
+          ? `Primary store set to ${storeNumber}.`
+          : `Oversight store ${storeNumber} added.`
+      );
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not assign store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleRemoveAssignment(assignmentId) {
+    if (!selectedUser) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      const updated = await removeApiUserStoreAssignment(selectedUser.id, assignmentId);
+      setSelectedUser(updated);
+      setStatusMessage("Store assignment removed.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not remove assignment.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (!canManage) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
         <HeaderBlock
@@ -340,7 +349,7 @@ export function AdminScreen({ user }) {
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>You do not have access</Text>
           <Text style={styles.emptyText}>
-            Ask an Admin or HR user to create or manage user invites.
+            Ask an Admin or HR user to create or manage users.
           </Text>
         </View>
       </ScrollView>
@@ -351,55 +360,21 @@ export function AdminScreen({ user }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
         eyebrow="ADMIN"
-        title="Admin tools"
-        subtitle="Invite users, manage roles, and assign store access."
+        title="Command Center"
+        subtitle="Manage people, stores, areas, and access."
       />
 
+      <View style={localStyles.statsGrid}>
+        <StatCard label="Active" value={users.filter((item) => item.is_active).length} />
+        <StatCard label="Stores" value={stores.length} />
+        <StatCard label="Areas" value={areas.length} />
+      </View>
+
       <View style={localStyles.navCard}>
-        <TouchableOpacity
-          style={[localStyles.navPill, activeSection === "invite" && localStyles.navPillActive]}
-          onPress={() => setActiveSection("invite")}
-        >
-          <Text style={[localStyles.navText, activeSection === "invite" && localStyles.navTextActive]}>
-            Add Person
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[localStyles.navPill, activeSection === "users" && localStyles.navPillActive]}
-          onPress={() => {
-            setSelectedUser(null);
-            setActiveSection("users");
-          }}
-        >
-          <Text style={[localStyles.navText, activeSection === "users" && localStyles.navTextActive]}>
-            Users
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[localStyles.navPill, activeSection === "areas" && localStyles.navPillActive]}
-          onPress={() => {
-            setSelectedUser(null);
-            setActiveSection("areas");
-          }}
-        >
-          <Text style={[localStyles.navText, activeSection === "areas" && localStyles.navTextActive]}>
-            Areas
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[localStyles.navPill, activeSection === "stores" && localStyles.navPillActive]}
-          onPress={() => {
-            setSelectedUser(null);
-            setActiveSection("stores");
-          }}
-        >
-          <Text style={[localStyles.navText, activeSection === "stores" && localStyles.navTextActive]}>
-            Stores
-          </Text>
-        </TouchableOpacity>
+        <AdminTab label="People" value="people" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Add" value="invite" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Stores" value="stores" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Areas" value="areas" activeSection={activeSection} setActiveSection={setActiveSection} />
       </View>
 
       {errorMessage ? (
@@ -414,111 +389,27 @@ export function AdminScreen({ user }) {
         </View>
       ) : null}
 
-      {activeSection === "invite" && (
-        <>
-          <View style={localStyles.card}>
-            <Text style={localStyles.sectionHeading}>Create invite</Text>
-
-            <Text style={localStyles.label}>Name</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Employee name"
-              placeholderTextColor="#7b8da0"
-              style={localStyles.input}
-            />
-
-            <Text style={localStyles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder="name@bostonpie.com"
-              placeholderTextColor="#7b8da0"
-              style={localStyles.input}
-            />
-
-            <Text style={localStyles.label}>Role</Text>
-            <OptionGrid
-              options={roles}
-              selectedValue={role}
-              onSelect={setRole}
-            />
-
-            {shouldShowStore(role) && (
-              <>
-                <Text style={localStyles.label}>Primary Store</Text>
-                <StoreGrid
-                  stores={stores}
-                  selectedStoreNumber={storeNumber}
-                  onSelect={setStoreNumber}
-                />
-              </>
-            )}
-
-            <Text style={localStyles.label}>Area</Text>
-            <OptionGrid
-              options={areas.map((item) => ({ label: item.name, value: item.name }))}
-              selectedValue={area}
-              onSelect={setArea}
-            />
-
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
-              onPress={handleCreateInvite}
-              disabled={isLoading}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isLoading ? "Creating Invite..." : "Create Invite"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {createdInvite && (
-            <View style={localStyles.inviteCard}>
-              <Text style={localStyles.inviteTitle}>Invite created</Text>
-              <Text style={localStyles.inviteText}>
-                Send this invite link to the employee so they can set their password.
-              </Text>
-
-              <View style={localStyles.inviteUrlBox}>
-                <Text style={localStyles.inviteUrl}>{createdInvite.invite_url}</Text>
-              </View>
-
-              <Text style={localStyles.inviteMeta}>
-                User: {createdInvite.user.name} · {createdInvite.user.role}
-              </Text>
-            </View>
-          )}
-        </>
-      )}
-
-      {activeSection === "users" && (
+      {activeSection === "people" && (
         <View style={localStyles.card}>
-          <Text style={localStyles.sectionHeading}>Users</Text>
+          <Text style={localStyles.sectionHeading}>People</Text>
 
-          <Text style={localStyles.label}>Search People</Text>
           <TextInput
             value={peopleSearch}
             onChangeText={setPeopleSearch}
             placeholder="Search name, email, or position"
             placeholderTextColor="#7b8da0"
-            style={localStyles.input}
+            style={localStyles.searchInput}
           />
 
           <Text style={localStyles.label}>Position</Text>
-          <OptionGrid
-            options={[
-              { label: "All", value: "all" },
-              ...roles,
-            ]}
+          <PillGrid
+            options={[{ label: "All", value: "all" }, ...roles]}
             selectedValue={peopleRoleFilter}
             onSelect={setPeopleRoleFilter}
           />
 
           <Text style={localStyles.label}>Store</Text>
-          <OptionGrid
+          <PillGrid
             options={[
               { label: "All Stores", value: "all" },
               ...stores.map((store) => ({
@@ -530,41 +421,15 @@ export function AdminScreen({ user }) {
             onSelect={setPeopleStoreFilter}
           />
 
-          <View style={localStyles.peopleSummaryRow}>
-            <View style={localStyles.peopleSummaryBox}>
-              <Text style={localStyles.peopleSummaryNumber}>{activeUsers.length}</Text>
-              <Text style={localStyles.peopleSummaryLabel}>Active</Text>
-            </View>
-
-            <View style={localStyles.peopleSummaryBox}>
-              <Text style={localStyles.peopleSummaryNumber}>{inactiveUsers.length}</Text>
-              <Text style={localStyles.peopleSummaryLabel}>Deactivated</Text>
-            </View>
+          <View style={localStyles.peopleSplit}>
+            <MiniStat label="Active" value={activeUsers.length} />
+            <MiniStat label="Deactivated" value={inactiveUsers.length} />
           </View>
 
           <Text style={localStyles.label}>Active People</Text>
-
           {activeUsers.length ? (
             activeUsers.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={localStyles.userRow}
-                onPress={() => openUserDetail(item.id)}
-              >
-                <View style={localStyles.avatar}>
-                  <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
-                </View>
-
-                <View style={localStyles.userMain}>
-                  <Text style={localStyles.userName}>{item.name}</Text>
-                  <Text style={localStyles.userMeta}>
-                    {formatRole(item.role)} · {item.store_name || item.area || "Company"}
-                  </Text>
-                  <Text style={localStyles.userEmail}>{item.email}</Text>
-                </View>
-
-                <Text style={localStyles.statusPill}>Active</Text>
-              </TouchableOpacity>
+              <UserRow key={item.id} item={item} onPress={() => openUserDetail(item.id)} />
             ))
           ) : (
             <Text style={localStyles.emptyText}>No active people match those filters.</Text>
@@ -581,31 +446,14 @@ export function AdminScreen({ user }) {
 
           {showInactiveUsers && (
             <View style={localStyles.deactivatedBlock}>
-              <Text style={localStyles.label}>Deactivated People</Text>
-
               {inactiveUsers.length ? (
                 inactiveUsers.map((item) => (
-                  <TouchableOpacity
+                  <UserRow
                     key={item.id}
-                    style={[localStyles.userRow, localStyles.inactiveUserRow]}
+                    item={item}
+                    inactive
                     onPress={() => openUserDetail(item.id)}
-                  >
-                    <View style={[localStyles.avatar, localStyles.inactiveAvatar]}>
-                      <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
-                    </View>
-
-                    <View style={localStyles.userMain}>
-                      <Text style={localStyles.userName}>{item.name}</Text>
-                      <Text style={localStyles.userMeta}>
-                        {formatRole(item.role)} · {item.store_name || item.area || "Company"}
-                      </Text>
-                      <Text style={localStyles.userEmail}>{item.email}</Text>
-                    </View>
-
-                    <Text style={[localStyles.statusPill, localStyles.statusPillInactive]}>
-                      Off
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 ))
               ) : (
                 <Text style={localStyles.emptyText}>No deactivated people match those filters.</Text>
@@ -615,39 +463,75 @@ export function AdminScreen({ user }) {
         </View>
       )}
 
-      {activeSection === "areas" && (
+      {activeSection === "invite" && (
         <View style={localStyles.card}>
-          <Text style={localStyles.sectionHeading}>Areas</Text>
+          <Text style={localStyles.sectionHeading}>Add Person</Text>
 
-          <Text style={localStyles.label}>Create Area</Text>
+          <Text style={localStyles.label}>Name</Text>
           <TextInput
-            value={newAreaName}
-            onChangeText={setNewAreaName}
-            placeholder="Area name"
+            value={inviteName}
+            onChangeText={setInviteName}
+            placeholder="Employee name"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
           />
 
+          <Text style={localStyles.label}>Email</Text>
+          <TextInput
+            value={inviteEmail}
+            onChangeText={setInviteEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder="name@bostonpie.com"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+          />
+
+          <Text style={localStyles.label}>Position</Text>
+          <PillGrid options={roles} selectedValue={inviteRole} onSelect={setInviteRole} />
+
+          {shouldShowPrimaryStoreControls(inviteRole) && (
+            <>
+              <Text style={localStyles.label}>Primary Store</Text>
+              <PillGrid
+                options={stores.map((store) => ({
+                  label: `Store ${store.store_number}`,
+                  value: store.store_number,
+                }))}
+                selectedValue={inviteStoreNumber}
+                onSelect={setInviteStoreNumber}
+              />
+            </>
+          )}
+
+          <Text style={localStyles.label}>Area</Text>
+          <PillGrid
+            options={areas.map((item) => ({ label: item.name, value: item.name }))}
+            selectedValue={inviteArea}
+            onSelect={setInviteArea}
+          />
+
           <TouchableOpacity
             style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
-            onPress={handleCreateArea}
+            onPress={handleCreateInvite}
             disabled={isLoading}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? "Creating Area..." : "Create Area"}
+              {isLoading ? "Creating Invite..." : "Create Invite"}
             </Text>
           </TouchableOpacity>
 
-          <Text style={[localStyles.label, { marginTop: 20 }]}>Current Areas</Text>
-
-          {areas.map((item) => (
-            <View key={item.id} style={localStyles.assignmentRow}>
-              <View>
-                <Text style={localStyles.assignmentTitle}>{item.name}</Text>
-                <Text style={localStyles.assignmentMeta}>Area</Text>
+          {createdInvite && (
+            <View style={localStyles.inviteCard}>
+              <Text style={localStyles.inviteTitle}>Invite created</Text>
+              <Text style={localStyles.inviteText}>
+                Send this link so the employee can set their password.
+              </Text>
+              <View style={localStyles.inviteUrlBox}>
+                <Text style={localStyles.inviteUrl}>{createdInvite.invite_url}</Text>
               </View>
             </View>
-          ))}
+          )}
         </View>
       )}
 
@@ -655,64 +539,57 @@ export function AdminScreen({ user }) {
         <View style={localStyles.card}>
           <Text style={localStyles.sectionHeading}>Stores</Text>
 
-          <Text style={localStyles.label}>Create Store</Text>
+          <View style={localStyles.formCard}>
+            <Text style={localStyles.formTitle}>Create Store</Text>
 
-          <TextInput
-            value={newStoreNumber}
-            onChangeText={setNewStoreNumber}
-            placeholder="Store number"
-            placeholderTextColor="#7b8da0"
-            style={localStyles.input}
-            keyboardType="number-pad"
-          />
+            <TextInput
+              value={newStoreNumber}
+              onChangeText={setNewStoreNumber}
+              placeholder="Store number"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+              keyboardType="number-pad"
+            />
 
-          <TextInput
-            value={newStoreName}
-            onChangeText={setNewStoreName}
-            placeholder="Store name, optional"
-            placeholderTextColor="#7b8da0"
-            style={localStyles.input}
-          />
+            <TextInput
+              value={newStoreName}
+              onChangeText={setNewStoreName}
+              placeholder="Store name, optional"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+            />
 
-          <Text style={localStyles.label}>Area</Text>
-          <OptionGrid
-            options={areas.map((item) => ({ label: item.name, value: item.name }))}
-            selectedValue={newStoreArea}
-            onSelect={setNewStoreArea}
-          />
+            <Text style={localStyles.label}>Area</Text>
+            <PillGrid
+              options={areas.map((item) => ({ label: item.name, value: item.name }))}
+              selectedValue={newStoreArea}
+              onSelect={setNewStoreArea}
+            />
 
-          <TouchableOpacity
-            style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
-            onPress={handleCreateStore}
-            disabled={isLoading}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isLoading ? "Creating Store..." : "Create Store"}
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={[localStyles.label, { marginTop: 20 }]}>Current Stores</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+              onPress={handleCreateStore}
+              disabled={isLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isLoading ? "Creating Store..." : "Create Store"}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {stores.length ? (
             stores.map((store) => (
               <View key={store.id} style={localStyles.storeCard}>
-                <View style={localStyles.storeTopRow}>
+                <View style={localStyles.rowBetween}>
                   <View>
-                    <Text style={localStyles.assignmentTitle}>
-                      Store {store.store_number}
-                    </Text>
-                    <Text style={localStyles.assignmentMeta}>
-                      {store.name} · {store.area || "No Area"}
-                    </Text>
+                    <Text style={localStyles.itemTitle}>Store {store.store_number}</Text>
+                    <Text style={localStyles.itemMeta}>{store.name} · {store.area || "No Area"}</Text>
                   </View>
-
-                  <Text style={store.is_active ? localStyles.statusPill : [localStyles.statusPill, localStyles.statusPillInactive]}>
-                    {store.is_active ? "Active" : "Off"}
-                  </Text>
+                  <StatusBadge active={store.is_active} />
                 </View>
 
                 <Text style={localStyles.label}>Move to Area</Text>
-                <OptionGrid
+                <PillGrid
                   options={areas.map((item) => ({ label: item.name, value: item.name }))}
                   selectedValue={store.area}
                   onSelect={(areaName) => handleUpdateStoreArea(store.id, areaName)}
@@ -725,35 +602,79 @@ export function AdminScreen({ user }) {
         </View>
       )}
 
+      {activeSection === "areas" && (
+        <View style={localStyles.card}>
+          <Text style={localStyles.sectionHeading}>Areas</Text>
+
+          <View style={localStyles.formCard}>
+            <Text style={localStyles.formTitle}>Create Area</Text>
+
+            <TextInput
+              value={newAreaName}
+              onChangeText={setNewAreaName}
+              placeholder="Area name"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+              onPress={handleCreateArea}
+              disabled={isLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isLoading ? "Creating Area..." : "Create Area"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {areas.map((item) => (
+            <View key={item.id} style={localStyles.simpleRow}>
+              <View>
+                <Text style={localStyles.itemTitle}>{item.name}</Text>
+                <Text style={localStyles.itemMeta}>Area</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {activeSection === "detail" && selectedUser && (
         <View style={localStyles.card}>
           <TouchableOpacity
-            style={localStyles.backToUsersButton}
+            style={localStyles.backButton}
             onPress={() => {
               setSelectedUser(null);
-              setActiveSection("users");
+              setActiveSection("people");
             }}
           >
-            <Text style={localStyles.backToUsersText}>‹ Back to Users</Text>
+            <Text style={localStyles.backButtonText}>‹ Back to People</Text>
           </TouchableOpacity>
 
-          <Text style={localStyles.detailName}>{selectedUser.name}</Text>
-          <Text style={localStyles.detailMeta}>{selectedUser.email}</Text>
+          <View style={localStyles.detailHeader}>
+            <View style={localStyles.detailAvatar}>
+              <Text style={localStyles.detailAvatarText}>{selectedUser.name.charAt(0)}</Text>
+            </View>
+            <View style={localStyles.detailMain}>
+              <Text style={localStyles.detailName}>{selectedUser.name}</Text>
+              <Text style={localStyles.detailMeta}>{selectedUser.email}</Text>
+              <Text style={localStyles.detailMeta}>{formatRole(selectedUser.role)} · {selectedUser.area || "Company"}</Text>
+            </View>
+          </View>
 
-          <Text style={localStyles.label}>Role</Text>
-          <OptionGrid
-            options={roles}
-            selectedValue={selectedUser.role}
-            onSelect={handleChangeRole}
-          />
+          <Text style={localStyles.label}>Position</Text>
+          <PillGrid options={roles} selectedValue={selectedUser.role} onSelect={handleChangeRole} />
 
           {shouldShowPrimaryStoreControls(selectedUser.role) && (
             <>
               <Text style={localStyles.label}>Primary Store</Text>
-              <StoreGrid
-                stores={stores}
-                selectedStoreNumber={selectedUser.store}
-                onSelect={(nextStore) => handleAssignStore("primary", nextStore)}
+              <PillGrid
+                options={stores.map((store) => ({
+                  label: `Store ${store.store_number}`,
+                  value: store.store_number,
+                }))}
+                selectedValue={selectedUser.store}
+                onSelect={(storeNumber) => handleAssignStore("primary", storeNumber)}
               />
             </>
           )}
@@ -761,26 +682,25 @@ export function AdminScreen({ user }) {
           {shouldShowOversightControls(selectedUser.role) && (
             <>
               <Text style={localStyles.label}>Oversight Stores</Text>
-              <StoreGrid
-                stores={stores}
-                selectedStoreNumber=""
-                onSelect={(nextStore) => handleAssignStore("oversight", nextStore)}
+              <PillGrid
+                options={stores.map((store) => ({
+                  label: `Store ${store.store_number}`,
+                  value: store.store_number,
+                }))}
+                selectedValue=""
+                onSelect={(storeNumber) => handleAssignStore("oversight", storeNumber)}
               />
             </>
           )}
 
-          <Text style={localStyles.label}>Current Assignments</Text>
+          <Text style={localStyles.label}>Current Store Access</Text>
 
           {selectedUser.store_assignments?.length ? (
             selectedUser.store_assignments.map((assignment) => (
               <View key={assignment.id} style={localStyles.assignmentRow}>
                 <View>
-                  <Text style={localStyles.assignmentTitle}>
-                    Store {assignment.store.store_number}
-                  </Text>
-                  <Text style={localStyles.assignmentMeta}>
-                    {assignment.assignment_type}
-                  </Text>
+                  <Text style={localStyles.itemTitle}>Store {assignment.store.store_number}</Text>
+                  <Text style={localStyles.itemMeta}>{assignment.assignment_type}</Text>
                 </View>
 
                 <TouchableOpacity
@@ -792,7 +712,7 @@ export function AdminScreen({ user }) {
               </View>
             ))
           ) : (
-            <Text style={localStyles.emptyText}>No store assignments yet.</Text>
+            <Text style={localStyles.emptyText}>No store access assigned.</Text>
           )}
 
           <TouchableOpacity
@@ -817,19 +737,83 @@ export function AdminScreen({ user }) {
   );
 }
 
-function OptionGrid({ options, selectedValue, onSelect }) {
+function AdminTab({ label, value, activeSection, setActiveSection }) {
+  const isActive = activeSection === value;
+
   return (
-    <View style={localStyles.optionGrid}>
+    <TouchableOpacity
+      style={[localStyles.navPill, isActive && localStyles.navPillActive]}
+      onPress={() => setActiveSection(value)}
+    >
+      <Text style={[localStyles.navText, isActive && localStyles.navTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <View style={localStyles.statCard}>
+      <Text style={localStyles.statValue}>{value}</Text>
+      <Text style={localStyles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <View style={localStyles.miniStat}>
+      <Text style={localStyles.miniValue}>{value}</Text>
+      <Text style={localStyles.miniLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function UserRow({ item, inactive, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[localStyles.userRow, inactive && localStyles.inactiveUserRow]}
+      onPress={onPress}
+    >
+      <View style={[localStyles.avatar, inactive && localStyles.inactiveAvatar]}>
+        <Text style={localStyles.avatarText}>{item.name.charAt(0)}</Text>
+      </View>
+
+      <View style={localStyles.userMain}>
+        <Text style={localStyles.userName}>{item.name}</Text>
+        <Text style={localStyles.userMeta}>
+          {formatRole(item.role)} · {item.store_name || item.area || "Company"}
+        </Text>
+        <Text style={localStyles.userEmail}>{item.email}</Text>
+      </View>
+
+      <StatusBadge active={item.is_active} />
+    </TouchableOpacity>
+  );
+}
+
+function StatusBadge({ active }) {
+  return (
+    <Text style={[localStyles.statusPill, !active && localStyles.statusPillInactive]}>
+      {active ? "Active" : "Off"}
+    </Text>
+  );
+}
+
+function PillGrid({ options, selectedValue, onSelect }) {
+  return (
+    <View style={localStyles.pillGrid}>
       {options.map((item) => {
         const isActive = selectedValue === item.value;
 
         return (
           <TouchableOpacity
             key={item.value}
-            style={[localStyles.optionChip, isActive && localStyles.optionChipActive]}
+            style={[localStyles.pill, isActive && localStyles.pillActive]}
             onPress={() => onSelect(item.value)}
           >
-            <Text style={[localStyles.optionText, isActive && localStyles.optionTextActive]}>
+            <Text style={[localStyles.pillText, isActive && localStyles.pillTextActive]}>
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -837,32 +821,6 @@ function OptionGrid({ options, selectedValue, onSelect }) {
       })}
     </View>
   );
-}
-
-function StoreGrid({ stores, selectedStoreNumber, onSelect }) {
-  return (
-    <View style={localStyles.optionGrid}>
-      {stores.map((store) => {
-        const isActive = selectedStoreNumber === store.store_number;
-
-        return (
-          <TouchableOpacity
-            key={store.store_number}
-            style={[localStyles.optionChip, isActive && localStyles.optionChipActive]}
-            onPress={() => onSelect(store.store_number)}
-          >
-            <Text style={[localStyles.optionText, isActive && localStyles.optionTextActive]}>
-              Store {store.store_number}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-function shouldShowStore(role) {
-  return ["tm", "manager", "general_manager"].includes(role);
 }
 
 function shouldShowPrimaryStoreControls(role) {
@@ -878,20 +836,44 @@ function formatRole(role) {
 }
 
 const localStyles = StyleSheet.create({
+  statsGrid: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    padding: 16,
+  },
+  statValue: {
+    color: "#10212b",
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  statLabel: {
+    color: "#6b7c8e",
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginTop: 3,
+  },
   navCard: {
     backgroundColor: "#101d2d",
     borderRadius: 24,
-    padding: 8,
+    padding: 7,
     marginBottom: 14,
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   navPill: {
     flex: 1,
-    borderRadius: 18,
-    paddingVertical: 12,
+    borderRadius: 17,
+    paddingVertical: 11,
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
   },
@@ -900,7 +882,7 @@ const localStyles = StyleSheet.create({
   },
   navText: {
     color: "#b8c6d6",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
   },
   navTextActive: {
@@ -908,64 +890,333 @@ const localStyles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#101d2d",
-    borderRadius: 26,
-    padding: 20,
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  formCard: {
+    backgroundColor: "#07111f",
+    borderRadius: 22,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
+  formTitle: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
   sectionHeading: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 23,
     fontWeight: "900",
     letterSpacing: -0.7,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
   input: {
-    backgroundColor: "#07111f",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#eef5f8",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    color: "#ffffff",
+    color: "#10212b",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 14,
+  },
+  searchInput: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    color: "#10212b",
     fontSize: 15,
     fontWeight: "700",
     marginBottom: 16,
   },
-  optionGrid: {
+  pillGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
     marginBottom: 16,
   },
-  optionChip: {
+  pill: {
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  optionChipActive: {
+  pillActive: {
     backgroundColor: "#e91f3f",
     borderColor: "#e91f3f",
   },
-  optionText: {
+  pillText: {
     color: "#b8c6d6",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
   },
-  optionTextActive: {
+  pillTextActive: {
     color: "#ffffff",
+  },
+  peopleSplit: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+  },
+  miniStat: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  miniValue: {
+    color: "#ffffff",
+    fontSize: 25,
+    fontWeight: "900",
+  },
+  miniLabel: {
+    color: "#9cadbf",
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+  inactiveUserRow: {
+    opacity: 0.78,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 17,
+    backgroundColor: "#e91f3f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inactiveAvatar: {
+    backgroundColor: "#64748b",
+  },
+  avatarText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  userMain: {
+    flex: 1,
+  },
+  userName: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 2,
+  },
+  userMeta: {
+    color: "#b8c6d6",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  userEmail: {
+    color: "#7f91a5",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  statusPill: {
+    color: "#166534",
+    backgroundColor: "#dcfce7",
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    overflow: "hidden",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  statusPillInactive: {
+    color: "#991b2f",
+    backgroundColor: "#ffe4e8",
+  },
+  deactivatedToggle: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    padding: 13,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  deactivatedToggleText: {
+    color: "#93c5fd",
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  deactivatedBlock: {
+    marginTop: 12,
+  },
+  inviteCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    padding: 16,
+    marginTop: 16,
+  },
+  inviteTitle: {
+    color: "#10212b",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  inviteText: {
+    color: "#526273",
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+    fontWeight: "700",
+  },
+  inviteUrlBox: {
+    backgroundColor: "#eef5f8",
+    borderRadius: 15,
+    padding: 12,
+  },
+  inviteUrl: {
+    color: "#10212b",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+  storeCard: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  simpleRow: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  itemTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  itemMeta: {
+    color: "#9cadbf",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 3,
+    textTransform: "uppercase",
+  },
+  detailHeader: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  detailAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 22,
+    backgroundColor: "#e91f3f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailAvatarText: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  detailMain: {
+    flex: 1,
+  },
+  detailName: {
+    color: "#ffffff",
+    fontSize: 25,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+  },
+  detailMeta: {
+    color: "#9cadbf",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  assignmentRow: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  removeButton: {
+    backgroundColor: "#ffe4e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  removeButtonText: {
+    color: "#991b2f",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  backButton: {
+    marginBottom: 14,
+  },
+  backButtonText: {
+    color: "#93c5fd",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  reactivateButton: {
+    backgroundColor: "#dcfce7",
+  },
+  reactivateButtonText: {
+    color: "#166534",
+  },
+  emptyText: {
+    color: "#9cadbf",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 12,
   },
   errorBox: {
     backgroundColor: "#ffe4e8",
@@ -991,229 +1242,5 @@ const localStyles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.55,
-  },
-  inviteCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 26,
-    padding: 20,
-    marginBottom: 20,
-  },
-  inviteTitle: {
-    color: "#10212b",
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: -0.8,
-    marginBottom: 6,
-  },
-  inviteText: {
-    color: "#526273",
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: 14,
-    fontWeight: "700",
-  },
-  inviteUrlBox: {
-    backgroundColor: "#eef5f8",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-  },
-  inviteUrl: {
-    color: "#10212b",
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: "800",
-  },
-  inviteMeta: {
-    color: "#697b8d",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  peopleSummaryRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 18,
-  },
-  peopleSummaryBox: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  peopleSummaryNumber: {
-    color: "#ffffff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  peopleSummaryLabel: {
-    color: "#9cadbf",
-    fontSize: 12,
-    fontWeight: "900",
-    marginTop: 2,
-    textTransform: "uppercase",
-  },
-  deactivatedToggle: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 16,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  deactivatedToggleText: {
-    color: "#93c5fd",
-    fontSize: 14,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  deactivatedBlock: {
-    marginTop: 10,
-  },
-  inactiveUserRow: {
-    opacity: 0.78,
-  },
-  inactiveAvatar: {
-    backgroundColor: "#64748b",
-  },
-  userRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-  },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 18,
-    backgroundColor: "#e91f3f",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  userMain: {
-    flex: 1,
-  },
-  userName: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-    marginBottom: 3,
-  },
-  userMeta: {
-    color: "#b8c6d6",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  userEmail: {
-    color: "#7f91a5",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  statusPill: {
-    color: "#166534",
-    backgroundColor: "#dcfce7",
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 999,
-    overflow: "hidden",
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  statusPillInactive: {
-    color: "#991b2f",
-    backgroundColor: "#ffe4e8",
-  },
-  backToUsersButton: {
-    marginBottom: 14,
-  },
-  backToUsersText: {
-    color: "#93c5fd",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  detailName: {
-    color: "#ffffff",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: -1,
-    marginBottom: 4,
-  },
-  detailMeta: {
-    color: "#9cadbf",
-    fontSize: 13,
-    fontWeight: "800",
-    marginBottom: 20,
-  },
-  storeCard: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  storeTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  assignmentRow: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  assignmentTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  assignmentMeta: {
-    color: "#9cadbf",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 3,
-    textTransform: "uppercase",
-  },
-  removeButton: {
-    backgroundColor: "#ffe4e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  removeButtonText: {
-    color: "#991b2f",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  reactivateButton: {
-    backgroundColor: "#dcfce7",
-  },
-  reactivateButtonText: {
-    color: "#166534",
-  },
-  emptyText: {
-    color: "#9cadbf",
-    fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 12,
   },
 });

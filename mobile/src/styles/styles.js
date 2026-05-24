@@ -316,7 +316,7 @@ export const styles = StyleSheet.create({
     lineHeight: 27,
     marginBottom: 18,
   },
-  acknowledgedBox: {
+  respondedBox: {
     backgroundColor: "#ecfdf3",
     borderRadius: 18,
     padding: 16,
@@ -324,13 +324,13 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#bbf7d0",
   },
-  acknowledgedBoxTitle: {
+  respondedBoxTitle: {
     color: "#166534",
     fontSize: 16,
     fontWeight: "900",
     marginBottom: 4,
   },
-  acknowledgedBoxText: {
+  respondedBoxText: {
     color: "#216b3b",
     fontSize: 14,
     lineHeight: 20,

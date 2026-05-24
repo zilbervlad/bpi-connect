@@ -29,7 +29,7 @@ export function ProfileScreen({ user, unreadCount, ackCount, onLogout }) {
         </View>
 
         <View style={styles.profileRow}>
-          <Text style={styles.profileRowLabel}>Needs acknowledgement</Text>
+          <Text style={styles.profileRowLabel}>Needs Response</Text>
           <Text style={styles.profileRowValue}>{ackCount}</Text>
         </View>
 
