@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
@@ -16,10 +15,12 @@ import {
   fetchApiThreads,
   fetchApiThreadMessages,
   sendApiThreadMessage,
+  sendApiThreadImageMessage,
   markApiThreadRead,
   findOrCreateDirectThread,
   loginApiUser,
   toggleApiThreadMessageReaction,
+  acknowledgeApiThreadMessage,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -145,6 +146,7 @@ function mapApiThreadMessageToBubble(apiMessage) {
     responded: apiMessage.responded,
     acknowledged: apiMessage.acknowledged,
     reactions: apiMessage.reactions || [],
+    attachments: apiMessage.attachments || [],
   };
 }
 
@@ -211,6 +213,30 @@ export default function App() {
       setLoginError(error.message || "Could not sign in.");
     } finally {
       setIsLoggingIn(false);
+    }
+  }
+
+  async function handleAcknowledgeThreadMessage(messageId) {
+    if (!selectedThreadId || !currentUser?.id) return;
+
+    try {
+      const apiMessage = await acknowledgeApiThreadMessage(messageId, currentUser.id);
+      const updatedBubble = mapApiThreadMessageToBubble(apiMessage);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) => {
+          if (thread.id !== selectedThreadId) return thread;
+
+          return {
+            ...thread,
+            messages: thread.messages.map((message) =>
+              message.id === messageId ? updatedBubble : message
+            ),
+          };
+        })
+      );
+    } catch (error) {
+      console.log("Could not acknowledge thread message:", error.message);
     }
   }
 
@@ -360,6 +386,40 @@ export default function App() {
 
   function closeThread() {
     setSelectedThreadId(null);
+  }
+
+  async function sendThreadImageMessage(threadId, imageData, body = "", metadata = {}) {
+    if (usingApi && currentUser?.apiUser) {
+      try {
+        const apiMessage = await sendApiThreadImageMessage(
+          threadId,
+          currentUser.id,
+          imageData,
+          body,
+          metadata
+        );
+
+        const bubbleMessage = mapApiThreadMessageToBubble(apiMessage);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((thread) => {
+            if (thread.id !== threadId) return thread;
+
+            return {
+              ...thread,
+              messages: [...thread.messages, bubbleMessage],
+              lastMessage: body || "Photo",
+              lastTime: "Now",
+            };
+          })
+        );
+
+        return;
+      } catch (error) {
+        console.log("Could not send API image message:", error.message);
+        throw error;
+      }
+    }
   }
 
   async function sendThreadMessage(threadId, body, requiresAck = false) {
@@ -575,7 +635,9 @@ export default function App() {
         thread={selectedThread}
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
+        onSendThreadImageMessage={sendThreadImageMessage}
         onReact={handleReactToThreadMessage}
+        onAcknowledge={handleAcknowledgeThreadMessage}
       />
     );
   }

@@ -7,22 +7,69 @@ import {
   ScrollView,
   TextInput,
   StyleSheet,
+  Image,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 
-export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
+export function ThreadScreen({
+  thread,
+  onBack,
+  onSendThreadMessage,
+  onSendThreadImageMessage,
+  onReact,
+  onAcknowledge,
+}) {
   const [draft, setDraft] = useState("");
 
   function handleSend() {
     if (!draft.trim()) return;
     onSendThreadMessage(thread.id, draft.trim());
     setDraft("");
+  }
+
+  async function handlePickImage() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        alert("Photo access is needed to send pictures.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 0.72,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64",
+      });
+
+      const mimeType = asset.mimeType || "image/jpeg";
+      const imageData = `data:${mimeType};base64,${base64}`;
+
+      await onSendThreadImageMessage?.(thread.id, imageData, "", {
+        mimeType,
+        fileName: asset.fileName || "chat-image.jpg",
+      });
+    } catch (error) {
+      alert(error.message || "Could not send picture.");
+    }
   }
 
   return (
@@ -77,14 +124,27 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
                   message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
                 ]}
               >
-                <Text
-                  style={[
-                    localStyles.bubbleText,
-                    message.isMe ? localStyles.bubbleTextMe : localStyles.bubbleTextOther,
-                  ]}
-                >
-                  {message.body}
-                </Text>
+                {message.attachments?.map((attachment) =>
+                  attachment.file_type === "image" ? (
+                    <Image
+                      key={attachment.id}
+                      source={{ uri: attachment.url }}
+                      style={localStyles.messageImage}
+                      resizeMode="cover"
+                    />
+                  ) : null
+                )}
+
+                {message.body && message.body !== "Photo" ? (
+                  <Text
+                    style={[
+                      localStyles.bubbleText,
+                      message.isMe ? localStyles.bubbleTextMe : localStyles.bubbleTextOther,
+                    ]}
+                  >
+                    {message.body}
+                  </Text>
+                ) : null}
               </View>
 
               <Text style={localStyles.messageTime}>{message.time}</Text>
@@ -93,6 +153,10 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
         </ScrollView>
 
         <View style={localStyles.composer}>
+          <TouchableOpacity style={localStyles.photoButton} onPress={handlePickImage}>
+            <Text style={localStyles.photoButtonText}>＋</Text>
+          </TouchableOpacity>
+
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -248,6 +312,13 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#e5e5ea",
     borderBottomLeftRadius: 5,
   },
+  messageImage: {
+    width: 230,
+    height: 230,
+    borderRadius: 22,
+    marginBottom: 6,
+    backgroundColor: "#d1d5db",
+  },
   bubbleText: {
     fontSize: 16,
     lineHeight: 22,
@@ -274,6 +345,21 @@ const localStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  photoButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#d1d1d6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  photoButtonText: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 27,
   },
   input: {
     flex: 1,
