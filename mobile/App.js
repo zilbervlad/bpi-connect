@@ -136,6 +136,8 @@ function mapApiThreadMessageToBubble(apiMessage) {
   };
 }
 
+const SAVED_USER_KEY = "bpi_connect_saved_user";
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -157,6 +159,24 @@ export default function App() {
   const ackCount = messages.filter(
     (message) => message.requiresAck && !message.responded
   ).length;
+
+  useEffect(() => {
+    async function loadSavedUser() {
+      try {
+        const savedUserJson = await AsyncStorage.getItem(SAVED_USER_KEY);
+
+        if (savedUserJson) {
+          const savedUser = JSON.parse(savedUserJson);
+          setCurrentUser(savedUser);
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        console.log("Could not load saved user:", error.message);
+      }
+    }
+
+    loadSavedUser();
+  }, []);
 
   useEffect(() => {
     loadApiData();
