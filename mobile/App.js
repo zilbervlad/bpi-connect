@@ -112,17 +112,20 @@ function formatApiTime(value) {
 }
 
 function mapApiThreadToAppThread(apiThread) {
+  const members = apiThread.members || [];
+
   return {
     id: apiThread.id,
     apiThread: true,
     type: apiThread.thread_type,
     groupKey: apiThread.group_key,
     name: apiThread.name,
-    subtitle: getThreadSubtitle(apiThread.thread_type),
-    lastMessage: apiThread.last_message || "",
+    subtitle: `${getThreadSubtitle(apiThread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`,
+    lastMessage: apiThread.last_message || "No messages yet",
     lastTime: formatApiTime(apiThread.last_time),
     unread: apiThread.unread || 0,
-    members: (apiThread.members || []).map((member) => member.name),
+    members,
+    memberNames: members.map((member) => member.name),
     messages: [],
   };
 }
@@ -132,12 +135,16 @@ function mapApiThreadMessageToBubble(apiMessage) {
     id: apiMessage.id,
     apiMessage: true,
     sender: apiMessage.sender?.name || "BPI Connect",
+    senderUser: apiMessage.sender || null,
     senderRole: normalizeApiRole(apiMessage.sender?.role || ""),
     body: apiMessage.body,
+    text: apiMessage.body,
     time: formatApiTime(apiMessage.created_at),
     isMe: Boolean(apiMessage.is_me),
     requiresAck: apiMessage.requires_ack,
     responded: apiMessage.responded,
+    acknowledged: apiMessage.acknowledged,
+    reactions: apiMessage.reactions || [],
   };
 }
 
@@ -310,7 +317,14 @@ export default function App() {
     setSelectedMessageId(null);
   }
 
-  async function openThread(thread) {
+  async function openThread(threadOrId) {
+    const thread =
+      typeof threadOrId === "object"
+        ? threadOrId
+        : threads.find((item) => item.id === threadOrId);
+
+    if (!thread) return;
+
     setThreads((currentThreads) =>
       currentThreads.map((item) =>
         item.id === thread.id ? { ...item, unread: 0 } : item
@@ -328,7 +342,9 @@ export default function App() {
             item.id === thread.id
               ? {
                   ...item,
-                  members: (data.thread.members || []).map((member) => member.name),
+                  members: data.thread.members || [],
+                  memberNames: (data.thread.members || []).map((member) => member.name),
+                  subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${(data.thread.members || []).length} ${(data.thread.members || []).length === 1 ? "member" : "members"}`,
                   messages: data.messages.map(mapApiThreadMessageToBubble),
                 }
               : item
@@ -557,6 +573,7 @@ export default function App() {
         thread={selectedThread}
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
+        onReact={handleReactToThreadMessage}
       />
     );
   }

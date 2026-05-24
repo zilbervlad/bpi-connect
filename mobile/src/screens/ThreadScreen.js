@@ -16,7 +16,7 @@ import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 
-export function ThreadScreen({ thread, onBack, onSendThreadMessage }) {
+export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
   const [draft, setDraft] = useState("");
 
   function handleSend() {
@@ -38,11 +38,7 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage }) {
             <Text style={localStyles.backText}>‹</Text>
           </TouchableOpacity>
 
-          <View style={localStyles.headerAvatar}>
-            <Text style={localStyles.headerAvatarText}>
-              {thread.type === "direct" ? thread.name.charAt(0) : getThreadBadge(thread.type)}
-            </Text>
-          </View>
+          <ThreadHeaderAvatar thread={thread} />
 
           <View style={localStyles.headerMain}>
             <Text style={localStyles.headerName}>{thread.name}</Text>
@@ -113,6 +109,21 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage }) {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function ThreadHeaderAvatar({ thread }) {
+  if (thread.type === "direct" && thread.members?.length) {
+    const otherMember = thread.members[0];
+    return <UserAvatar user={otherMember} name={thread.name} size={46} />;
+  }
+
+  return (
+    <View style={localStyles.headerAvatar}>
+      <Text style={localStyles.headerAvatarText}>
+        {getThreadBadge(thread.type)}
+      </Text>
+    </View>
   );
 }
 
@@ -286,5 +297,45 @@ const localStyles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 24,
+  },
+  reactionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  reactionChip: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  reactionChipActive: {
+    backgroundColor: "#ffffff",
+    borderColor: "#ffffff",
+  },
+  reactionText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  reactionTextActive: {
+    color: "#10212b",
+  },
+  quickReactButton: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderRadius: 999,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  quickReactText: {
+    fontSize: 14,
   },
 });
