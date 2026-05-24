@@ -387,3 +387,17 @@ export async function resendApiUserInvite(userId) {
 
   return data;
 }
+
+export async function deleteApiArea(areaId) {
+  const response = await fetch(`${API_BASE_URL}/api/areas/${areaId}`, {
+    method: "DELETE",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not delete area");
+  }
+
+  return data;
+}

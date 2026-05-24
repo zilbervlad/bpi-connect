@@ -23,6 +23,7 @@ import {
   resendApiUserInvite,
   fetchApiAreas,
   createApiArea,
+  deleteApiArea,
   createApiStore,
   updateApiStore,
 } from "../api/client";
@@ -210,6 +211,28 @@ export function AdminScreen({ user }) {
     }
   }
 
+  async function handleDeleteArea(areaId, areaName) {
+    setErrorMessage("");
+    setStatusMessage("");
+
+    if (areaName === "Company") {
+      setErrorMessage("Company area cannot be deleted.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await deleteApiArea(areaId);
+      setStatusMessage("Area deleted.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not delete area.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleCreateStore() {
     setErrorMessage("");
     setStatusMessage("");
@@ -234,6 +257,22 @@ export function AdminScreen({ user }) {
       await loadAdminData();
     } catch (error) {
       setErrorMessage(error.message || "Could not create store.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleToggleStoreActive(store) {
+    setErrorMessage("");
+    setStatusMessage("");
+    setIsLoading(true);
+
+    try {
+      await updateApiStore(store.id, { is_active: !store.is_active });
+      setStatusMessage(store.is_active ? "Store deactivated." : "Store reactivated.");
+      await loadAdminData();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not update store.");
     } finally {
       setIsLoading(false);
     }
@@ -641,6 +680,23 @@ export function AdminScreen({ user }) {
                   <StatusBadge active={store.is_active} />
                 </View>
 
+                <TouchableOpacity
+                  style={[
+                    localStyles.smallDangerButton,
+                    !store.is_active && localStyles.smallSuccessButton,
+                  ]}
+                  onPress={() => handleToggleStoreActive(store)}
+                >
+                  <Text
+                    style={[
+                      localStyles.smallDangerButtonText,
+                      !store.is_active && localStyles.smallSuccessButtonText,
+                    ]}
+                  >
+                    {store.is_active ? "Deactivate Store" : "Reactivate Store"}
+                  </Text>
+                </TouchableOpacity>
+
                 <Text style={localStyles.label}>Move to Area</Text>
                 <PillGrid
                   options={areas.map((item) => ({ label: item.name, value: item.name }))}
@@ -683,9 +739,20 @@ export function AdminScreen({ user }) {
 
           {areas.map((item) => (
             <View key={item.id} style={localStyles.simpleRow}>
-              <View>
-                <Text style={localStyles.itemTitle}>{item.name}</Text>
-                <Text style={localStyles.itemMeta}>Area</Text>
+              <View style={localStyles.rowBetween}>
+                <View>
+                  <Text style={localStyles.itemTitle}>{item.name}</Text>
+                  <Text style={localStyles.itemMeta}>Area</Text>
+                </View>
+
+                {item.name !== "Company" ? (
+                  <TouchableOpacity
+                    style={localStyles.smallDangerButton}
+                    onPress={() => handleDeleteArea(item.id, item.name)}
+                  >
+                    <Text style={localStyles.smallDangerButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           ))}
@@ -1230,6 +1297,25 @@ const localStyles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+  },
+  smallDangerButton: {
+    backgroundColor: "#ffe4e8",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignSelf: "flex-start",
+    marginBottom: 12,
+  },
+  smallDangerButtonText: {
+    color: "#991b2f",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  smallSuccessButton: {
+    backgroundColor: "#dcfce7",
+  },
+  smallSuccessButtonText: {
+    color: "#166534",
   },
   rowBetween: {
     flexDirection: "row",
