@@ -36,10 +36,54 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedStore, setSelectedStore] = useState("All");
 
+  const scopedUsers = useMemo(() => {
+    const currentRole = formatRole(user.role);
+    const currentStoreKey = getStoreKey(user);
+    const currentArea = String(user.area || "").trim().toLowerCase();
+
+    const canViewAll = currentRole === "Admin" || currentRole === "HR";
+    const canViewArea = currentRole === "Coach";
+
+    return users.filter((item) => {
+      if (item.id === user.id) return false;
+      if (item.is_active === false) return false;
+
+      if (canViewAll) return true;
+
+      const itemStoreKey = getStoreKey(item);
+      const itemArea = String(item.area || "").trim().toLowerCase();
+
+      if (canViewArea) {
+        if (!currentArea) return true;
+        return itemArea === currentArea;
+      }
+
+      if (currentStoreKey && currentStoreKey !== "company") {
+        return itemStoreKey === currentStoreKey;
+      }
+
+      if (currentArea) {
+        return itemArea === currentArea;
+      }
+
+      return itemStoreKey === currentStoreKey;
+    });
+  }, [users, user]);
+
   const storeFilters = useMemo(() => {
+    const currentRole = formatRole(user.role);
+    const canViewStoreFilters =
+      currentRole === "Admin" ||
+      currentRole === "HR" ||
+      currentRole === "Coach";
+
+    if (!canViewStoreFilters) {
+      return [{ key: "All", label: "My Store" }];
+    }
+
     const storeMap = new Map();
 
-    users.forEach((item) => {
+    scopedUsers.forEach((item) => {
       const key = getStoreKey(item);
       const label = getStoreLabel(item);
 
@@ -49,19 +93,17 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
     });
 
     return [
-      { key: "All", label: "All Stores" },
+      { key: "All", label: currentRole === "Coach" ? "My Area" : "All Stores" },
       ...Array.from(storeMap.entries())
         .map(([key, label]) => ({ key, label }))
         .sort((a, b) => String(a.label).localeCompare(String(b.label))),
     ];
-  }, [users]);
+  }, [scopedUsers, user.role]);
 
   const visibleUsers = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
 
-    return users
-      .filter((item) => item.id !== user.id)
-      .filter((item) => item.is_active !== false)
+    return scopedUsers
       .filter((item) => {
         if (selectedRole === "All") return true;
         return formatRole(item.role) === selectedRole;
@@ -81,7 +123,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
         );
       })
       .sort(sortPeople);
-  }, [users, user.id, search, selectedRole, selectedStore]);
+  }, [scopedUsers, search, selectedRole, selectedStore]);
 
   return (
     <View style={styles.screen}>
@@ -98,7 +140,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
             <HeaderBlock
               eyebrow="DIRECTORY"
               title="People"
-              subtitle={`${visibleUsers.length} shown · ${users.length} total`}
+              subtitle={`${visibleUsers.length} shown · ${getDirectoryScopeLabel(user)}`}
             />
 
             <View style={localStyles.searchCard}>
@@ -221,6 +263,20 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
       />
     </View>
   );
+}
+
+function getDirectoryScopeLabel(user) {
+  const role = formatRole(user.role);
+
+  if (role === "Admin" || role === "HR") {
+    return "Company directory";
+  }
+
+  if (role === "Coach") {
+    return user.area ? `${user.area} area` : "Coach directory";
+  }
+
+  return getStoreLabel(user);
 }
 
 function formatRole(role) {
