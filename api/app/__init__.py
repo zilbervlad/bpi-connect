@@ -2229,6 +2229,17 @@ def create_app():
 
 
 
+def get_outbound_email_sender():
+    return (
+        os.getenv("PASSWORD_RESET_FROM_EMAIL", "").strip()
+        or os.getenv("INVITE_EMAIL_FROM", "").strip()
+        or os.getenv("INVITE_FROM_EMAIL", "").strip()
+        or os.getenv("RESEND_FROM_EMAIL", "").strip()
+        or os.getenv("FROM_EMAIL", "").strip()
+        or "BPI Connect <onboarding@resend.dev>"
+    )
+
+
 def send_invite_email(user, invite_url):
     resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
     invite_email_from = os.getenv("INVITE_EMAIL_FROM", "BPI Connect <onboarding@resend.dev>").strip()
@@ -2309,7 +2320,7 @@ This invite was sent by Boston Pie, Inc.
 
 def send_password_reset_email(user, reset_url):
     resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
-    from_email = os.getenv("INVITE_FROM_EMAIL", "BPI Connect <onboarding@resend.dev>").strip()
+    from_email = get_outbound_email_sender()
 
     if not resend_api_key:
         return {
