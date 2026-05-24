@@ -1,4 +1,7 @@
 import os
+import base64
+import hashlib
+import time
 import requests
 from datetime import datetime
 from secrets import token_urlsafe
@@ -968,6 +971,78 @@ def create_app():
         return jsonify({
             "success": True,
             "user": serialize_user_detail(user),
+        })
+
+
+    @app.post("/api/users/<int:user_id>/avatar")
+    def upload_user_avatar(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        data = request.get_json() or {}
+        image_data = data.get("image_data")
+
+        if not image_data:
+            return jsonify({
+                "success": False,
+                "error": "image_data is required.",
+            }), 400
+
+        cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+        api_key = os.getenv("CLOUDINARY_API_KEY", "").strip()
+        api_secret = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+
+        if not cloud_name or not api_key or not api_secret:
+            return jsonify({
+                "success": False,
+                "error": "Cloudinary is not configured.",
+            }), 500
+
+        timestamp = int(time.time())
+        folder = "bpi-connect/avatars"
+        public_id = f"user-{user.id}-{timestamp}"
+
+        signature_payload = f"folder={folder}&public_id={public_id}&timestamp={timestamp}{api_secret}"
+        signature = hashlib.sha1(signature_payload.encode("utf-8")).hexdigest()
+
+        response = requests.post(
+            f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload",
+            data={
+                "file": image_data,
+                "api_key": api_key,
+                "timestamp": timestamp,
+                "signature": signature,
+                "folder": folder,
+                "public_id": public_id,
+                "overwrite": "true",
+            },
+            timeout=30,
+        )
+
+        if response.status_code >= 400:
+            return jsonify({
+                "success": False,
+                "error": response.text,
+            }), 500
+
+        uploaded = response.json()
+        avatar_url = uploaded.get("secure_url")
+
+        if not avatar_url:
+            return jsonify({
+                "success": False,
+                "error": "Upload succeeded but no secure_url was returned.",
+            }), 500
+
+        user.avatar_url = avatar_url
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+            "avatar_url": avatar_url,
         })
 
 
