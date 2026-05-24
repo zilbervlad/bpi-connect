@@ -50,7 +50,7 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
           <View style={localStyles.threadInfo}>
             <Text style={localStyles.threadInfoTitle}>{thread.name}</Text>
             <Text style={localStyles.threadInfoText}>
-              {thread.members.join(", ")}
+              {(thread.memberNames || thread.members?.map((member) => member.name) || []).join(", ")}
             </Text>
           </View>
 
@@ -62,11 +62,14 @@ export function ThreadScreen({ thread, onBack, onSendThreadMessage, onReact }) {
                 message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
               ]}
             >
-              {!message.isMe && (
-                <Text style={localStyles.senderName}>
-                  {message.sender} · {message.senderRole}
-                </Text>
-              )}
+              <Text
+                style={[
+                  localStyles.senderName,
+                  message.isMe && localStyles.senderNameMe,
+                ]}
+              >
+                {message.sender} · {message.senderRole}
+              </Text>
 
               <View
                 style={[
@@ -220,6 +223,10 @@ const localStyles = StyleSheet.create({
   bubbleRowOther: {
     alignSelf: "flex-start",
     alignItems: "flex-start",
+  },
+  senderNameMe: {
+    alignSelf: "flex-end",
+    textAlign: "right",
   },
   senderName: {
     color: "#6e6e73",
