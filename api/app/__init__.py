@@ -1567,6 +1567,77 @@ def create_app():
         })
 
 
+    @app.post("/api/threads/<int:thread_id>/members")
+    def add_thread_member(thread_id):
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+        member_role = (data.get("member_role") or "member").strip()
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        existing = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user.id,
+        ).first()
+
+        if existing:
+            existing.member_role = member_role
+        else:
+            db.session.add(ThreadMember(
+                thread_id=thread.id,
+                user_id=user.id,
+                member_role=member_role,
+            ))
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread, user.id),
+        })
+
+
+    @app.delete("/api/threads/<int:thread_id>/members/<int:user_id>")
+    def remove_thread_member(thread_id, user_id):
+        thread = Thread.query.get(thread_id)
+
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread_id,
+            user_id=user_id,
+        ).first()
+
+        if not membership:
+            return jsonify({
+                "success": False,
+                "error": "Membership not found.",
+            }), 404
+
+        db.session.delete(membership)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(thread),
+        })
+
+
     @app.get("/api/threads/<int:thread_id>/messages")
     def list_thread_messages(thread_id):
         user_id = request.args.get("user_id", type=int)
