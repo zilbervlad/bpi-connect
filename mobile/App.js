@@ -170,7 +170,7 @@ export default function App() {
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
 
-  const unreadCount = threads.reduce((total, thread) => total + thread.unread, 0);
+  const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
   const ackCount = messages.filter(
     (message) => message.requiresAck && !message.responded
   ).length;
@@ -184,6 +184,7 @@ export default function App() {
           const savedUser = JSON.parse(savedUserJson);
           setCurrentUser(savedUser);
           setIsLoggedIn(true);
+          await reloadDataForUser(savedUser);
           registerPushTokenForUser(savedUser);
         }
       } catch (error) {
@@ -195,8 +196,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadApiData();
-  }, []);
+    if (!isLoggedIn) {
+      loadApiData();
+    }
+  }, [isLoggedIn]);
 
   async function registerPushTokenForUser(user) {
     if (!user?.id || !user?.apiUser) return;
@@ -325,7 +328,13 @@ export default function App() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await AsyncStorage.removeItem(SAVED_USER_KEY);
+    } catch (error) {
+      console.log("Could not clear saved user:", error.message);
+    }
+
     setIsLoggedIn(false);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
@@ -335,7 +344,7 @@ export default function App() {
 
   async function loadApiData() {
     try {
-      const loadedUsers = await fetchApiUsers(user.id);
+      const loadedUsers = await fetchApiUsers();
       const mappedUsers = loadedUsers.map(mapApiUserToDemoUser);
 
       const defaultUser =
@@ -408,6 +417,7 @@ export default function App() {
 
     try {
       const loadedThreads = await fetchApiThreads(currentUser.id);
+
       const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
 
       setThreads((currentThreads) =>
@@ -497,6 +507,12 @@ export default function App() {
         );
 
         await markApiThreadRead(thread.id, currentUser.id);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((item) =>
+            item.id === thread.id ? { ...item, unread: 0 } : item
+          )
+        );
       } catch (error) {
         console.log("Could not load thread messages:", error.message);
       }
