@@ -2406,7 +2406,11 @@ def create_app():
             query
             .outerjoin(latest_message_subquery, Thread.id == latest_message_subquery.c.thread_id)
             .order_by(
-                db.func.coalesce(latest_message_subquery.c.last_activity_at, Thread.created_at).desc(),
+                db.case(
+                    (latest_message_subquery.c.last_activity_at.is_(None), 1),
+                    else_=0,
+                ),
+                latest_message_subquery.c.last_activity_at.desc(),
                 Thread.created_at.desc(),
             )
             .all()
