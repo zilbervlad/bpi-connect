@@ -33,20 +33,19 @@ import {
 
 const roles = [
   { label: "TM", value: "tm" },
-  { label: "Manager", value: "manager" },
+  { label: "MIT", value: "manager" },
   { label: "General Manager", value: "general_manager" },
   { label: "Coach", value: "coach" },
-  { label: "Supervisor", value: "supervisor" },
   { label: "HR", value: "hr" },
   { label: "Admin", value: "admin" },
 ];
 
 const roleLabels = {
   tm: "TM",
-  manager: "Manager",
+  manager: "MIT",
   general_manager: "General Manager",
   coach: "Coach",
-  supervisor: "Supervisor",
+  supervisor: "Coach",
   hr: "HR",
   admin: "Admin",
 };
@@ -493,8 +492,8 @@ export function AdminScreen({ user }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
         eyebrow="ADMIN"
-        title="Command Center"
-        subtitle="Manage people, stores, areas, and access."
+        title="Admin"
+        subtitle="People, stores, access, and groups."
       />
 
       <View style={localStyles.statsGrid}>
@@ -504,8 +503,8 @@ export function AdminScreen({ user }) {
       </View>
 
       <View style={localStyles.navCard}>
-        <AdminTab label="People" value="people" activeSection={activeSection} setActiveSection={setActiveSection} />
-        <AdminTab label="Add" value="invite" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Users" value="people" activeSection={activeSection} setActiveSection={setActiveSection} />
+        <AdminTab label="Invite" value="invite" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Stores" value="stores" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Groups" value="groups" activeSection={activeSection} setActiveSection={setActiveSection} />
         <AdminTab label="Areas" value="areas" activeSection={activeSection} setActiveSection={setActiveSection} />
@@ -525,17 +524,17 @@ export function AdminScreen({ user }) {
 
       {activeSection === "people" && (
         <View style={localStyles.card}>
-          <Text style={localStyles.sectionHeading}>People</Text>
+          <Text style={localStyles.sectionHeading}>Users</Text>
 
           <TextInput
             value={peopleSearch}
             onChangeText={setPeopleSearch}
-            placeholder="Search name, email, or position"
+            placeholder="Search users..."
             placeholderTextColor="#7b8da0"
             style={localStyles.searchInput}
           />
 
-          <Text style={localStyles.label}>Position</Text>
+          <Text style={localStyles.label}>Role</Text>
           <PillGrid
             options={[{ label: "All", value: "all" }, ...roles]}
             selectedValue={peopleRoleFilter}
@@ -560,13 +559,13 @@ export function AdminScreen({ user }) {
             <MiniStat label="Deactivated" value={inactiveUsers.length} />
           </View>
 
-          <Text style={localStyles.label}>Active People</Text>
+          <Text style={localStyles.label}>Active Users</Text>
           {activeUsers.length ? (
             activeUsers.map((item) => (
               <UserRow key={item.id} item={item} onPress={() => openUserDetail(item.id)} />
             ))
           ) : (
-            <Text style={localStyles.emptyText}>No active people match those filters.</Text>
+            <Text style={localStyles.emptyText}>No active users match those filters.</Text>
           )}
 
           <TouchableOpacity
@@ -574,7 +573,7 @@ export function AdminScreen({ user }) {
             onPress={() => setShowInactiveUsers((current) => !current)}
           >
             <Text style={localStyles.deactivatedToggleText}>
-              {showInactiveUsers ? "Hide Deactivated People" : `Show Deactivated People (${inactiveUsers.length})`}
+              {showInactiveUsers ? "Hide Deactivated" : `Show Deactivated (${inactiveUsers.length})`}
             </Text>
           </TouchableOpacity>
 
@@ -590,7 +589,7 @@ export function AdminScreen({ user }) {
                   />
                 ))
               ) : (
-                <Text style={localStyles.emptyText}>No deactivated people match those filters.</Text>
+                <Text style={localStyles.emptyText}>No deactivated users match those filters.</Text>
               )}
             </View>
           )}
@@ -599,13 +598,13 @@ export function AdminScreen({ user }) {
 
       {activeSection === "invite" && (
         <View style={localStyles.card}>
-          <Text style={localStyles.sectionHeading}>Add Person</Text>
+          <Text style={localStyles.sectionHeading}>Invite User</Text>
 
           <Text style={localStyles.label}>Name</Text>
           <TextInput
             value={inviteName}
             onChangeText={setInviteName}
-            placeholder="Employee name"
+            placeholder="Name"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
           />
@@ -616,12 +615,12 @@ export function AdminScreen({ user }) {
             onChangeText={setInviteEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="name@bostonpie.com"
+            placeholder="Email"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
           />
 
-          <Text style={localStyles.label}>Position</Text>
+          <Text style={localStyles.label}>Role</Text>
           <PillGrid options={roles} selectedValue={inviteRole} onSelect={setInviteRole} />
 
           {shouldShowPrimaryStoreControls(inviteRole) && (
@@ -651,7 +650,7 @@ export function AdminScreen({ user }) {
             disabled={isLoading}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? "Creating Invite..." : "Create Invite"}
+              {isLoading ? "Sending Invite..." : "Send Invite"}
             </Text>
           </TouchableOpacity>
 
@@ -875,7 +874,7 @@ export function AdminScreen({ user }) {
               setActiveSection("people");
             }}
           >
-            <Text style={localStyles.backButtonText}>‹ Back to People</Text>
+            <Text style={localStyles.backButtonText}>‹ Back to Users</Text>
           </TouchableOpacity>
 
           <View style={localStyles.detailHeader}>
@@ -887,7 +886,7 @@ export function AdminScreen({ user }) {
             </View>
           </View>
 
-          <Text style={localStyles.label}>Position</Text>
+          <Text style={localStyles.label}>Role</Text>
           <PillGrid options={roles} selectedValue={selectedUser.role} onSelect={handleChangeRole} />
 
           {shouldShowPrimaryStoreControls(selectedUser.role) && (
@@ -992,7 +991,7 @@ export function AdminScreen({ user }) {
             )}
           </View>
 
-          <Text style={localStyles.label}>Current Store Access</Text>
+          <Text style={localStyles.label}>Store Access</Text>
 
           {selectedUser.store_assignments?.length ? (
             selectedUser.store_assignments.map((assignment) => (
@@ -1011,7 +1010,7 @@ export function AdminScreen({ user }) {
               </View>
             ))
           ) : (
-            <Text style={localStyles.emptyText}>No store access assigned.</Text>
+            <Text style={localStyles.emptyText}>No store assigned.</Text>
           )}
 
           <TouchableOpacity
@@ -1138,7 +1137,7 @@ const localStyles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     gap: 5,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   statCard: {
     flex: 1,
@@ -1148,7 +1147,7 @@ const localStyles = StyleSheet.create({
   },
   statValue: {
     color: "#10212b",
-    fontSize: 23,
+    fontSize: 20,
     fontWeight: "900",
     letterSpacing: -1,
   },
@@ -1163,7 +1162,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#101d2d",
     borderRadius: 16,
     padding: 7,
-    marginBottom: 14,
+    marginBottom: 8,
     flexDirection: "row",
     gap: 6,
     borderWidth: 1,
@@ -1207,14 +1206,14 @@ const localStyles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "900",
-    marginBottom: 12,
+    marginBottom: 7,
   },
   sectionHeading: {
     color: "#ffffff",
-    fontSize: 23,
+    fontSize: 20,
     fontWeight: "900",
     letterSpacing: -0.7,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   label: {
     color: "#ffffff",
@@ -1232,7 +1231,7 @@ const localStyles = StyleSheet.create({
     color: "#10212b",
     fontSize: 15,
     fontWeight: "700",
-    marginBottom: 14,
+    marginBottom: 8,
   },
   searchInput: {
     backgroundColor: "#ffffff",
@@ -1247,13 +1246,13 @@ const localStyles = StyleSheet.create({
   pillGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 5,
     marginBottom: 7,
   },
   pill: {
     borderRadius: 999,
     paddingHorizontal: 13,
-    paddingVertical: 9,
+    paddingVertical: 6,
     backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -1301,8 +1300,8 @@ const localStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: "rgba(255,255,255,0.045)",
     borderRadius: 18,
-    padding: 12,
-    marginBottom: 10,
+    padding: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.075)",
   },
@@ -1322,7 +1321,7 @@ const localStyles = StyleSheet.create({
   },
   avatarText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900",
   },
   userMain: {
@@ -1381,7 +1380,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 9,
     alignSelf: "center",
-    marginBottom: 14,
+    marginBottom: 8,
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 14,
@@ -1411,13 +1410,13 @@ const localStyles = StyleSheet.create({
     color: "#526273",
     fontSize: 13,
     lineHeight: 19,
-    marginBottom: 12,
+    marginBottom: 7,
     fontWeight: "700",
   },
   inviteUrlBox: {
     backgroundColor: "#eef5f8",
     borderRadius: 15,
-    padding: 12,
+    padding: 8,
   },
   inviteUrl: {
     color: "#10212b",
@@ -1429,7 +1428,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 20,
     padding: 8,
-    marginBottom: 12,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -1437,7 +1436,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 18,
     padding: 8,
-    marginBottom: 10,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -1445,9 +1444,9 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#ffe4e8",
     borderRadius: 14,
     paddingHorizontal: 8,
-    paddingVertical: 9,
+    paddingVertical: 6,
     alignSelf: "flex-start",
-    marginBottom: 12,
+    marginBottom: 7,
   },
   smallDangerButtonText: {
     color: "#991b2f",
@@ -1464,7 +1463,7 @@ const localStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 7,
     alignItems: "center",
   },
   itemTitle: {
@@ -1533,13 +1532,13 @@ const localStyles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "700",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   assignmentRow: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 18,
     padding: 8,
-    marginBottom: 10,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     flexDirection: "row",
@@ -1550,7 +1549,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#ffe4e8",
     borderRadius: 12,
     paddingHorizontal: 8,
-    paddingVertical: 9,
+    paddingVertical: 6,
   },
   removeButtonText: {
     color: "#991b2f",
@@ -1558,7 +1557,7 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   backButton: {
-    marginBottom: 14,
+    marginBottom: 8,
   },
   backButtonText: {
     color: "#93c5fd",
@@ -1575,13 +1574,13 @@ const localStyles = StyleSheet.create({
     color: "#9cadbf",
     fontSize: 14,
     fontWeight: "700",
-    marginBottom: 12,
+    marginBottom: 7,
   },
   errorBox: {
     backgroundColor: "#ffe4e8",
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
+    padding: 8,
+    marginBottom: 8,
   },
   errorText: {
     color: "#991b2f",
@@ -1591,8 +1590,8 @@ const localStyles = StyleSheet.create({
   successBox: {
     backgroundColor: "#dcfce7",
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
+    padding: 8,
+    marginBottom: 8,
   },
   successText: {
     color: "#166534",
