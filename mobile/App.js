@@ -28,13 +28,10 @@ import {
 import { BottomTabs } from "./src/components/BottomTabs";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
-import { InboxScreen } from "./src/screens/InboxScreen";
 import { ChatsScreen } from "./src/screens/ChatsScreen";
-import { AnnouncementsScreen } from "./src/screens/AnnouncementsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
 import { BroadcastScreen } from "./src/screens/BroadcastScreen";
-import { ComposeScreen } from "./src/screens/ComposeScreen";
 import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
@@ -649,14 +646,23 @@ export default function App() {
   }
 
   function changeTab(tab) {
+    const safeTabMap = {
+      Inbox: "Chats",
+      Announcements: "Chats",
+      Update: "Broadcast",
+      Compose: "People",
+    };
+
+    const nextTab = safeTabMap[tab] || tab;
+
     setSelectedMessageId(null);
     setSelectedThreadId(null);
 
-    if (tab !== "Compose") {
+    if (nextTab !== "People") {
       setStartingRecipient(null);
     }
 
-    setActiveTab(tab);
+    setActiveTab(nextTab);
   }
 
   function switchUser(user) {
@@ -816,7 +822,7 @@ export default function App() {
             ackCount={ackCount}
             messages={messages}
             threads={threads}
-            onOpenInbox={() => changeTab("Inbox")}
+            onOpenInbox={() => changeTab("Chats")}
             onOpenChats={() => changeTab("Chats")}
             onOpenThread={(threadId) => openThread(threadId)}
             onOpenPeople={() => changeTab("People")}
@@ -833,38 +839,12 @@ export default function App() {
           />
         )}
 
-        {activeTab === "Inbox" && (
-          <InboxScreen
-            messages={messages}
-            unreadCount={unreadCount}
-            ackCount={ackCount}
-            onOpenMessage={openMessage}
-          />
-        )}
-
         {activeTab === "People" && (
           <PeopleScreen
             user={currentUser}
             users={profileUsers}
             usingApi={usingApi}
             onStartMessage={startMessageToRecipient}
-          />
-        )}
-
-        {activeTab === "Compose" && (
-          <ComposeScreen
-            user={currentUser}
-            users={profileUsers}
-            usingApi={usingApi}
-            startingRecipient={startingRecipient}
-            onSendPrivateMessage={sendPrivateMessage}
-          />
-        )}
-
-        {activeTab === "Announcements" && (
-          <AnnouncementsScreen
-            messages={messages.filter((message) => message.type === "announcement")}
-            onOpenMessage={openMessage}
           />
         )}
 
