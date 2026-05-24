@@ -1518,7 +1518,7 @@ def create_app():
         })
 
     @app.post("/api/thread-messages/<int:message_id>/ack")
-    def acknowledge_thread_message(message_id):
+    def acknowledge_thread_message_short(message_id):
         data = request.get_json() or {}
         user_id = data.get("user_id")
 
