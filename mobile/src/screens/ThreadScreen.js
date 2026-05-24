@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -30,6 +30,7 @@ export function ThreadScreen({
   onAcknowledge,
 }) {
   const [draft, setDraft] = useState("");
+  const scrollViewRef = useRef(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
 
   const quickReactions = ["👍", "❤️", "😂", "👀", "✅"];
@@ -52,6 +53,15 @@ export function ThreadScreen({
 
     return () => clearInterval(interval);
   }, [thread?.id, onRefreshThread]);
+
+  // auto-scroll to bottom when chat loads or messages update
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [thread?.id, thread?.messages?.length]);
 
   function handleSend() {
     if (!draft.trim()) return;
