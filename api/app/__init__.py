@@ -9,6 +9,7 @@ from secrets import token_urlsafe
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
@@ -28,6 +29,14 @@ from app.models import (
     ThreadMessageReaction,
     PushToken,
 )
+socketio = SocketIO(
+    cors_allowed_origins="*",
+    async_mode="eventlet",
+    ping_timeout=30,
+    ping_interval=10,
+)
+
+
 def get_store_thread_key(store):
     return f"store:{store.store_number}"
 
@@ -235,6 +244,7 @@ def create_app():
 
     CORS(app)
     db.init_app(app)
+    socketio.init_app(app, cors_allowed_origins="*")
 
     @app.post("/dev/remove-company-area-chat")
     def dev_remove_company_area_chat():
@@ -420,6 +430,37 @@ def create_app():
             "has_password_reset_from_email": bool(os.getenv("PASSWORD_RESET_FROM_EMAIL", "").strip()),
             "has_from_email": bool(os.getenv("FROM_EMAIL", "").strip()),
         })
+
+
+    @socketio.on("connect")
+    def socket_connect():
+        return True
+
+
+    @socketio.on("join_user")
+    def socket_join_user(data):
+        user_id = data.get("user_id") if isinstance(data, dict) else None
+
+        if not user_id:
+            return {"success": False, "error": "user_id is required."}
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return {"success": False, "error": "User not found."}
+
+        join_room(f"user:{user.id}")
+
+        memberships = ThreadMember.query.filter_by(user_id=user.id).all()
+
+        for membership in memberships:
+            join_room(f"thread:{membership.thread_id}")
+
+        return {
+            "success": True,
+            "user_id": user.id,
+            "threads_joined": len(memberships),
+        }
 
 
     @app.get("/")
@@ -2573,6 +2614,8 @@ def create_app():
         db.session.add(attachment)
         db.session.commit()
 
+        emit_thread_message_created(thread, message)
+
         push_result = notify_thread_members(thread, sender, message)
 
         return jsonify({
@@ -2626,6 +2669,23 @@ def create_app():
                 "sent": 0,
                 "error": str(error),
             }
+
+
+    def emit_thread_message_created(thread, message):
+        memberships = ThreadMember.query.filter_by(thread_id=thread.id).all()
+
+        for membership in memberships:
+            payload = {
+                "thread_id": thread.id,
+                "thread": serialize_thread(thread, user_id=membership.user_id),
+                "message": serialize_thread_message(message, user_id=membership.user_id),
+            }
+
+            socketio.emit(
+                "thread_message_created",
+                payload,
+                room=f"user:{membership.user_id}",
+            )
 
 
     def notify_thread_members(thread, sender, message):
@@ -2700,6 +2760,8 @@ def create_app():
         )
         db.session.add(message)
         db.session.commit()
+
+        emit_thread_message_created(thread, message)
 
         push_result = notify_thread_members(thread, sender, message)
 

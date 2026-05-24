@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SafeAreaView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { io } from "socket.io-client";
 
 import { styles } from "./src/styles/styles";
 import { demoUsers } from "./src/data/users";
@@ -159,6 +160,7 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
 }
 
 const SAVED_USER_KEY = "bpi_connect_saved_user";
+const REALTIME_URL = "https://bpi-connect.onrender.com";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
@@ -174,6 +176,9 @@ export default function App() {
   const [apiUsers, setApiUsers] = useState([]);
   const [usingApi, setUsingApi] = useState(false);
 
+  const socketRef = useRef(null);
+  const selectedThreadIdRef = useRef(selectedThreadId);
+
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
 
@@ -181,6 +186,10 @@ export default function App() {
   const ackCount = messages.filter(
     (message) => message.requiresAck && !message.responded
   ).length;
+
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
 
   useEffect(() => {
     async function loadSavedUser() {
@@ -230,6 +239,43 @@ export default function App() {
     }
   }
 
+  // Realtime Socket.IO connection
+  useEffect(() => {
+    if (!isLoggedIn || !usingApi || !currentUser?.id || !currentUser?.apiUser) {
+      return undefined;
+    }
+
+    const socket = io(REALTIME_URL, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 600,
+      timeout: 10000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_user", { user_id: currentUser.id }, (response) => {
+        console.log("Realtime joined:", response);
+      });
+    });
+
+    socket.on("thread_message_created", async (payload) => {
+      handleRealtimeThreadMessage(payload);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.log("Realtime connect error:", error.message);
+    });
+
+    return () => {
+      socket.off("thread_message_created");
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [isLoggedIn, usingApi, currentUser?.id]);
+
   useEffect(() => {
     if (!selectedThreadId || !usingApi || !currentUser?.id) return undefined;
 
@@ -237,7 +283,7 @@ export default function App() {
 
     const interval = setInterval(() => {
       refreshOpenThreadMessages(selectedThreadId);
-    }, 1000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [selectedThreadId, usingApi, currentUser?.id]);
@@ -252,7 +298,7 @@ export default function App() {
 
     const interval = setInterval(() => {
       refreshThreadList();
-    }, 3000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [activeTab, selectedThreadId, usingApi, currentUser?.id]);
@@ -417,6 +463,61 @@ export default function App() {
 
   function closeMessage() {
     setSelectedMessageId(null);
+  }
+
+  async function handleRealtimeThreadMessage(payload) {
+    if (!payload?.thread_id || !payload?.message) return;
+
+    const incomingThread = payload.thread ? mapApiThreadToAppThread(payload.thread) : null;
+    const incomingMessage = mapApiThreadMessageToBubble(payload.message);
+    const threadId = payload.thread_id;
+    const isOpenThread = Number(selectedThreadIdRef.current) === Number(threadId);
+
+    setThreads((currentThreads) => {
+      const existingThread = currentThreads.find((thread) => Number(thread.id) === Number(threadId));
+
+      if (!existingThread && incomingThread) {
+        return [
+          {
+            ...incomingThread,
+            unread: isOpenThread || incomingMessage.isMe ? 0 : incomingThread.unread || 1,
+            messages: isOpenThread ? [incomingMessage] : [],
+          },
+          ...currentThreads,
+        ];
+      }
+
+      return currentThreads.map((thread) => {
+        if (Number(thread.id) !== Number(threadId)) return thread;
+
+        const existingMessages = thread.messages || [];
+        const alreadyExists = existingMessages.some(
+          (message) => String(message.id) === String(incomingMessage.id)
+        );
+
+        const nextMessages =
+          isOpenThread && !alreadyExists
+            ? [...existingMessages, incomingMessage]
+            : existingMessages;
+
+        return {
+          ...thread,
+          ...(incomingThread || {}),
+          messages: nextMessages,
+          lastMessage: incomingMessage.body || incomingThread?.lastMessage || thread.lastMessage,
+          lastTime: incomingMessage.time || incomingThread?.lastTime || "Now",
+          unread: isOpenThread || incomingMessage.isMe ? 0 : (thread.unread || 0) + 1,
+        };
+      });
+    });
+
+    if (isOpenThread && !incomingMessage.isMe && usingApi && currentUser?.id) {
+      try {
+        await markApiThreadRead(threadId, currentUser.id);
+      } catch (error) {
+        console.log("Could not mark realtime message read:", error.message);
+      }
+    }
   }
 
   async function refreshThreadList() {
