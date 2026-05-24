@@ -717,18 +717,17 @@ export default function App() {
 
     setThreads((currentThreads) =>
       currentThreads.map((item) =>
-        item.id === thread.id ? { ...item, unread: 0 } : item
+        item.id === thread.id
+          ? {
+              ...item,
+              unreadAtOpen: item.unread || 0,
+              unread: 0,
+            }
+          : item
       )
     );
 
     setSelectedThreadId(thread.id);
-
-    // clear unread when opening thread
-    setThreads((currentThreads) =>
-      currentThreads.map((item) =>
-        item.id === thread.id ? { ...item, unread: 0 } : item
-      )
-    );
 
     if (usingApi && thread.apiThread && currentUser?.id) {
       try {
@@ -742,6 +741,7 @@ export default function App() {
                   members: data.thread.members || [],
                   memberNames: (data.thread.members || []).map((member) => member.name),
                   subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${(data.thread.members || []).length} ${(data.thread.members || []).length === 1 ? "member" : "members"}`,
+                  unreadAtOpen: item.unreadAtOpen || thread.unread || 0,
                   messages: data.messages.map(mapApiThreadMessageToBubble),
                 }
               : item

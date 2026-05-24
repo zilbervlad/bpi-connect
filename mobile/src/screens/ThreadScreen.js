@@ -41,6 +41,11 @@ export function ThreadScreen({
   const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const quickReactions = ["👍", "❤️", "😂", "👀", "✅"];
+  const unreadAtOpen = Number(thread.unreadAtOpen || 0);
+  const unreadStartIndex =
+    unreadAtOpen > 0
+      ? Math.max((thread.messages || []).length - unreadAtOpen, 0)
+      : -1;
 
   function scrollToLatest(animated = true) {
     requestAnimationFrame(() => {
@@ -233,13 +238,21 @@ export function ThreadScreen({
           </View>
 
           {thread.messages.map((message, index) => (
-            <View
-              key={message.id}
-              style={[
-                localStyles.bubbleRow,
-                message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
-              ]}
-            >
+            <View key={message.id}>
+              {index === unreadStartIndex ? (
+                <View style={localStyles.unreadDivider}>
+                  <View style={localStyles.unreadDividerLine} />
+                  <Text style={localStyles.unreadDividerText}>Unread messages</Text>
+                  <View style={localStyles.unreadDividerLine} />
+                </View>
+              ) : null}
+
+              <View
+                style={[
+                  localStyles.bubbleRow,
+                  message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
+                ]}
+              >
               {shouldShowSenderName(thread.messages, message, index) ? (
                 <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
                   {message.sender} · {message.senderRole}
@@ -342,6 +355,7 @@ export function ThreadScreen({
               </TouchableOpacity>
 
               <Text style={localStyles.messageTime}>{message.time}</Text>
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -529,6 +543,26 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     lineHeight: 17,
+  },
+  unreadDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 14,
+    paddingHorizontal: 10,
+  },
+  unreadDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e91f3f",
+    opacity: 0.45,
+  },
+  unreadDividerText: {
+    color: "#e91f3f",
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   bubbleRow: {
     marginBottom: 10,
