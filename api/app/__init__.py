@@ -346,6 +346,39 @@ def create_app():
         })
 
 
+    @app.post("/api/users/<int:user_id>/resend-invite")
+    def resend_user_invite(user_id):
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        if user.invite_accepted_at:
+            return jsonify({
+                "success": False,
+                "error": "This user has already accepted their invite.",
+            }), 400
+
+        if not user.invite_token:
+            user.invite_token = secrets.token_urlsafe(32)
+
+        user.invite_sent_at = datetime.utcnow()
+        db.session.commit()
+
+        app_invite_base_url = os.getenv("APP_INVITE_BASE_URL", "bpi-connect://accept-invite").strip().rstrip("/")
+        invite_url = f"{app_invite_base_url}/{user.invite_token}"
+
+        email_result = send_invite_email(user, invite_url)
+
+        return jsonify({
+            "success": True,
+            "user": serialize_user_detail(user),
+            "invite_url": invite_url,
+            "invite_email_sent": email_result.get("sent", False),
+            "invite_email_error": email_result.get("error"),
+        })
+
+
     @app.post("/api/invites")
     def create_invite():
         data = request.get_json() or {}

@@ -370,3 +370,20 @@ export async function uploadApiUserAvatar(userId, imageData) {
 
   return data.user;
 }
+
+export async function resendApiUserInvite(userId) {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/resend-invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not resend invite");
+  }
+
+  return data;
+}
