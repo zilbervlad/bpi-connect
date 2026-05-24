@@ -27,6 +27,47 @@ from app.models import (
     ThreadMessageReaction,
     PushToken,
 )
+def get_store_thread_key(store):
+    return f"store:{store.store_number}"
+
+
+def ensure_store_thread(store, created_by_user_id=None):
+    group_key = get_store_thread_key(store)
+
+    thread = Thread.query.filter_by(group_key=group_key).first()
+
+    if not thread:
+        thread = Thread(
+            thread_type="store",
+            name=f"Store {store.store_number}",
+            group_key=group_key,
+            created_by_user_id=created_by_user_id,
+        )
+        db.session.add(thread)
+        db.session.flush()
+
+    return thread
+
+
+def ensure_thread_member(thread_id, user_id):
+    existing = ThreadMember.query.filter_by(
+        thread_id=thread_id,
+        user_id=user_id,
+    ).first()
+
+    if not existing:
+        db.session.add(ThreadMember(thread_id=thread_id, user_id=user_id))
+
+
+def sync_user_to_store_chat(user, store):
+    if not user or not store:
+        return None
+
+    thread = ensure_store_thread(store, created_by_user_id=user.id)
+    ensure_thread_member(thread.id, user.id)
+    return thread
+
+
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
@@ -41,6 +82,50 @@ def create_app():
 
     CORS(app)
     db.init_app(app)
+
+    @app.post("/dev/backfill-store-chats")
+    def dev_backfill_store_chats():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        stores = Store.query.all()
+        created_threads = 0
+        added_members = 0
+
+        for store in stores:
+            before_thread = Thread.query.filter_by(group_key=get_store_thread_key(store)).first()
+            thread = ensure_store_thread(store)
+            if not before_thread:
+                created_threads += 1
+
+            assigned_user_ids = set()
+
+            for assignment in UserStoreAssignment.query.filter_by(store_id=store.id).all():
+                assigned_user_ids.add(assignment.user_id)
+
+            for user in User.query.filter_by(store_id=store.id).all():
+                assigned_user_ids.add(user.id)
+
+            for user_id in assigned_user_ids:
+                existing_member = ThreadMember.query.filter_by(
+                    thread_id=thread.id,
+                    user_id=user_id,
+                ).first()
+
+                if not existing_member:
+                    ensure_thread_member(thread.id, user_id)
+                    added_members += 1
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "stores_checked": len(stores),
+            "store_threads_created": created_threads,
+            "members_added": added_members,
+        })
+
 
     @app.get("/dev/push-tokens")
     def dev_push_tokens():
@@ -1339,6 +1424,10 @@ def create_app():
         )
 
         db.session.add(store)
+        db.session.flush()
+
+        ensure_store_thread(store)
+
         db.session.commit()
 
         return jsonify({
@@ -1580,6 +1669,8 @@ def create_app():
                 assignment_type=assignment_type,
             )
             db.session.add(existing)
+
+        sync_user_to_store_chat(user, store)
 
         db.session.commit()
 
