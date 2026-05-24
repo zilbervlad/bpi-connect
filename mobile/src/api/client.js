@@ -1,7 +1,8 @@
 const API_BASE_URL = "https://bpi-connect.onrender.com";
 
-export async function fetchApiUsers() {
-  const response = await fetch(`${API_BASE_URL}/api/users`);
+export async function fetchApiUsers(viewerUserId = null) {
+  const query = viewerUserId ? `?viewer_user_id=${encodeURIComponent(viewerUserId)}` : "";
+  const response = await fetch(`${API_BASE_URL}/api/users${query}`);
   const data = await response.json();
 
   if (!response.ok || !data.success) {
@@ -579,4 +580,25 @@ export async function saveApiUserPushToken(userId, token, metadata = {}) {
   }
 
   return data.push_token;
+}
+
+export async function setApiThreadMuted(threadId, userId, muted) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/mute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      muted,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not update mute setting");
+  }
+
+  return data.thread;
 }

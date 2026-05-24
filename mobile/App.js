@@ -335,7 +335,7 @@ export default function App() {
 
   async function loadApiData() {
     try {
-      const loadedUsers = await fetchApiUsers();
+      const loadedUsers = await fetchApiUsers(user.id);
       const mappedUsers = loadedUsers.map(mapApiUserToDemoUser);
 
       const defaultUser =

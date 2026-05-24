@@ -1398,6 +1398,36 @@ def create_app():
         role = (request.args.get("role") or "").strip().lower()
         store_number = (request.args.get("store_number") or "").strip()
         search = (request.args.get("search") or "").strip().lower()
+        viewer_user_id = request.args.get("viewer_user_id", type=int)
+
+        viewer = User.query.get(viewer_user_id) if viewer_user_id else None
+
+        if viewer:
+            viewer_role = (viewer.role or "").strip().lower()
+
+            if viewer_role not in ["admin", "hr"]:
+                if viewer_role in ["coach", "supervisor"]:
+                    oversight_store_ids = [
+                        assignment.store_id
+                        for assignment in UserStoreAssignment.query.filter_by(
+                            user_id=viewer.id,
+                            assignment_type="oversight",
+                        ).all()
+                    ]
+
+                    query = query.filter(
+                        db.or_(
+                            User.area_id == viewer.area_id,
+                            User.store_id.in_(oversight_store_ids) if oversight_store_ids else False,
+                        )
+                    )
+                else:
+                    if viewer.store_id:
+                        query = query.filter(User.store_id == viewer.store_id)
+                    elif viewer.area_id:
+                        query = query.filter(User.area_id == viewer.area_id)
+                    else:
+                        query = query.filter(User.id == viewer.id)
 
         if active in ["true", "false"]:
             query = query.filter(User.is_active == (active == "true"))
