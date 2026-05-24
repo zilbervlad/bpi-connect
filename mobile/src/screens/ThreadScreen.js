@@ -30,6 +30,8 @@ export function ThreadScreen({
   onAcknowledge,
 }) {
   const [draft, setDraft] = useState("");
+  const [pendingImage, setPendingImage] = useState(null);
+  const [pendingImageCaption, setPendingImageCaption] = useState("");
   const scrollViewRef = useRef(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
 
@@ -97,13 +99,42 @@ export function ThreadScreen({
       const mimeType = asset.mimeType || "image/jpeg";
       const imageData = `data:${mimeType};base64,${base64}`;
 
-      await onSendThreadImageMessage?.(thread.id, imageData, "", {
+      setPendingImage({
+        uri: asset.uri,
+        imageData,
         mimeType,
         fileName: asset.fileName || "chat-image.jpg",
       });
+      setPendingImageCaption("");
+    } catch (error) {
+      alert(error.message || "Could not choose picture.");
+    }
+  }
+
+  async function handleSendPendingImage() {
+    if (!pendingImage) return;
+
+    try {
+      await onSendThreadImageMessage?.(
+        thread.id,
+        pendingImage.imageData,
+        pendingImageCaption.trim(),
+        {
+          mimeType: pendingImage.mimeType,
+          fileName: pendingImage.fileName,
+        }
+      );
+
+      setPendingImage(null);
+      setPendingImageCaption("");
     } catch (error) {
       alert(error.message || "Could not send picture.");
     }
+  }
+
+  function handleCancelPendingImage() {
+    setPendingImage(null);
+    setPendingImageCaption("");
   }
 
   return (
@@ -233,6 +264,41 @@ export function ThreadScreen({
             </View>
           ))}
         </ScrollView>
+
+        {pendingImage ? (
+          <View style={localStyles.pendingImagePanel}>
+            <Image
+              source={{ uri: pendingImage.uri }}
+              style={localStyles.pendingImagePreview}
+              resizeMode="cover"
+            />
+
+            <TextInput
+              value={pendingImageCaption}
+              onChangeText={setPendingImageCaption}
+              placeholder="Add a caption..."
+              placeholderTextColor="#8a8a8e"
+              style={localStyles.pendingCaptionInput}
+              multiline
+            />
+
+            <View style={localStyles.pendingImageActions}>
+              <TouchableOpacity
+                style={localStyles.pendingCancelButton}
+                onPress={handleCancelPendingImage}
+              >
+                <Text style={localStyles.pendingCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={localStyles.pendingSendButton}
+                onPress={handleSendPendingImage}
+              >
+                <Text style={localStyles.pendingSendText}>Send Photo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
 
         <View style={localStyles.composer}>
           <TouchableOpacity style={localStyles.photoButton} onPress={handlePickImage}>
@@ -428,6 +494,56 @@ const localStyles = StyleSheet.create({
     marginTop: 3,
     marginHorizontal: 8,
     fontWeight: "600",
+  },
+  pendingImagePanel: {
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#d8d8dd",
+    padding: 12,
+    gap: 10,
+  },
+  pendingImagePreview: {
+    width: 170,
+    height: 170,
+    borderRadius: 18,
+    alignSelf: "center",
+    backgroundColor: "#d1d5db",
+  },
+  pendingCaptionInput: {
+    backgroundColor: "#f2f2f7",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#10212b",
+    fontSize: 15,
+    maxHeight: 90,
+  },
+  pendingImageActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  pendingCancelButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#e5e7eb",
+  },
+  pendingCancelText: {
+    color: "#526273",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  pendingSendButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#007aff",
+  },
+  pendingSendText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
   },
   composer: {
     backgroundColor: "#f8f8f8",
