@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
@@ -55,8 +56,12 @@ function mapApiUserToDemoUser(apiUser) {
   return {
     id: apiUser.id,
     name: apiUser.name,
+    email: apiUser.email,
+    avatar_url: apiUser.avatar_url || null,
+    avatarUrl: apiUser.avatar_url || null,
     role: normalizeApiRole(apiUser.role),
     store: apiUser.store_name || apiUser.store || "Boston Pie",
+    store_name: apiUser.store_name || null,
     area: apiUser.area || "Company",
     storeGroupId: apiUser.store ? `store-${apiUser.store}` : "company",
     apiUser: true,
