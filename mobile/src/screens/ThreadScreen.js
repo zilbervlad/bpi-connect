@@ -29,6 +29,8 @@ export function ThreadScreen({
 }) {
   const [draft, setDraft] = useState("");
 
+  const quickReactions = ["👍", "❤️", "😂", "👀", "✅"];
+
   function handleSend() {
     if (!draft.trim()) return;
     onSendThreadMessage(thread.id, draft.trim());
@@ -101,7 +103,7 @@ export function ThreadScreen({
             </Text>
           </View>
 
-          {thread.messages.map((message) => (
+          {thread.messages.map((message, index) => (
             <View
               key={message.id}
               style={[
@@ -109,14 +111,11 @@ export function ThreadScreen({
                 message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
               ]}
             >
-              <Text
-                style={[
-                  localStyles.senderName,
-                  message.isMe && localStyles.senderNameMe,
-                ]}
-              >
-                {message.sender} · {message.senderRole}
-              </Text>
+              {shouldShowSenderName(thread.messages, message, index) ? (
+                <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
+                  {message.sender} · {message.senderRole}
+                </Text>
+              ) : null}
 
               <View
                 style={[
@@ -145,6 +144,34 @@ export function ThreadScreen({
                     {message.body}
                   </Text>
                 ) : null}
+                <View style={localStyles.reactionRow}>
+                  {quickReactions.map((emoji) => {
+                    const existingReaction = message.reactions?.find(
+                      (reaction) => reaction.emoji === emoji
+                    );
+
+                    return (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={[
+                          localStyles.quickReactionButton,
+                          existingReaction?.reacted_by_me && localStyles.quickReactionButtonActive,
+                        ]}
+                        onPress={() => onReact?.(message.id, emoji)}
+                        activeOpacity={0.82}
+                      >
+                        <Text
+                          style={[
+                            localStyles.quickReactionText,
+                            existingReaction?.reacted_by_me && localStyles.quickReactionTextActive,
+                          ]}
+                        >
+                          {emoji}{existingReaction?.count ? ` ${existingReaction.count}` : ""}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               <Text style={localStyles.messageTime}>{message.time}</Text>
@@ -176,6 +203,17 @@ export function ThreadScreen({
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function shouldShowSenderName(messages, message, index) {
+  const previousMessage = messages[index - 1];
+
+  if (!previousMessage) return true;
+
+  return (
+    previousMessage.sender !== message.sender ||
+    previousMessage.isMe !== message.isMe
   );
 }
 
@@ -430,5 +468,32 @@ const localStyles = StyleSheet.create({
   },
   quickReactText: {
     fontSize: 14,
+  },
+  reactionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  quickReactionButton: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    minWidth: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickReactionButtonActive: {
+    backgroundColor: "#ffffff",
+  },
+  quickReactionText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  quickReactionTextActive: {
+    color: "#10212b",
   },
 });
