@@ -477,3 +477,49 @@ export async function removeApiThreadMember(threadId, userId) {
 
   return data.thread;
 }
+
+export async function acknowledgeApiThreadMessage(messageId, userId) {
+  const response = await fetch(`${API_BASE_URL}/api/thread-messages/${messageId}/ack`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not acknowledge message");
+  }
+
+  return data.message;
+}
+
+
+export async function sendApiThreadImageMessage(threadId, senderUserId, imageData, body = "", metadata = {}) {
+  const response = await fetch(`${API_BASE_URL}/api/threads/${threadId}/messages/image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender_user_id: senderUserId,
+      body,
+      image_data: imageData,
+      mime_type: metadata.mimeType || "image/jpeg",
+      original_filename: metadata.fileName || "chat-image.jpg",
+      requires_ack: Boolean(metadata.requiresAck),
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Could not send image");
+  }
+
+  return data.message;
+}
