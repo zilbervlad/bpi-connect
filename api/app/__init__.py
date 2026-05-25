@@ -3051,7 +3051,6 @@ def create_app():
                 "last_read_at": membership.last_read_at.isoformat(),
             },
             room=f"thread:{thread_id}",
-            include_self=False,
         )
 
         return jsonify({
