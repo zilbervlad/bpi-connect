@@ -1197,6 +1197,7 @@ def create_app():
         })
 
 
+    @app.post("/api/users/invite")
     @app.post("/api/invites")
     def create_invite():
         data = request.get_json() or {}
@@ -1204,8 +1205,8 @@ def create_app():
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").strip().lower()
         role = (data.get("role") or "").strip().lower()
-        store_number = (data.get("store_number") or "").strip()
-        area_name = (data.get("area") or "").strip()
+        store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
+        area_name = (data.get("area") or data.get("areaName") or "").strip()
 
         if not name or not email or not role:
             return jsonify({
