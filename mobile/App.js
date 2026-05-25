@@ -522,29 +522,13 @@ export default function App() {
       const loadedUsers = await fetchApiUsers();
       const mappedUsers = loadedUsers.map(mapApiUserToDemoUser);
 
-      const defaultUser =
-        mappedUsers.find((user) => user.role === "Admin") || mappedUsers[0];
-
-      const loadedMessages = await fetchApiMessages(defaultUser?.id);
-      const loadedThreads = await fetchApiThreads(defaultUser?.id);
-
+      // Do not auto-select a default API user.
+      // The logged-in user must only come from handleLogin() or saved AsyncStorage.
       setApiUsers(mappedUsers);
-      setCurrentUser(defaultUser || demoUsers[0]);
-      setMessages(
-        loadedMessages.length
-          ? loadedMessages.map(mapApiMessageToAppMessage)
-          : starterMessages
-      );
-      setThreads(
-        loadedThreads.length
-          ? loadedThreads.map(mapApiThreadToAppThread)
-          : starterThreads
-      );
       setUsingApi(true);
     } catch (error) {
       console.log("API unavailable, using local demo data:", error.message);
       setApiUsers([]);
-      setCurrentUser(demoUsers[0]);
       setMessages(starterMessages);
       setThreads(starterThreads);
       setUsingApi(false);
