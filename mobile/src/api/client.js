@@ -269,3 +269,15 @@ export async function setApiThreadFavorite(threadId, userId, favorite) {
 
   return data.thread;
 }
+
+export async function findOrCreateDirectThread(senderUserId, recipientUserId) {
+  const data = await apiRequest("/api/threads/direct", {
+    method: "POST",
+    body: JSON.stringify({
+      sender_user_id: senderUserId,
+      recipient_user_id: recipientUserId,
+    }),
+  });
+
+  return data.thread;
+}

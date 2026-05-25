@@ -229,16 +229,51 @@ export default function App() {
     try {
       const result = await findOrCreateDirectThread(currentUser.id, recipient.id);
 
+      const directThread =
+        result?.thread ||
+        result?.data?.thread ||
+        result;
+
       const threadId =
+        directThread?.id ||
         result?.id ||
         result?.thread_id ||
-        result?.thread?.id ||
         result?.data?.id ||
-        result?.data?.thread_id ||
-        result?.data?.thread?.id;
+        result?.data?.thread_id;
 
       if (!threadId) {
         console.log("Direct thread returned no thread id:", result);
+        return;
+      }
+
+      const mappedThread =
+        directThread?.thread_type || directThread?.group_key
+          ? mapApiThreadToAppThread(directThread)
+          : null;
+
+      if (mappedThread) {
+        setThreads((currentThreads) => {
+          const exists = currentThreads.some(
+            (thread) => String(thread.id) === String(mappedThread.id)
+          );
+
+          if (exists) {
+            return currentThreads.map((thread) =>
+              String(thread.id) === String(mappedThread.id)
+                ? {
+                    ...thread,
+                    ...mappedThread,
+                    messages: thread.messages || mappedThread.messages || [],
+                  }
+                : thread
+            );
+          }
+
+          return [mappedThread, ...currentThreads];
+        });
+
+        setSelectedThreadId(mappedThread.id);
+        setActiveTab("Chats");
         return;
       }
 
@@ -246,7 +281,8 @@ export default function App() {
         await refreshThreadList();
       }
 
-      await openThread(threadId);
+      setSelectedThreadId(threadId);
+      setActiveTab("Chats");
     } catch (error) {
       console.log("Failed to start direct message:", error);
     }
