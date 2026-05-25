@@ -9,7 +9,15 @@ async function apiRequest(path, options = {}) {
     },
   });
 
-  const data = await response.json();
+  const rawText = await response.text();
+  let data = null;
+
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    const preview = rawText ? rawText.slice(0, 220) : "No response body";
+    throw new Error(`API returned non-JSON for ${path}: ${response.status} ${preview}`);
+  }
 
   if (!response.ok || data.success === false) {
     throw new Error(data.error || data.message || "API request failed");
@@ -226,6 +234,15 @@ export async function setApiThreadMuted(threadId, userId, muted) {
   });
 
   return data.thread;
+}
+
+export async function markApiThreadRead(threadId, userId) {
+  return apiRequest(`/api/threads/${threadId}/read`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
 }
 
 export async function toggleApiThreadMessageReaction(messageId, userId, emoji) {

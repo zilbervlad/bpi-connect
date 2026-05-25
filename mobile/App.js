@@ -300,6 +300,8 @@ export default function App() {
   const socketRef = useRef(null);
   const selectedThreadIdRef = useRef(selectedThreadId);
   const locallyReadThreadIdsRef = useRef(new Set());
+  const openThreadRefreshInFlightRef = useRef(new Set());
+  const lastThreadReadAtRef = useRef({});
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
@@ -836,6 +838,14 @@ export default function App() {
   async function refreshOpenThreadMessages(threadId = selectedThreadId) {
     if (!threadId || !usingApi || !currentUser?.id) return;
 
+    const refreshKey = `${currentUser.id}:${threadId}`;
+
+    if (openThreadRefreshInFlightRef.current.has(refreshKey)) {
+      return;
+    }
+
+    openThreadRefreshInFlightRef.current.add(refreshKey);
+
     try {
       const data = await fetchApiThreadMessages(threadId, currentUser.id);
       await markThreadReadAndClear(threadId);
@@ -844,7 +854,7 @@ export default function App() {
 
       setThreads((currentThreads) =>
         currentThreads.map((thread) => {
-          if (thread.id !== threadId) return thread;
+          if (Number(thread.id) !== Number(threadId)) return thread;
 
           return {
             ...thread,
@@ -860,6 +870,8 @@ export default function App() {
       );
     } catch (error) {
       console.log("Could not refresh open thread:", error.message);
+    } finally {
+      openThreadRefreshInFlightRef.current.delete(refreshKey);
     }
   }
 
@@ -881,6 +893,16 @@ export default function App() {
     );
 
     if (!usingApi || !currentUser?.id) return;
+
+    const readKey = `${currentUser.id}:${threadId}`;
+    const now = Date.now();
+    const lastReadAt = lastThreadReadAtRef.current[readKey] || 0;
+
+    if (now - lastReadAt < 2500) {
+      return;
+    }
+
+    lastThreadReadAtRef.current[readKey] = now;
 
     try {
       await markApiThreadRead(threadId, currentUser.id);
@@ -925,30 +947,8 @@ export default function App() {
     setSelectedThreadId(thread.id);
     markThreadReadAndClear(thread.id);
 
-    if (usingApi && thread.apiThread && currentUser?.id) {
-      try {
-        const data = await fetchApiThreadMessages(thread.id, currentUser.id);
-
-        setThreads((currentThreads) =>
-          currentThreads.map((item) =>
-            item.id === thread.id
-              ? {
-                  ...item,
-                  members: data.thread.members || [],
-                  memberNames: (data.thread.members || []).map((member) => member.name),
-                  subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${(data.thread.members || []).length} ${(data.thread.members || []).length === 1 ? "member" : "members"}`,
-                  unreadAtOpen: item.unreadAtOpen || thread.unread || 0,
-                  messages: data.messages.map(mapApiThreadMessageToBubble),
-                }
-              : item
-          )
-        );
-
-        await markThreadReadAndClear(thread.id);
-      } catch (error) {
-        console.log("Could not load thread messages:", error.message);
-      }
-    }
+    // Message loading is handled by the selectedThreadId effect.
+    // Avoid fetching here too, because it causes duplicate refresh/read calls.
   }
 
   async function handleToggleThreadMute(threadId, muted) {

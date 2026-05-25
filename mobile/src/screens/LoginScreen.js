@@ -20,18 +20,6 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
     onLogin(email.trim(), password);
   }
 
-  const maskedPassword = password ? "•".repeat(password.length) : "";
-
-  function handlePasswordChange(value) {
-    if (value.length < maskedPassword.length) {
-      setPassword(password.slice(0, Math.max(value.length, 0)));
-      return;
-    }
-
-    const addedText = value.slice(maskedPassword.length);
-    setPassword(password + addedText);
-  }
-
   async function handleForgotPassword() {
     if (!email.trim()) {
       setResetMessage("Enter your email first, then tap Forgot Password.");
@@ -77,27 +65,30 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             placeholder="name@bostonpie.com"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
-            autoComplete="off"
-            textContentType="none"
-            importantForAutofill="no"
+            autoComplete="email"
+            textContentType="username"
+            importantForAutofill="yes"
             autoCorrect={false}
             spellCheck={false}
+            returnKeyType="next"
           />
 
           <Text style={localStyles.label}>Password</Text>
           <TextInput
-            value={maskedPassword}
-            onChangeText={handlePasswordChange}
+            value={password}
+            onChangeText={setPassword}
             placeholder="Password"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
-            autoComplete="off"
-            textContentType="none"
-            importantForAutofill="no"
+            autoComplete="password"
+            textContentType="password"
+            importantForAutofill="yes"
             autoCorrect={false}
             spellCheck={false}
             autoCapitalize="none"
-            keyboardType="default"
+            secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
 
           <TouchableOpacity
