@@ -6,8 +6,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { styles } from "./src/styles/styles";
 import { demoUsers } from "./src/data/users";
-import { starterMessages } from "./src/data/messages";
-import { starterThreads } from "./src/data/threads";
 
 import {
   fetchApiUsers,
@@ -287,9 +285,9 @@ export default function App() {
       console.log("Failed to start direct message:", error);
     }
   };
-  const [currentUser, setCurrentUser] = useState(demoUsers[0]);
-  const [messages, setMessages] = useState(starterMessages);
-  const [threads, setThreads] = useState(starterThreads);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [threads, setThreads] = useState([]);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [startingRecipient, setStartingRecipient] = useState(null);
@@ -548,7 +546,7 @@ export default function App() {
     }
 
     setIsLoggedIn(false);
-    setCurrentUser(demoUsers[0]);
+    setCurrentUser(null);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
     setStartingRecipient(null);
@@ -565,10 +563,10 @@ export default function App() {
       setApiUsers(mappedUsers);
       setUsingApi(true);
     } catch (error) {
-      console.log("API unavailable, using local demo data:", error.message);
+      console.log("API unavailable:", error.message);
       setApiUsers([]);
-      setMessages(starterMessages);
-      setThreads(starterThreads);
+      setMessages([]);
+      setThreads([]);
       setUsingApi(false);
     }
   }

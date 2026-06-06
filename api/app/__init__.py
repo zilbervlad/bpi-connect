@@ -1069,15 +1069,15 @@ def create_app():
 
               <form method="POST">
                 <label>New password</label>
-                <input name="password" type="password" required minlength="6" placeholder="New password" />
+                <input name="password" type="password" required placeholder="New password" />
 
                 <label>Confirm password</label>
-                <input name="confirm_password" type="password" required minlength="6" placeholder="Confirm password" />
+                <input name="confirm_password" type="password" required placeholder="Confirm password" />
 
                 <button type="submit">Update Password</button>
               </form>
 
-              <p class="small">Your password must be at least 6 characters.</p>
+              <p class="small">Choose a password you can remember.</p>
             </div>
           </body>
         </html>
@@ -1094,8 +1094,8 @@ def create_app():
         password = (request.form.get("password") or "").strip()
         confirm_password = (request.form.get("confirm_password") or "").strip()
 
-        if len(password) < 6:
-            return "Password must be at least 6 characters.", 400
+        if not password:
+            return "Password is required.", 400
 
         if password != confirm_password:
             return "Passwords do not match.", 400
