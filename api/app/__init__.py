@@ -512,6 +512,21 @@ def create_app():
         })
 
 
+
+    @app.get("/dev/media-config")
+    def dev_media_config():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        return jsonify({
+            "success": True,
+            "has_cloudinary_cloud_name": bool(os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()),
+            "has_cloudinary_api_key": bool(os.getenv("CLOUDINARY_API_KEY", "").strip()),
+            "has_cloudinary_api_secret": bool(os.getenv("CLOUDINARY_API_SECRET", "").strip()),
+        })
+
+
     @app.get("/dev/email-config")
     def dev_email_config():
         auth_error = require_dev_admin_secret()
