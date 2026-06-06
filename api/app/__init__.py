@@ -719,6 +719,60 @@ def create_app():
         return actor, None
 
 
+
+    def require_bpi_ops_integration_secret():
+        expected_secret = os.getenv("BPI_OPS_INTEGRATION_SECRET", "").strip()
+        provided_secret = (
+            request.headers.get("X-BPI-Ops-Secret", "").strip()
+            or request.headers.get("X-Integration-Secret", "").strip()
+        )
+
+        if not expected_secret:
+            return jsonify({
+                "success": False,
+                "error": "BPI_OPS_INTEGRATION_SECRET is not configured.",
+            }), 403
+
+        if provided_secret != expected_secret:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized integration request.",
+            }), 403
+
+        return None
+
+
+    def normalize_bpi_connect_role(role, position=None):
+        raw_role = (role or "").strip().lower()
+        raw_position = (position or "").strip().lower()
+
+        if raw_role in {"admin", "hr", "coach", "supervisor", "general_manager", "manager", "tm", "maintenance"}:
+            return raw_role
+
+        if raw_role in {"driver", "csr", "customer service rep", "customer_service"}:
+            return "tm"
+
+        if raw_role in {"gm", "general manager"}:
+            return "general_manager"
+
+        if raw_role in {"mit", "shift runner", "shift_runner"}:
+            return "manager"
+
+        if raw_position in {"driver", "csr", "customer service rep", "customer_service"}:
+            return "tm"
+
+        if raw_position in {"gm", "general manager"}:
+            return "general_manager"
+
+        if raw_position in {"mit", "shift runner", "shift_runner"}:
+            return "manager"
+
+        if raw_position in {"supervisor", "coach", "hr", "maintenance"}:
+            return raw_position
+
+        return "tm"
+
+
     def require_dev_admin_secret():
         expected_secret = os.getenv("DEV_ADMIN_SECRET", "").strip()
         provided_secret = request.headers.get("X-Dev-Admin-Secret", "").strip()
@@ -1817,6 +1871,170 @@ def create_app():
         return jsonify({
             "success": True,
             "user": serialize_user(user),
+        })
+
+
+
+    @app.post("/api/integrations/bpi-ops/users/sync")
+    def sync_bpi_ops_user():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        data = request.get_json() or {}
+
+        bpi_ops_user_id = data.get("bpi_ops_user_id") or data.get("bpiOpsUserId")
+        name = (data.get("name") or "").strip()
+        email = (data.get("email") or "").strip().lower()
+        role = normalize_bpi_connect_role(data.get("role"), data.get("position"))
+        store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
+        area_name = (data.get("area") or data.get("area_name") or data.get("areaName") or "").strip()
+        is_active = bool(data.get("is_active", True))
+        send_invite = bool(data.get("send_invite", True))
+
+        try:
+            bpi_ops_user_id = int(bpi_ops_user_id) if bpi_ops_user_id not in [None, ""] else None
+        except (TypeError, ValueError):
+            bpi_ops_user_id = None
+
+        if not bpi_ops_user_id:
+            return jsonify({
+                "success": False,
+                "error": "bpi_ops_user_id is required.",
+            }), 400
+
+        if not name or not email:
+            return jsonify({
+                "success": False,
+                "error": "name and email are required.",
+            }), 400
+
+        if not is_valid_email_address(email):
+            return jsonify({
+                "success": False,
+                "error": "A valid email address is required.",
+            }), 400
+
+        area = None
+        if area_name:
+            area = Area.query.filter(db.func.lower(Area.name) == area_name.lower()).first()
+            if not area:
+                area = Area(name=area_name)
+                db.session.add(area)
+                db.session.flush()
+
+        store = None
+        if store_number:
+            store = Store.query.filter_by(store_number=store_number).first()
+
+            if not store:
+                store = Store(
+                    store_number=store_number,
+                    name=f"Store {store_number}",
+                    area_id=area.id if area else None,
+                    is_active=True,
+                )
+                db.session.add(store)
+                db.session.flush()
+                ensure_store_thread(store)
+
+            elif area and store.area_id != area.id:
+                store.area_id = area.id
+
+        if store and not area:
+            area = store.area
+
+        user = User.query.filter_by(bpi_ops_user_id=bpi_ops_user_id).first()
+        action = "updated"
+
+        if not user:
+            user = User.query.filter(db.func.lower(User.email) == email).first()
+
+            if user and user.bpi_ops_user_id and int(user.bpi_ops_user_id) != int(bpi_ops_user_id):
+                return jsonify({
+                    "success": False,
+                    "error": "Email already belongs to another linked BPI Connect account.",
+                }), 409
+
+        if not user:
+            action = "created"
+            user = User(
+                name=name,
+                email=email,
+                bpi_ops_user_id=bpi_ops_user_id,
+                role=role,
+                store_id=store.id if store else None,
+                area_id=area.id if area else None,
+                is_active=is_active,
+            )
+            db.session.add(user)
+            db.session.flush()
+        else:
+            user.name = name
+            user.email = email
+            user.bpi_ops_user_id = bpi_ops_user_id
+            user.role = role
+            user.store_id = store.id if store else None
+            user.area_id = area.id if area else None
+            user.is_active = is_active
+
+        if store:
+            if role in {"coach", "supervisor"}:
+                assignment_type = "oversight"
+            else:
+                assignment_type = "primary"
+
+            if assignment_type == "primary":
+                UserStoreAssignment.query.filter_by(
+                    user_id=user.id,
+                    assignment_type="primary",
+                ).delete()
+                user.store_id = store.id
+                user.area_id = store.area_id or (area.id if area else None)
+
+            existing_assignment = UserStoreAssignment.query.filter_by(
+                user_id=user.id,
+                store_id=store.id,
+                assignment_type=assignment_type,
+            ).first()
+
+            if not existing_assignment:
+                db.session.add(UserStoreAssignment(
+                    user_id=user.id,
+                    store_id=store.id,
+                    assignment_type=assignment_type,
+                ))
+
+            sync_user_to_store_chat(user, store)
+
+        sync_user_to_default_chats(user)
+
+        invite_url = None
+        invite_email_sent = False
+        invite_email_error = None
+
+        if send_invite and is_active and not user.invite_accepted_at:
+            if not user.invite_token:
+                user.invite_token = secrets.token_urlsafe(32)
+
+            user.invite_sent_at = datetime.utcnow()
+
+            app_invite_base_url = os.getenv("APP_INVITE_BASE_URL", "https://bpi-connect.onrender.com/invite").strip().rstrip("/")
+            invite_url = f"{app_invite_base_url}/{user.invite_token}"
+
+            email_result = send_invite_email(user, invite_url)
+            invite_email_sent = email_result.get("sent", False)
+            invite_email_error = email_result.get("error")
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "action": action,
+            "user": serialize_user_detail(user),
+            "invite_url": invite_url,
+            "invite_email_sent": invite_email_sent,
+            "invite_email_error": invite_email_error,
         })
 
 
