@@ -2295,6 +2295,8 @@ def create_app():
         if "is_active" in data:
             user.is_active = bool(data.get("is_active"))
 
+        sync_user_to_default_chats(user)
+
         db.session.commit()
 
         return jsonify({
