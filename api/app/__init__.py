@@ -1806,6 +1806,12 @@ def create_app():
         user.password_hash = generate_password_hash(password)
         user.invite_accepted_at = datetime.utcnow()
         user.invite_token = None
+
+        if user.store:
+            sync_user_to_store_chat(user, user.store)
+
+        sync_user_to_default_chats(user)
+
         db.session.commit()
 
         return jsonify({
