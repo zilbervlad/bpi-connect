@@ -1449,7 +1449,7 @@ def create_app():
         if actor_error:
             return actor_error
 
-        name = (data.get("name") or "").strip()
+        name = " ".join((data.get("name") or "").strip().split())
         email = (data.get("email") or "").strip().lower()
         role = (data.get("role") or "").strip().lower()
         bpi_ops_user_id = data.get("bpi_ops_user_id") or data.get("bpiOpsUserId")
