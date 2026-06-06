@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { requestApiPasswordReset } from "../api/client";
@@ -45,7 +46,11 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
 
       <View style={localStyles.container}>
         <View style={localStyles.logo}>
-          <Text style={localStyles.logoText}>BPI</Text>
+          <Image
+            source={require("../../assets/bpi-logo.png")}
+            style={localStyles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
         <Text style={localStyles.title}>BPI Connect</Text>
@@ -145,19 +150,23 @@ const localStyles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: {
-    width: 74,
-    height: 74,
-    borderRadius: 24,
-    backgroundColor: "#e91f3f",
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 22,
+    padding: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
-  logoText: {
-    color: "#ffffff",
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: -1,
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   title: {
     color: "#ffffff",
