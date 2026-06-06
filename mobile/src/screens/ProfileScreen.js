@@ -89,7 +89,7 @@ export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpd
 
         <View style={styles.profileRow}>
           <Text style={styles.profileRowLabel}>Push notifications</Text>
-          <Text style={styles.profileRowValue}>Coming soon</Text>
+          <Text style={styles.profileRowValue}>Managed by phone settings</Text>
         </View>
       </View>
 

@@ -3173,6 +3173,12 @@ def create_app():
         if not membership and not sender_can_access_group_thread:
             return jsonify({"success": False, "error": "Sender is not a member of this thread."}), 403
 
+        if requires_ack and sender_role not in ["admin", "hr", "coach", "supervisor"]:
+            return jsonify({
+                "success": False,
+                "error": "Only Admin, HR, Coach, or Supervisor accounts can require acknowledgements.",
+            }), 403
+
         message = ThreadMessage(
             thread_id=thread.id,
             sender_user_id=sender.id,
