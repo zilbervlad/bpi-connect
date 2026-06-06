@@ -199,6 +199,7 @@ export function AdminScreen({ user }) {
         role: inviteRole,
         storeNumber: shouldShowPrimaryStoreControls(inviteRole) ? inviteStoreNumber : "",
         area: inviteArea,
+        actorUserId: user.id,
       });
 
       setCreatedInvite(invite);
@@ -256,7 +257,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      await createApiArea(newAreaName.trim());
+      await createApiArea(newAreaName.trim(), user.id);
       setNewAreaName("");
       setStatusMessage("Area created.");
       await loadAdminData();
@@ -279,7 +280,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      await deleteApiArea(areaId);
+      await deleteApiArea(areaId, user.id);
       setStatusMessage("Area deleted.");
       await loadAdminData();
     } catch (error) {
@@ -305,6 +306,7 @@ export function AdminScreen({ user }) {
         storeNumber: newStoreNumber.trim(),
         name: newStoreName.trim() || `Store ${newStoreNumber.trim()}`,
         area: newStoreArea,
+        actorUserId: user.id,
       });
 
       setNewStoreNumber("");
@@ -324,7 +326,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      await updateApiStore(store.id, { is_active: !store.is_active });
+      await updateApiStore(store.id, { is_active: !store.is_active }, user.id);
       setStatusMessage(store.is_active ? "Store deactivated." : "Store reactivated.");
       await loadAdminData();
     } catch (error) {
@@ -340,7 +342,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      await updateApiStore(storeId, { area: areaName });
+      await updateApiStore(storeId, { area: areaName }, user.id);
       setStatusMessage("Store area updated.");
       await loadAdminData();
     } catch (error) {
@@ -359,7 +361,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      const result = await sendApiUserPasswordReset(selectedUser.id);
+      const result = await sendApiUserPasswordReset(selectedUser.id, user.id);
       setSelectedUser(result.user);
       setPasswordResetResult(result);
 
@@ -386,7 +388,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      const result = await resendApiUserInvite(selectedUser.id);
+      const result = await resendApiUserInvite(selectedUser.id, user.id);
       setSelectedUser(result.user);
       setResentInvite(result);
 
@@ -434,7 +436,10 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      const updated = await updateApiUser(selectedUser.id, { role: nextRole });
+      const updated = await updateApiUser(selectedUser.id, {
+        role: nextRole,
+        actor_user_id: user.id,
+      });
       setSelectedUser(updated);
       setStatusMessage("Role updated.");
       await loadAdminData();
@@ -456,6 +461,7 @@ export function AdminScreen({ user }) {
       const updated = await addApiUserStoreAssignment(selectedUser.id, {
         storeNumber,
         assignmentType,
+        actorUserId: user.id,
       });
 
       setSelectedUser(updated);
@@ -480,7 +486,7 @@ export function AdminScreen({ user }) {
     setIsLoading(true);
 
     try {
-      const updated = await removeApiUserStoreAssignment(selectedUser.id, assignmentId);
+      const updated = await removeApiUserStoreAssignment(selectedUser.id, assignmentId, user.id);
       setSelectedUser(updated);
       setStatusMessage("Store assignment removed.");
       await loadAdminData();

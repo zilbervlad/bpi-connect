@@ -481,7 +481,6 @@ def create_app():
         if auth_error:
             return auth_error
 
-        data = request.get_json() or {}
         user_id = data.get("user_id")
 
         if not user_id:
@@ -684,6 +683,34 @@ def create_app():
             "app": "BPI Connect API",
             "status": "running",
         })
+
+
+    def require_admin_actor(data=None):
+        data = data or {}
+        actor_user_id = (
+            data.get("actor_user_id")
+            or data.get("admin_user_id")
+            or request.args.get("actor_user_id", type=int)
+            or request.args.get("admin_user_id", type=int)
+        )
+
+        if not actor_user_id:
+            return None, (jsonify({
+                "success": False,
+                "error": "Admin actor is required.",
+            }), 403)
+
+        actor = User.query.get(actor_user_id)
+        actor_role = (actor.role or "").strip().lower() if actor else ""
+
+        if not actor or not actor.is_active or actor_role not in {"admin", "hr"}:
+            return None, (jsonify({
+                "success": False,
+                "error": "Admin or HR access is required.",
+            }), 403)
+
+        return actor, None
+
 
     def require_dev_admin_secret():
         expected_secret = os.getenv("DEV_ADMIN_SECRET", "").strip()
@@ -1077,6 +1104,11 @@ def create_app():
 
     @app.post("/api/users/<int:user_id>/send-password-reset")
     def send_user_password_reset(user_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         user = User.query.get(user_id)
 
         if not user:
@@ -1279,6 +1311,11 @@ def create_app():
 
     @app.post("/api/users/<int:user_id>/resend-invite")
     def resend_user_invite(user_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         user = User.query.get(user_id)
 
         if not user:
@@ -1314,6 +1351,9 @@ def create_app():
     @app.post("/api/invites")
     def create_invite():
         data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
 
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").strip().lower()
@@ -1841,6 +1881,9 @@ def create_app():
     @app.post("/api/areas")
     def create_area():
         data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
 
         name = (data.get("name") or "").strip()
 
@@ -1870,6 +1913,11 @@ def create_app():
 
     @app.delete("/api/areas/<int:area_id>")
     def delete_area(area_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         area = Area.query.get(area_id)
 
         if not area:
@@ -1911,6 +1959,9 @@ def create_app():
     @app.post("/api/stores")
     def create_store():
         data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
 
         store_number = (data.get("store_number") or "").strip()
         name = (data.get("name") or "").strip()
@@ -1961,12 +2012,15 @@ def create_app():
 
     @app.patch("/api/stores/<int:store_id>")
     def update_store(store_id):
+        data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         store = Store.query.get(store_id)
 
         if not store:
             return jsonify({"success": False, "error": "Store not found."}), 404
-
-        data = request.get_json() or {}
 
         if "store_number" in data:
             new_store_number = (data.get("store_number") or "").strip()
@@ -2102,12 +2156,15 @@ def create_app():
 
     @app.patch("/api/users/<int:user_id>")
     def update_user(user_id):
+        data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         user = User.query.get(user_id)
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
-
-        data = request.get_json() or {}
 
         if "name" in data:
             user.name = (data.get("name") or "").strip() or user.name
@@ -2155,12 +2212,15 @@ def create_app():
 
     @app.post("/api/users/<int:user_id>/store-assignments")
     def add_store_assignment(user_id):
+        data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         user = User.query.get(user_id)
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
-
-        data = request.get_json() or {}
 
         store_number = (data.get("store_number") or "").strip()
         assignment_type = (data.get("assignment_type") or "primary").strip().lower()
@@ -2213,6 +2273,11 @@ def create_app():
 
     @app.delete("/api/users/<int:user_id>/store-assignments/<int:assignment_id>")
     def remove_store_assignment(user_id, assignment_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         assignment = UserStoreAssignment.query.filter_by(
             id=assignment_id,
             user_id=user_id,
@@ -2342,6 +2407,9 @@ def create_app():
     @app.post("/api/threads")
     def create_thread():
         data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
 
         name = (data.get("name") or "").strip()
         thread_type = (data.get("thread_type") or "group").strip()
@@ -2425,6 +2493,11 @@ def create_app():
 
     @app.patch("/api/threads/<int:thread_id>")
     def update_thread(thread_id):
+        data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         thread = Thread.query.get(thread_id)
 
         if not thread:
@@ -2751,6 +2824,11 @@ def create_app():
 
     @app.post("/api/threads/<int:thread_id>/members")
     def add_thread_member(thread_id):
+        data = request.get_json() or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         thread = Thread.query.get(thread_id)
 
         if not thread:
@@ -2795,6 +2873,11 @@ def create_app():
 
     @app.delete("/api/threads/<int:thread_id>/members/<int:user_id>")
     def remove_thread_member(thread_id, user_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
         thread = Thread.query.get(thread_id)
 
         if not thread:

@@ -74,7 +74,7 @@ export async function updateApiUser(userId, updates) {
   return data.user;
 }
 
-export async function createInviteApiUser({ name, email, role, storeNumber, area }) {
+export async function createInviteApiUser({ name, email, role, storeNumber, area, actorUserId }) {
   return apiRequest("/api/users/invite", {
     method: "POST",
     body: JSON.stringify({
@@ -83,37 +83,48 @@ export async function createInviteApiUser({ name, email, role, storeNumber, area
       role,
       store_number: storeNumber,
       area,
+      actor_user_id: actorUserId,
     }),
   });
 }
 
-export async function resendApiUserInvite(userId) {
+export async function resendApiUserInvite(userId, actorUserId) {
   return apiRequest(`/api/users/${userId}/resend-invite`, {
     method: "POST",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
   });
 }
 
-export async function sendApiUserPasswordReset(userId) {
+export async function sendApiUserPasswordReset(userId, actorUserId) {
   return apiRequest(`/api/users/${userId}/password-reset`, {
     method: "POST",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
   });
 }
 
-export async function addApiUserStoreAssignment(userId, { storeNumber, assignmentType }) {
+export async function addApiUserStoreAssignment(userId, { storeNumber, assignmentType, actorUserId }) {
   const data = await apiRequest(`/api/users/${userId}/store-assignments`, {
     method: "POST",
     body: JSON.stringify({
       store_number: storeNumber,
       assignment_type: assignmentType,
+      actor_user_id: actorUserId,
     }),
   });
 
   return data.user;
 }
 
-export async function removeApiUserStoreAssignment(userId, assignmentId) {
+export async function removeApiUserStoreAssignment(userId, assignmentId, actorUserId) {
   const data = await apiRequest(`/api/users/${userId}/store-assignments/${assignmentId}`, {
     method: "DELETE",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
   });
 
   return data.user;
@@ -124,23 +135,27 @@ export async function fetchApiStores() {
   return data.stores || [];
 }
 
-export async function createApiStore({ storeNumber, name, area }) {
+export async function createApiStore({ storeNumber, name, area, actorUserId }) {
   const data = await apiRequest("/api/stores", {
     method: "POST",
     body: JSON.stringify({
       store_number: storeNumber,
       name,
       area,
+      actor_user_id: actorUserId,
     }),
   });
 
   return data.store;
 }
 
-export async function updateApiStore(storeId, updates) {
+export async function updateApiStore(storeId, updates, actorUserId) {
   const data = await apiRequest(`/api/stores/${storeId}`, {
     method: "PATCH",
-    body: JSON.stringify(updates),
+    body: JSON.stringify({
+      ...updates,
+      actor_user_id: actorUserId,
+    }),
   });
 
   return data.store;
@@ -151,18 +166,24 @@ export async function fetchApiAreas() {
   return data.areas || [];
 }
 
-export async function createApiArea(name) {
+export async function createApiArea(name, actorUserId) {
   const data = await apiRequest("/api/areas", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name,
+      actor_user_id: actorUserId,
+    }),
   });
 
   return data.area;
 }
 
-export async function deleteApiArea(areaId) {
+export async function deleteApiArea(areaId, actorUserId) {
   return apiRequest(`/api/areas/${areaId}`, {
     method: "DELETE",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
   });
 }
 
@@ -220,6 +241,7 @@ export async function createApiThread({ name, threadType, createdByUserId, membe
       name,
       thread_type: threadType,
       created_by_user_id: createdByUserId,
+      actor_user_id: createdByUserId,
       member_ids: memberIds,
     }),
   });
@@ -227,10 +249,13 @@ export async function createApiThread({ name, threadType, createdByUserId, membe
   return data.thread;
 }
 
-export async function updateApiThread(threadId, updates) {
+export async function updateApiThread(threadId, updates, actorUserId) {
   const data = await apiRequest(`/api/threads/${threadId}`, {
     method: "PATCH",
-    body: JSON.stringify(updates),
+    body: JSON.stringify({
+      ...updates,
+      actor_user_id: actorUserId,
+    }),
   });
 
   return data.thread;
