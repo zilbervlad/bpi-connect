@@ -73,3 +73,30 @@ export async function registerForPushNotificationsAsync() {
     deviceName: Device.deviceName || Device.modelName || null,
   };
 }
+
+
+function getThreadIdFromNotificationResponse(response) {
+  const threadId =
+    response?.notification?.request?.content?.data?.thread_id ||
+    response?.notification?.request?.content?.data?.threadId;
+
+  return threadId ? Number(threadId) : null;
+}
+
+
+export function addNotificationResponseListener(callback) {
+  return Notifications.addNotificationResponseReceivedListener((response) => {
+    const threadId = getThreadIdFromNotificationResponse(response);
+
+    if (threadId) {
+      callback({ threadId, response });
+    }
+  });
+}
+
+
+export async function getLastNotificationThreadIdAsync() {
+  const response = await Notifications.getLastNotificationResponseAsync();
+  return getThreadIdFromNotificationResponse(response);
+}
+

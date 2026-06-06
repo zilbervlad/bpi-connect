@@ -38,7 +38,11 @@ import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { AdminScreen } from "./src/screens/AdminScreen";
 import { MoreScreen } from "./src/screens/MoreScreen";
-import { registerForPushNotificationsAsync } from "./src/services/pushNotifications";
+import {
+  registerForPushNotificationsAsync,
+  addNotificationResponseListener,
+  getLastNotificationThreadIdAsync,
+} from "./src/services/pushNotifications";
 
 function normalizeApiRole(role) {
   const roleMap = {
@@ -312,6 +316,48 @@ export default function App() {
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.id || !currentUser?.apiUser) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function openThreadFromPush(threadId) {
+      if (!threadId || !isMounted) return;
+
+      setActiveTab("Chats");
+      setSelectedThreadId(Number(threadId));
+      locallyReadThreadIdsRef.current.delete(String(threadId));
+
+      try {
+        await refreshThreadList();
+        await refreshOpenThreadMessages(Number(threadId));
+      } catch (error) {
+        console.log("Could not open push thread:", error.message);
+      }
+    }
+
+    const subscription = addNotificationResponseListener(({ threadId }) => {
+      openThreadFromPush(threadId);
+    });
+
+    getLastNotificationThreadIdAsync()
+      .then((threadId) => {
+        if (threadId) {
+          openThreadFromPush(threadId);
+        }
+      })
+      .catch((error) => {
+        console.log("Could not read last notification:", error.message);
+      });
+
+    return () => {
+      isMounted = false;
+      subscription?.remove?.();
+    };
+  }, [isLoggedIn, currentUser?.id, currentUser?.apiUser]);
 
   useEffect(() => {
     async function loadSavedUser() {
