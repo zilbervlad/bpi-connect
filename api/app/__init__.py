@@ -812,6 +812,39 @@ def create_app():
 
 
 
+
+    @app.post("/dev/migrate-username-login")
+    def migrate_username_login():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        engine_name = db.engine.url.get_backend_name()
+
+        with db.engine.begin() as connection:
+            if engine_name == "postgresql":
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(120)"
+                ))
+                connection.execute(db.text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"
+                ))
+            else:
+                existing_columns = [
+                    row[1] for row in connection.execute(db.text("PRAGMA table_info(users)")).fetchall()
+                ]
+
+                if "username" not in existing_columns:
+                    connection.execute(db.text(
+                        "ALTER TABLE users ADD COLUMN username VARCHAR(120)"
+                    ))
+
+        return jsonify({
+            "success": True,
+            "message": "Username login field migrated.",
+        })
+
+
     @app.post("/dev/migrate-bpi-ops-user-link")
     def migrate_bpi_ops_user_link():
         auth_error = require_dev_admin_secret()
@@ -1371,21 +1404,31 @@ def create_app():
     def login():
         data = request.get_json() or {}
 
-        email = (data.get("email") or "").strip().lower()
+        login_identifier = (
+            data.get("email")
+            or data.get("username")
+            or data.get("login")
+            or ""
+        ).strip().lower()
         password = data.get("password") or ""
 
-        if not email or not password:
+        if not login_identifier or not password:
             return jsonify({
                 "success": False,
-                "error": "Email and password are required.",
+                "error": "Email/username and password are required.",
             }), 400
 
-        user = User.query.filter(db.func.lower(User.email) == email).first()
+        user = User.query.filter(
+            db.or_(
+                db.func.lower(User.email) == login_identifier,
+                db.func.lower(User.username) == login_identifier,
+            )
+        ).first()
 
         if not user or not user.password_hash or not check_password_hash(user.password_hash, password):
             return jsonify({
                 "success": False,
-                "error": "Invalid email or password.",
+                "error": "Invalid email/username or password.",
             }), 401
 
         if not user.is_active:
@@ -1884,8 +1927,10 @@ def create_app():
         data = request.get_json() or {}
 
         bpi_ops_user_id = data.get("bpi_ops_user_id") or data.get("bpiOpsUserId")
-        name = (data.get("name") or "").strip()
+        name = " ".join((data.get("name") or "").strip().split())
+        username = (data.get("username") or "").strip().lower()
         email = (data.get("email") or "").strip().lower()
+        password_hash = (data.get("password_hash") or data.get("passwordHash") or "").strip()
         role = normalize_bpi_connect_role(data.get("role"), data.get("position"))
         store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
         area_name = (data.get("area") or data.get("area_name") or data.get("areaName") or "").strip()
@@ -1960,6 +2005,7 @@ def create_app():
             action = "created"
             user = User(
                 name=name,
+                username=username or None,
                 email=email,
                 bpi_ops_user_id=bpi_ops_user_id,
                 role=role,
@@ -1971,12 +2017,18 @@ def create_app():
             db.session.flush()
         else:
             user.name = name
+            user.username = username or user.username
             user.email = email
             user.bpi_ops_user_id = bpi_ops_user_id
             user.role = role
             user.store_id = store.id if store else None
             user.area_id = area.id if area else None
             user.is_active = is_active
+
+        if password_hash:
+            user.password_hash = password_hash
+            user.invite_accepted_at = user.invite_accepted_at or datetime.utcnow()
+            user.invite_token = None
 
         if store:
             if role in {"coach", "supervisor"}:
@@ -3832,6 +3884,7 @@ def serialize_user(user):
     return {
         "id": user.id,
         "name": user.name,
+        "username": getattr(user, "username", None),
         "email": user.email,
         "bpi_ops_user_id": getattr(user, "bpi_ops_user_id", None),
         "avatar_url": user.avatar_url,
