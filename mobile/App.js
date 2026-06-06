@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SafeAreaView, View } from "react-native";
+import { ActivityIndicator, SafeAreaView, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -173,6 +173,7 @@ const REALTIME_URL = "https://bpi-connect.onrender.com";
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -385,6 +386,8 @@ export default function App() {
         }
       } catch (error) {
         console.log("Could not load saved user:", error.message);
+      } finally {
+        setIsBooting(false);
       }
     }
 
@@ -1361,6 +1364,23 @@ export default function App() {
   }
 
   const profileUsers = usingApi && apiUsers.length ? apiUsers : demoUsers;
+
+  if (isBooting) {
+    return (
+      <SafeAreaView style={styles.appShell}>
+        <StatusBar style="light" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <ActivityIndicator size="large" color="#e91f3f" />
+          <Text style={{ color: "#ffffff", fontSize: 18, fontWeight: "900", marginTop: 18 }}>
+            Loading BPI Connect
+          </Text>
+          <Text style={{ color: "#9aacbf", fontSize: 13, fontWeight: "700", marginTop: 6, textAlign: "center" }}>
+            Getting your current chats and updates...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
