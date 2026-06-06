@@ -82,6 +82,7 @@ export function AdminScreen({ user }) {
   const [newStoreArea, setNewStoreArea] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupType, setNewGroupType] = useState("group");
+  const [newGroupMemberIds, setNewGroupMemberIds] = useState([]);
 
   const canManage = ["Admin", "HR"].includes(user.role);
 
@@ -109,6 +110,23 @@ export function AdminScreen({ user }) {
 
   const activeUsers = filteredUsers.filter((item) => item.is_active);
   const inactiveUsers = filteredUsers.filter((item) => !item.is_active);
+
+  const groupMemberOptions = users
+    .filter((item) => item.is_active)
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  function toggleNewGroupMember(userId) {
+    setNewGroupMemberIds((current) => {
+      const normalizedId = Number(userId);
+
+      if (current.some((item) => Number(item) === normalizedId)) {
+        return current.filter((item) => Number(item) !== normalizedId);
+      }
+
+      return [...current, normalizedId];
+    });
+  }
+
 
   useEffect(() => {
     if (canManage) {
@@ -212,9 +230,11 @@ export function AdminScreen({ user }) {
         name: newGroupName.trim(),
         threadType: newGroupType,
         createdByUserId: user.id,
+        memberIds: newGroupMemberIds,
       });
 
       setNewGroupName("");
+      setNewGroupMemberIds([]);
       setStatusMessage("Group created.");
       await loadAdminData();
     } catch (error) {
@@ -797,19 +817,56 @@ export function AdminScreen({ user }) {
               onSelect={setNewGroupType}
             />
 
+            <Text style={localStyles.label}>Members</Text>
+            <Text style={localStyles.helperText}>
+              Select who should be added to this group. You will be added automatically as owner.
+            </Text>
+
+            <View style={localStyles.memberPicker}>
+              {groupMemberOptions.length ? (
+                groupMemberOptions.map((item) => {
+                  const selected = newGroupMemberIds.some(
+                    (memberId) => Number(memberId) === Number(item.id)
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        localStyles.memberPickRow,
+                        selected && localStyles.memberPickRowActive,
+                      ]}
+                      onPress={() => toggleNewGroupMember(item.id)}
+                    >
+                      <UserAvatar user={item} size={30} />
+                      <View style={localStyles.memberPickMain}>
+                        <Text style={localStyles.memberPickName}>{item.name}</Text>
+                        <Text style={localStyles.memberPickMeta}>
+                          {formatRole(item.role)} · {item.store || item.area || "Company"}
+                        </Text>
+                      </View>
+                      <Text style={localStyles.memberPickCheck}>{selected ? "✓" : "+"}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text style={localStyles.emptyText}>No active users available.</Text>
+              )}
+            </View>
+
             <TouchableOpacity
               style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
               onPress={handleCreateGroup}
               disabled={isLoading}
             >
               <Text style={styles.primaryButtonText}>
-                {isLoading ? "Creating Group..." : "Create Group"}
+                {isLoading ? "Creating Group..." : `Create Group${newGroupMemberIds.length ? ` (${newGroupMemberIds.length} members)` : ""}`}
               </Text>
             </TouchableOpacity>
           </View>
 
           <Text style={localStyles.emptyText}>
-            Groups created here will appear in Chats after refresh/login. Member management comes next.
+            Groups created here will appear in Chats for selected members.
           </Text>
         </View>
       )}
@@ -1645,6 +1702,52 @@ const localStyles = StyleSheet.create({
     color: "#166534",
     fontSize: 13,
     fontWeight: "900",
+  },
+  helperText: {
+    color: "#6b7c8f",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  memberPicker: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  memberPickRow: {
+    backgroundColor: "#f7fafc",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#dbe5ee",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  memberPickRowActive: {
+    backgroundColor: "#fff1f4",
+    borderColor: "#e91f3f",
+  },
+  memberPickMain: {
+    flex: 1,
+  },
+  memberPickName: {
+    color: "#10212b",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  memberPickMeta: {
+    color: "#6b7c8f",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  memberPickCheck: {
+    color: "#e91f3f",
+    fontSize: 18,
+    fontWeight: "900",
+    width: 24,
+    textAlign: "center",
   },
   disabledButton: {
     opacity: 0.55,

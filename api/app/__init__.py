@@ -2346,6 +2346,10 @@ def create_app():
         name = (data.get("name") or "").strip()
         thread_type = (data.get("thread_type") or "group").strip()
         created_by_user_id = data.get("created_by_user_id")
+        member_ids = data.get("member_ids") or []
+
+        if not isinstance(member_ids, list):
+            member_ids = []
 
         if not name:
             return jsonify({
@@ -2379,6 +2383,8 @@ def create_app():
         db.session.add(thread)
         db.session.flush()
 
+        added_member_ids = set()
+
         if created_by_user_id:
             creator = User.query.get(created_by_user_id)
             if creator:
@@ -2387,6 +2393,27 @@ def create_app():
                     user_id=creator.id,
                     member_role="owner",
                 ))
+                added_member_ids.add(int(creator.id))
+
+        for raw_member_id in member_ids:
+            try:
+                member_id = int(raw_member_id)
+            except (TypeError, ValueError):
+                continue
+
+            if member_id in added_member_ids:
+                continue
+
+            member = User.query.filter_by(id=member_id, is_active=True).first()
+            if not member:
+                continue
+
+            db.session.add(ThreadMember(
+                thread_id=thread.id,
+                user_id=member.id,
+                member_role="member",
+            ))
+            added_member_ids.add(int(member.id))
 
         db.session.commit()
 
