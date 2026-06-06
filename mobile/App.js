@@ -584,6 +584,50 @@ export default function App() {
     }
   }
 
+  async function handleUserUpdated(apiUser) {
+    if (!apiUser?.id) return;
+
+    const mappedUser = mapApiUserToDemoUser(apiUser);
+    const savedUser = {
+      ...mappedUser,
+      apiUser: true,
+    };
+
+    setCurrentUser(savedUser);
+
+    try {
+      await AsyncStorage.setItem(SAVED_USER_KEY, JSON.stringify(savedUser));
+    } catch (error) {
+      console.log("Could not save updated user:", error.message);
+    }
+
+    setApiUsers((currentUsers) =>
+      currentUsers.map((user) =>
+        Number(user.id) === Number(savedUser.id) ? savedUser : user
+      )
+    );
+
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) => ({
+        ...thread,
+        members: (thread.members || []).map((member) =>
+          Number(member.id) === Number(savedUser.id)
+            ? {
+                ...member,
+                avatar_url: savedUser.avatar_url,
+                avatarUrl: savedUser.avatarUrl,
+              }
+            : member
+        ),
+      }))
+    );
+
+    if (typeof reloadDataForUser === "function") {
+      await reloadDataForUser(savedUser);
+    }
+  }
+
+
   async function handleLogout() {
     try {
       await AsyncStorage.removeItem(SAVED_USER_KEY);
@@ -1423,6 +1467,7 @@ export default function App() {
             unreadCount={unreadCount}
             ackCount={ackCount}
             onLogout={handleLogout}
+            onUserUpdated={handleUserUpdated}
           />
         )}
       </View>

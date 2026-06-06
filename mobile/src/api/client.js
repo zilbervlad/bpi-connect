@@ -53,6 +53,18 @@ export async function fetchApiUserDetail(userId) {
   return data.user;
 }
 
+
+export async function uploadApiUserAvatar(userId, imageData) {
+  const data = await apiRequest(`/api/users/${userId}/avatar`, {
+    method: "POST",
+    body: JSON.stringify({
+      image_data: imageData,
+    }),
+  });
+
+  return data.user;
+}
+
 export async function updateApiUser(userId, updates) {
   const data = await apiRequest(`/api/users/${userId}`, {
     method: "PATCH",
