@@ -750,6 +750,39 @@ def create_app():
         })
 
 
+
+    @app.post("/dev/migrate-bpi-ops-user-link")
+    def migrate_bpi_ops_user_link():
+        auth_error = require_dev_admin_secret()
+        if auth_error:
+            return auth_error
+
+        engine_name = db.engine.url.get_backend_name()
+
+        with db.engine.begin() as connection:
+            if engine_name == "postgresql":
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS bpi_ops_user_id INTEGER"
+                ))
+                connection.execute(db.text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_bpi_ops_user_id ON users (bpi_ops_user_id)"
+                ))
+            else:
+                existing_columns = [
+                    row[1] for row in connection.execute(db.text("PRAGMA table_info(users)")).fetchall()
+                ]
+
+                if "bpi_ops_user_id" not in existing_columns:
+                    connection.execute(db.text(
+                        "ALTER TABLE users ADD COLUMN bpi_ops_user_id INTEGER"
+                    ))
+
+        return jsonify({
+            "success": True,
+            "message": "BPI Ops user link field migrated.",
+        })
+
+
     @app.post("/dev/migrate-password-reset")
     def migrate_password_reset_fields():
         auth_error = require_dev_admin_secret()
@@ -1358,8 +1391,14 @@ def create_app():
         name = (data.get("name") or "").strip()
         email = (data.get("email") or "").strip().lower()
         role = (data.get("role") or "").strip().lower()
+        bpi_ops_user_id = data.get("bpi_ops_user_id") or data.get("bpiOpsUserId")
         store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
         area_name = (data.get("area") or data.get("areaName") or "").strip()
+
+        try:
+            bpi_ops_user_id = int(bpi_ops_user_id) if bpi_ops_user_id not in [None, ""] else None
+        except (TypeError, ValueError):
+            bpi_ops_user_id = None
 
         if not name or not email or not role:
             return jsonify({
@@ -1373,6 +1412,14 @@ def create_app():
                 "success": False,
                 "error": "A user with this email already exists.",
             }), 409
+
+        if bpi_ops_user_id:
+            existing_ops_link = User.query.filter_by(bpi_ops_user_id=bpi_ops_user_id).first()
+            if existing_ops_link:
+                return jsonify({
+                    "success": False,
+                    "error": "A BPI Ops user is already linked to another BPI Connect account.",
+                }), 409
 
         store = None
         area = None
@@ -1391,6 +1438,7 @@ def create_app():
         user = User(
             name=name,
             email=email,
+            bpi_ops_user_id=bpi_ops_user_id,
             role=role,
             store_id=store.id if store else None,
             area_id=area.id if area else None,
@@ -1400,6 +1448,26 @@ def create_app():
         )
 
         db.session.add(user)
+        db.session.flush()
+
+        if store:
+            existing_assignment = UserStoreAssignment.query.filter_by(
+                user_id=user.id,
+                store_id=store.id,
+                assignment_type="primary",
+            ).first()
+
+            if not existing_assignment:
+                db.session.add(UserStoreAssignment(
+                    user_id=user.id,
+                    store_id=store.id,
+                    assignment_type="primary",
+                ))
+
+            sync_user_to_store_chat(user, store)
+
+        sync_user_to_default_chats(user)
+
         db.session.commit()
 
         app_invite_base_url = os.getenv("APP_INVITE_BASE_URL", "bpi-connect://accept-invite").strip().rstrip("/")
@@ -3520,6 +3588,7 @@ def serialize_user(user):
         "id": user.id,
         "name": user.name,
         "email": user.email,
+        "bpi_ops_user_id": user.bpi_ops_user_id,
         "avatar_url": user.avatar_url,
         "role": user.role,
         "store": user.store.store_number if user.store else None,

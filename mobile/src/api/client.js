@@ -74,7 +74,7 @@ export async function updateApiUser(userId, updates) {
   return data.user;
 }
 
-export async function createInviteApiUser({ name, email, role, storeNumber, area, actorUserId }) {
+export async function createInviteApiUser({ name, email, role, storeNumber, area, actorUserId, bpiOpsUserId }) {
   return apiRequest("/api/users/invite", {
     method: "POST",
     body: JSON.stringify({
@@ -84,6 +84,7 @@ export async function createInviteApiUser({ name, email, role, storeNumber, area
       store_number: storeNumber,
       area,
       actor_user_id: actorUserId,
+      bpi_ops_user_id: bpiOpsUserId,
     }),
   });
 }
