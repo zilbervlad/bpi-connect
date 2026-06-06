@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 import base64
 import hashlib
@@ -683,6 +684,12 @@ def create_app():
             "app": "BPI Connect API",
             "status": "running",
         })
+
+
+
+    def is_valid_email_address(email):
+        email = (email or "").strip()
+        return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email))
 
 
     def require_admin_actor(data=None):
@@ -1404,6 +1411,12 @@ def create_app():
             return jsonify({
                 "success": False,
                 "error": "name, email, and role are required.",
+            }), 400
+
+        if not is_valid_email_address(email):
+            return jsonify({
+                "success": False,
+                "error": "A valid email address is required.",
             }), 400
 
         existing = User.query.filter(db.func.lower(User.email) == email).first()
@@ -2240,6 +2253,12 @@ def create_app():
         if "email" in data:
             new_email = (data.get("email") or "").strip().lower()
             if new_email:
+                if not is_valid_email_address(new_email):
+                    return jsonify({
+                        "success": False,
+                        "error": "A valid email address is required.",
+                    }), 400
+
                 existing = User.query.filter(
                     db.func.lower(User.email) == new_email,
                     User.id != user.id,
