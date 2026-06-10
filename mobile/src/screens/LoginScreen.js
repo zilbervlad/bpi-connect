@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Linking,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { requestApiPasswordReset } from "../api/client";
@@ -19,6 +21,12 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
 
   function handleLogin() {
     onLogin(email.trim(), password);
+  }
+
+  function openConnectLink(url) {
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Could not open link", "Please visit bostonpie.net/connect for support.");
+    });
   }
 
   async function handleForgotPassword() {
@@ -55,7 +63,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
 
         <Text style={localStyles.title}>BPI Connect</Text>
         <Text style={localStyles.subtitle}>
-          Sign in to messages, store groups, announcements, and team updates.
+          Secure workplace communication for approved organizations and multi-location teams.
         </Text>
 
         <View style={localStyles.card}>
@@ -67,7 +75,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="name@bostonpie.com"
+            placeholder="name@company.com"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
             autoComplete="email"
@@ -129,11 +137,41 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
           </TouchableOpacity>
 
           <Text style={localStyles.note}>
-            Accounts are invite-only. See your manager, HR, or admin if you need access.
+            Accounts are provisioned by approved organization administrators.
           </Text>
+
+          <View style={localStyles.linkGrid}>
+            <TouchableOpacity
+              style={localStyles.linkButton}
+              onPress={() => openConnectLink("https://bostonpie.net/connect/request-access/")}
+            >
+              <Text style={localStyles.linkText}>Request Access</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={localStyles.linkButton}
+              onPress={() => openConnectLink("https://bostonpie.net/connect/privacy/")}
+            >
+              <Text style={localStyles.linkText}>Privacy Policy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={localStyles.linkButton}
+              onPress={() => openConnectLink("https://bostonpie.net/connect/support/")}
+            >
+              <Text style={localStyles.linkText}>Support</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={localStyles.linkButton}
+              onPress={() => openConnectLink("https://bostonpie.net/connect/delete-account/")}
+            >
+              <Text style={localStyles.linkText}>Delete Account</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <Text style={localStyles.footer}>Boston Pie, Inc.</Text>
+        <Text style={localStyles.footer}>Workplace communication for approved teams</Text>
       </View>
     </SafeAreaView>
   );
@@ -270,10 +308,28 @@ const localStyles = StyleSheet.create({
     marginTop: 16,
     fontWeight: "700",
   },
+  linkGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 16,
+  },
+  linkButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  linkText: {
+    color: "#e91f3f",
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+  },
   footer: {
     color: "#718399",
     textAlign: "center",
     marginTop: 26,
     fontWeight: "700",
+    fontSize: 12,
   },
 });
