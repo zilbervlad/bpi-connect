@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.bostonpie.bpiconnect",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "28"
     },
     "android": {
       "package": "com.bostonpie.bpiconnect",
