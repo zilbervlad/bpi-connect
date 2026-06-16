@@ -1977,6 +1977,19 @@ def create_app():
                 },
             )
 
+        print(
+            "BPI_OPS_HR_DOC_NOTIFY_RECEIVED",
+            {
+                "email": email,
+                "user_id": user.id,
+                "document_title": document_title,
+                "token_count": len(tokens),
+                "notified": bool(tokens),
+                "push_result": push_result,
+            },
+            flush=True,
+        )
+
         return jsonify({
             "success": True,
             "notified": bool(tokens),
