@@ -1,10 +1,26 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert } from "react-native";
 import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
 
 export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenProfile, onLogout }) {
   const canOpenAdmin = ["Admin", "HR"].includes(user.role);
+
+  async function openExternalLink(url, fallbackTitle = "Unable to open link") {
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+
+      if (!canOpen) {
+        Alert.alert(fallbackTitle, "Please try again or contact your manager.");
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      console.warn("Unable to open external link", error);
+      Alert.alert(fallbackTitle, "Please try again or contact your manager.");
+    }
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
@@ -48,10 +64,32 @@ export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenPro
           </TouchableOpacity>
         )}
 
+        <TouchableOpacity
+          style={localStyles.row}
+          onPress={() => openExternalLink("https://ops.bostonpie.net/hr-documents/my", "Unable to open documents")}
+        >
+          <View>
+            <Text style={localStyles.rowTitle}>BPI Ops Documents</Text>
+            <Text style={localStyles.rowMeta}>Review assigned HR documents and acknowledgements</Text>
+          </View>
+          <Text style={localStyles.chevron}>›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={localStyles.row} onPress={onOpenProfile}>
           <View>
             <Text style={localStyles.rowTitle}>Profile</Text>
             <Text style={localStyles.rowMeta}>View account details</Text>
+          </View>
+          <Text style={localStyles.chevron}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.row}
+          onPress={() => openExternalLink("https://bostonpie.net/connect/support", "Unable to open support")}
+        >
+          <View>
+            <Text style={localStyles.rowTitle}>Support</Text>
+            <Text style={localStyles.rowMeta}>Get help with BPI Connect access or issues</Text>
           </View>
           <Text style={localStyles.chevron}>›</Text>
         </TouchableOpacity>
