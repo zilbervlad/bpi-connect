@@ -39,6 +39,8 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
       });
   }, [threads, canSendCompanyMessages]);
 
+  const canRequireAcknowledgement = ["Admin", "HR", "Coach", "Supervisor"].includes(user.role);
+
   const [targetThreadId, setTargetThreadId] = useState(
     availableTargets[0]?.id || ""
   );
@@ -157,24 +159,26 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
           multiline
         />
 
-        <TouchableOpacity
-          style={[localStyles.ackRow, requiresAck && localStyles.ackRowActive]}
-          onPress={() => setRequiresAck((current) => !current)}
-          activeOpacity={0.84}
-        >
-          <View style={[localStyles.checkbox, requiresAck && localStyles.checkboxActive]}>
-            <Text style={localStyles.checkboxText}>{requiresAck ? "✓" : ""}</Text>
-          </View>
+        {canRequireAcknowledgement ? (
+          <TouchableOpacity
+            style={[localStyles.ackRow, requiresAck && localStyles.ackRowActive]}
+            onPress={() => setRequiresAck((current) => !current)}
+            activeOpacity={0.84}
+          >
+            <View style={[localStyles.checkbox, requiresAck && localStyles.checkboxActive]}>
+              <Text style={localStyles.checkboxText}>{requiresAck ? "✓" : ""}</Text>
+            </View>
 
-          <View style={localStyles.ackTextWrap}>
-            <Text style={[localStyles.ackTitle, requiresAck && localStyles.ackTitleActive]}>
-              Require acknowledgement
-            </Text>
-            <Text style={[localStyles.ackSubtitle, requiresAck && localStyles.ackSubtitleActive]}>
-              Useful for important updates managers/TMs need to confirm.
-            </Text>
-          </View>
-        </TouchableOpacity>
+            <View style={localStyles.ackTextWrap}>
+              <Text style={[localStyles.ackTitle, requiresAck && localStyles.ackTitleActive]}>
+                Require acknowledgement
+              </Text>
+              <Text style={[localStyles.ackSubtitle, requiresAck && localStyles.ackSubtitleActive]}>
+                Useful for important updates managers/TMs need to confirm.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity
           style={[
