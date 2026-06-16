@@ -12,9 +12,15 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 
 export function BroadcastScreen({ user, threads, onSendUpdate }) {
+  const canSendCompanyMessages = ["Admin", "HR"].includes(user.role);
+
   const availableTargets = useMemo(() => {
     return threads
-      .filter((thread) => thread.type !== "direct")
+      .filter((thread) => {
+        if (thread.type === "direct") return false;
+        if (thread.type === "company" && !canSendCompanyMessages) return false;
+        return true;
+      })
       .sort((a, b) => {
         const order = {
           company: 1,
@@ -31,7 +37,7 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
 
         return String(a.name || "").localeCompare(String(b.name || ""));
       });
-  }, [threads]);
+  }, [threads, canSendCompanyMessages]);
 
   const [targetThreadId, setTargetThreadId] = useState(
     availableTargets[0]?.id || ""
