@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as Linking from "expo-linking";
 import Constants from "expo-constants";
 
 let activeNotificationThreadId = null;
@@ -84,8 +85,33 @@ function getThreadIdFromNotificationResponse(response) {
 }
 
 
+function getUrlFromNotificationResponse(response) {
+  const data = response?.notification?.request?.content?.data || {};
+  return data.document_url || data.documentUrl || data.url || null;
+}
+
+
+function openNotificationUrl(response) {
+  const url = getUrlFromNotificationResponse(response);
+
+  if (!url) {
+    return false;
+  }
+
+  Linking.openURL(url).catch((error) => {
+    console.warn("Unable to open notification URL", error);
+  });
+
+  return true;
+}
+
+
 export function addNotificationResponseListener(callback) {
   return Notifications.addNotificationResponseReceivedListener((response) => {
+    if (openNotificationUrl(response)) {
+      return;
+    }
+
     const threadId = getThreadIdFromNotificationResponse(response);
 
     if (threadId) {
@@ -97,6 +123,11 @@ export function addNotificationResponseListener(callback) {
 
 export async function getLastNotificationThreadIdAsync() {
   const response = await Notifications.getLastNotificationResponseAsync();
+
+  if (openNotificationUrl(response)) {
+    return null;
+  }
+
   return getThreadIdFromNotificationResponse(response);
 }
 
