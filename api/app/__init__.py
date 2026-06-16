@@ -482,6 +482,7 @@ def create_app():
         if auth_error:
             return auth_error
 
+        data = request.get_json(silent=True) or {}
         user_id = data.get("user_id")
 
         if not user_id:
