@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as Linking from "expo-linking";
@@ -27,7 +27,6 @@ Notifications.setNotificationHandler({
     };
   },
 });
-
 
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
@@ -75,40 +74,58 @@ export async function registerForPushNotificationsAsync() {
   };
 }
 
+function getNotificationData(response) {
+  return response?.notification?.request?.content?.data || {};
+}
 
 function getThreadIdFromNotificationResponse(response) {
-  const threadId =
-    response?.notification?.request?.content?.data?.thread_id ||
-    response?.notification?.request?.content?.data?.threadId;
+  const data = getNotificationData(response);
+  const threadId = data.thread_id || data.threadId;
 
   return threadId ? Number(threadId) : null;
 }
 
-
 function getUrlFromNotificationResponse(response) {
-  const data = response?.notification?.request?.content?.data || {};
+  const data = getNotificationData(response);
+
   return data.document_url || data.documentUrl || data.url || null;
 }
 
-
-function openNotificationUrl(response) {
+async function openNotificationUrl(response) {
   const url = getUrlFromNotificationResponse(response);
 
   if (!url) {
     return false;
   }
 
-  Linking.openURL(url).catch((error) => {
-    console.warn("Unable to open notification URL", error);
-  });
+  try {
+    const canOpen = await Linking.canOpenURL(url);
 
-  return true;
+    if (!canOpen) {
+      Alert.alert(
+        "Unable to open document",
+        "Please check your email or contact your manager."
+      );
+      return true;
+    }
+
+    await Linking.openURL(url);
+    return true;
+  } catch (error) {
+    console.warn("Unable to open notification URL", error);
+    Alert.alert(
+      "Unable to open document",
+      "Please check your email or contact your manager."
+    );
+    return true;
+  }
 }
 
-
 export function addNotificationResponseListener(callback) {
-  return Notifications.addNotificationResponseReceivedListener((response) => {
-    if (openNotificationUrl(response)) {
+  return Notifications.addNotificationResponseReceivedListener(async (response) => {
+    const openedUrl = await openNotificationUrl(response);
+
+    if (openedUrl) {
       return;
     }
 
@@ -120,14 +137,14 @@ export function addNotificationResponseListener(callback) {
   });
 }
 
-
 export async function getLastNotificationThreadIdAsync() {
   const response = await Notifications.getLastNotificationResponseAsync();
 
-  if (openNotificationUrl(response)) {
+  const openedUrl = await openNotificationUrl(response);
+
+  if (openedUrl) {
     return null;
   }
 
   return getThreadIdFromNotificationResponse(response);
 }
-
