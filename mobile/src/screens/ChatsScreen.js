@@ -17,6 +17,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
         const isFavorite = Boolean(thread.favorite);
 
         if (activeFilter === "favorites" && !isFavorite) return false;
+        if (activeFilter === "unread" && !(thread.unread > 0)) return false;
         if (activeFilter === "stores" && thread.type !== "store") return false;
         if (activeFilter === "roles" && thread.type !== "role") return false;
         if (activeFilter === "direct" && thread.type !== "direct") return false;
@@ -35,6 +36,11 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
         const bFav = Boolean(b.favorite);
 
         if (aFav !== bFav) return aFav ? -1 : 1;
+
+        const aUnread = Number(a.unread || 0) > 0;
+        const bUnread = Number(b.unread || 0) > 0;
+
+        if (aUnread !== bUnread) return aUnread ? -1 : 1;
 
         const aStore = getStoreNumber(a);
         const bStore = getStoreNumber(b);
@@ -89,6 +95,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
           {[
             { label: "All", value: "all" },
             { label: "★ Favorites", value: "favorites" },
+            { label: `Unread${unreadCount ? ` (${unreadCount})` : ""}`, value: "unread" },
             { label: "Stores", value: "stores" },
             { label: "Roles", value: "roles" },
             { label: "Direct", value: "direct" },
@@ -116,20 +123,23 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
         {sortedThreads.length ? (
           sortedThreads.map((thread, index) => {
             const isFavorite = Boolean(thread.favorite);
+            const hasUnread = Number(thread.unread || 0) > 0;
 
             return (
               <View key={thread.id}>
-                <View style={localStyles.threadRow}>
+                <View style={[localStyles.threadRow, hasUnread && localStyles.threadRowUnread]}>
+                  <View style={[localStyles.unreadAccent, hasUnread && localStyles.unreadAccentActive]} />
+
                   <TouchableOpacity
                     style={localStyles.threadOpenArea}
                     onPress={() => onOpenThread(thread)}
                     activeOpacity={0.84}
                   >
-                    <ThreadAvatar thread={thread} />
+                    <ThreadAvatar thread={thread} hasUnread={hasUnread} />
 
                     <View style={localStyles.threadMain}>
                       <View style={localStyles.threadTop}>
-                        <Text style={localStyles.threadName} numberOfLines={1}>
+                        <Text style={[localStyles.threadName, hasUnread && localStyles.threadNameUnread]} numberOfLines={1}>
                           {thread.name}
                         </Text>
 
@@ -141,11 +151,11 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
                       </View>
 
                       <View style={localStyles.previewRow}>
-                        <Text style={localStyles.typePill}>
+                        <Text style={[localStyles.typePill, hasUnread && localStyles.typePillUnread]}>
                           {formatThreadType(thread.type)}
                         </Text>
 
-                        <Text style={localStyles.threadPreview} numberOfLines={1}>
+                        <Text style={[localStyles.threadPreview, hasUnread && localStyles.threadPreviewUnread]} numberOfLines={1}>
                           {thread.lastMessage || "No messages yet"}
                         </Text>
                       </View>
@@ -153,7 +163,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
                   </TouchableOpacity>
 
                   <View style={localStyles.rightRail}>
-                    <Text style={localStyles.threadTime}>{thread.lastTime}</Text>
+                    <Text style={[localStyles.threadTime, hasUnread && localStyles.threadTimeUnread]}>{thread.lastTime}</Text>
 
                     <View style={localStyles.iconRow}>
                       <TouchableOpacity
@@ -187,7 +197,9 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
                   </View>
                 </View>
 
-                {index < sortedThreads.length - 1 ? <View style={localStyles.divider} /> : null}
+                {index < sortedThreads.length - 1 ? (
+                  <View style={[localStyles.divider, hasUnread && localStyles.dividerUnread]} />
+                ) : null}
               </View>
             );
           })
@@ -204,7 +216,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
   );
 }
 
-function ThreadAvatar({ thread }) {
+function ThreadAvatar({ thread, hasUnread }) {
   if (thread.type === "direct" && thread.members?.length) {
     const otherMember =
       thread.members.find((member) => member.id !== thread.currentUserId) ||
@@ -214,7 +226,13 @@ function ThreadAvatar({ thread }) {
   }
 
   return (
-    <View style={[localStyles.avatar, thread.type === "store" && localStyles.storeAvatar]}>
+    <View
+      style={[
+        localStyles.avatar,
+        thread.type === "store" && localStyles.storeAvatar,
+        hasUnread && localStyles.avatarUnread,
+      ]}
+    >
       <Text style={localStyles.avatarText}>{getAvatarLabel(thread)}</Text>
     </View>
   );
@@ -334,8 +352,22 @@ const localStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     minHeight: 54,
+  },
+  threadRowUnread: {
+    backgroundColor: "rgba(239,23,69,0.13)",
+    borderLeftWidth: 0,
+  },
+  unreadAccent: {
+    width: 4,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: "transparent",
+    marginRight: 8,
+  },
+  unreadAccentActive: {
+    backgroundColor: "#ef1745",
   },
   threadOpenArea: {
     flex: 1,
@@ -354,6 +386,13 @@ const localStyles = StyleSheet.create({
   storeAvatar: {
     backgroundColor: "#e91f3f",
   },
+  avatarUnread: {
+    shadowColor: "#ef1745",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   avatarText: {
     color: "#ffffff",
     fontSize: 11,
@@ -369,16 +408,24 @@ const localStyles = StyleSheet.create({
     gap: 6,
   },
   threadName: {
-    color: "#ffffff",
+    color: "#d9e4ef",
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "800",
     flex: 1,
+  },
+  threadNameUnread: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
   },
   threadTime: {
     color: "#8fa1b6",
     fontSize: 9,
     fontWeight: "900",
     textAlign: "right",
+  },
+  threadTimeUnread: {
+    color: "#ffffff",
   },
   previewRow: {
     flexDirection: "row",
@@ -397,11 +444,18 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
+  typePillUnread: {
+    backgroundColor: "#ef1745",
+  },
   threadPreview: {
     color: "#9aacbf",
     fontSize: 11,
     fontWeight: "800",
     flex: 1,
+  },
+  threadPreviewUnread: {
+    color: "#ffffff",
+    fontWeight: "900",
   },
   rightRail: {
     width: 56,
@@ -447,22 +501,30 @@ const localStyles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: "#ef1745",
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#ef1745",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
   unreadText: {
     color: "#ffffff",
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: "900",
   },
   divider: {
     height: 1,
     backgroundColor: "#203044",
     marginLeft: 52,
+  },
+  dividerUnread: {
+    backgroundColor: "rgba(239,23,69,0.28)",
   },
   emptyState: {
     padding: 14,
