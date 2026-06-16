@@ -1955,11 +1955,11 @@ def create_app():
             if token_value:
                 tokens.append(token_value)
 
-        title = "New BPI Ops document"
+        title = "BPI Ops Document"
         if action == "resend":
-            title = "BPI Ops document reminder"
+            title = "BPI Ops Document Reminder"
 
-        body = f"Please review and acknowledge: {document_title}"
+        body = f"Tap to review and acknowledge: {document_title}"
         if due_date:
             body = f"{body} · Due {due_date}"
 
