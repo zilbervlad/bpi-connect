@@ -1,7 +1,6 @@
-import { Alert, Platform } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import * as Linking from "expo-linking";
 import Constants from "expo-constants";
 
 let activeNotificationThreadId = null;
