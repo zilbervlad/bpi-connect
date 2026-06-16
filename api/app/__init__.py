@@ -1918,6 +1918,74 @@ def create_app():
 
 
 
+
+    @app.post("/api/integrations/bpi-ops/hr-documents/notify")
+    def notify_bpi_ops_hr_document():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        data = request.get_json(silent=True) or {}
+
+        email = (data.get("email") or "").strip().lower()
+        document_title = (data.get("document_title") or data.get("title") or "Required Document").strip()
+        document_url = (data.get("document_url") or "").strip()
+        due_date = (data.get("due_date") or "").strip()
+        action = (data.get("action") or "assigned").strip()
+
+        if not email:
+            return jsonify({"success": False, "error": "email is required."}), 400
+
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "No BPI Connect user found for that email.",
+                "email": email,
+            }), 404
+
+        tokens = []
+        for push_token in getattr(user, "push_tokens", []) or []:
+            token_value = (
+                getattr(push_token, "token", None)
+                or getattr(push_token, "push_token", None)
+                or getattr(push_token, "expo_push_token", None)
+            )
+            if token_value:
+                tokens.append(token_value)
+
+        title = "New BPI Ops document"
+        if action == "resend":
+            title = "BPI Ops document reminder"
+
+        body = f"Please review and acknowledge: {document_title}"
+        if due_date:
+            body = f"{body} · Due {due_date}"
+
+        push_result = None
+        if tokens:
+            push_result = send_expo_push_notifications(
+                tokens,
+                title=title,
+                body=body,
+                data={
+                    "type": "hr_document",
+                    "source": "bpi_ops",
+                    "document_title": document_title,
+                    "document_url": document_url,
+                    "url": document_url,
+                },
+            )
+
+        return jsonify({
+            "success": True,
+            "notified": bool(tokens),
+            "user_id": user.id,
+            "email": user.email,
+            "token_count": len(tokens),
+            "push_result": push_result,
+        })
+
     @app.post("/api/integrations/bpi-ops/users/sync")
     def sync_bpi_ops_user():
         auth_error = require_bpi_ops_integration_secret()
