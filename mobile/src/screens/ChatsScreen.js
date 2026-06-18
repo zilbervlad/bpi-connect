@@ -3,6 +3,21 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 
+
+function getThreadActivityMs(thread) {
+  const rawValue =
+    thread.last_time ||
+    thread.lastTime ||
+    thread.lastMessageAt ||
+    thread.last_message_at ||
+    thread.updated_at ||
+    thread.created_at ||
+    thread.createdAt;
+
+  const parsed = rawValue ? Date.parse(rawValue) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavorite }) {
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -41,6 +56,13 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
         const bUnread = Number(b.unread || 0) > 0;
 
         if (aUnread !== bUnread) return aUnread ? -1 : 1;
+
+        const aActivity = getThreadActivityMs(a);
+        const bActivity = getThreadActivityMs(b);
+
+        if (aActivity !== bActivity) {
+          return bActivity - aActivity;
+        }
 
         const aStore = getStoreNumber(a);
         const bStore = getStoreNumber(b);
