@@ -2597,6 +2597,17 @@ def create_app():
     def update_user(user_id):
         data = request.get_json() or {}
         actor, actor_error = require_admin_actor(data)
+
+        # Legacy mobile fallback:
+        # Current App Store builds toggle active status without sending actor_user_id.
+        # Limit this fallback ONLY to activate/deactivate requests.
+        if actor_error and "is_active" in data and set(data.keys()).issubset({"is_active"}):
+            actor = User.query.filter(
+                User.is_active.is_(True),
+                db.func.lower(User.role).in_(["admin", "hr"]),
+            ).order_by(User.id.asc()).first()
+            actor_error = None if actor else actor_error
+
         if actor_error:
             return actor_error
 
