@@ -3386,6 +3386,7 @@ def create_app():
             "messages": [serialize_thread_message(message, user_id=user_id) for message in messages],
         })
 
+    @app.post("/api/threads/<int:thread_id>/image-messages")
     @app.post("/api/threads/<int:thread_id>/messages/image")
     def create_thread_image_message(thread_id):
         thread = Thread.query.get(thread_id)
@@ -3395,10 +3396,14 @@ def create_app():
 
         data = request.get_json() or {}
         sender_user_id = data.get("sender_user_id")
-        body = (data.get("body") or "").strip()
+        body = (data.get("body") or data.get("caption") or "").strip()
         image_data = data.get("image_data")
         mime_type = (data.get("mime_type") or "image/jpeg").strip()
-        original_filename = (data.get("original_filename") or "chat-image.jpg").strip()
+        original_filename = (
+            data.get("original_filename")
+            or data.get("file_name")
+            or "chat-image.jpg"
+        ).strip()
         requires_ack = bool(data.get("requires_ack", False))
 
         if not sender_user_id:
