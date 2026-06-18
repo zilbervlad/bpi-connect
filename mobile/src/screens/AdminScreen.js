@@ -415,6 +415,7 @@ export function AdminScreen({ user }) {
 
     try {
       const updated = await updateApiUser(selectedUser.id, {
+        actor_user_id: user.id,
         is_active: !selectedUser.is_active,
       });
 
