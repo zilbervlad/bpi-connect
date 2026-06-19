@@ -2259,8 +2259,19 @@ def create_app():
                     else:
                         query = query.filter(User.id == viewer.id)
                 else:
-                    if viewer.store_id:
-                        query = query.filter(User.store_id == viewer.store_id)
+                    viewer_store_ids = list(user_store_ids(viewer))
+
+                    if viewer_store_ids:
+                        query = (
+                            query
+                            .outerjoin(UserStoreAssignment, UserStoreAssignment.user_id == User.id)
+                            .filter(
+                                db.or_(
+                                    User.store_id.in_(viewer_store_ids),
+                                    UserStoreAssignment.store_id.in_(viewer_store_ids),
+                                )
+                            )
+                        )
                     elif viewer.area_id:
                         query = query.filter(User.area_id == viewer.area_id)
                     else:
@@ -2751,6 +2762,8 @@ def create_app():
 
         if was_primary:
             user.store_id = None
+
+        sync_user_to_default_chats(user)
 
         db.session.commit()
 
@@ -3985,6 +3998,27 @@ def send_password_reset_email(user, reset_url):
 
 
 def serialize_user(user):
+    assigned_stores = []
+
+    if user.store:
+        assigned_stores.append(user.store)
+
+    for assignment in getattr(user, "store_assignments", []) or []:
+        if assignment.store:
+            assigned_stores.append(assignment.store)
+
+    seen_store_ids = set()
+    store_numbers = []
+    store_labels = []
+
+    for store in assigned_stores:
+        if store.id in seen_store_ids:
+            continue
+
+        seen_store_ids.add(store.id)
+        store_numbers.append(store.store_number)
+        store_labels.append(f"Store {store.store_number}")
+
     return {
         "id": user.id,
         "name": user.name,
@@ -3995,6 +4029,9 @@ def serialize_user(user):
         "role": user.role,
         "store": user.store.store_number if user.store else None,
         "store_name": user.store.name if user.store else None,
+        "store_numbers": store_numbers,
+        "store_labels": store_labels,
+        "stores_display": ", ".join(store_labels),
         "area": user.area.name if user.area else None,
         "is_active": user.is_active,
         "invite_sent_at": user.invite_sent_at.isoformat() if user.invite_sent_at else None,

@@ -314,6 +314,10 @@ function formatRoleShort(role) {
 }
 
 function getStoreKey(person) {
+  if (Array.isArray(person.store_numbers) && person.store_numbers.length) {
+    return person.store_numbers.join(",");
+  }
+
   if (person.store) return String(person.store);
   if (person.store_number) return String(person.store_number);
   if (person.store_name) return String(person.store_name);
@@ -322,6 +326,16 @@ function getStoreKey(person) {
 }
 
 function getStoreLabel(person) {
+  if (person.stores_display) return person.stores_display;
+
+  if (Array.isArray(person.store_labels) && person.store_labels.length) {
+    return person.store_labels.join(", ");
+  }
+
+  if (Array.isArray(person.store_numbers) && person.store_numbers.length) {
+    return person.store_numbers.map((storeNumber) => `Store ${storeNumber}`).join(", ");
+  }
+
   if (person.store_name) return person.store_name;
   if (person.store) return `Store ${person.store}`;
   if (person.store_number) return `Store ${person.store_number}`;
