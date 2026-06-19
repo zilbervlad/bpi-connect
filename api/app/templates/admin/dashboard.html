@@ -1,0 +1,58 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard · BPI Connect Admin{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>Dashboard</h1>
+    <div class="subtitle">Live overview of BPI Connect users, announcements, and threads.</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="metric">Active Users</div><div class="metric-value">{{ active_users }}</div></div>
+  <div class="card"><div class="metric">Inactive Users</div><div class="metric-value">{{ inactive_users }}</div></div>
+  <div class="card"><div class="metric">Announcements</div><div class="metric-value">{{ total_announcements }}</div></div>
+  <div class="card"><div class="metric">Pending ACKs</div><div class="metric-value">{{ pending_acks }}</div></div>
+</div>
+
+<div class="section grid">
+  <div class="card" style="grid-column: span 2;">
+    <div class="metric">Users by Role</div>
+    <table>
+      <tbody>
+        {% for role, count in role_rows %}
+          <tr><td><span class="pill">{{ role }}</span></td><td>{{ count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="grid-column: span 2;">
+    <div class="metric">System</div>
+    <table>
+      <tbody>
+        <tr><td>Total Users</td><td>{{ total_users }}</td></tr>
+        <tr><td>Total Threads</td><td>{{ total_threads }}</td></tr>
+        <tr><td>Unread Announcement Recipients</td><td>{{ unread_announcements }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section card">
+  <div class="metric">Recent Announcements</div>
+  <table>
+    <thead><tr><th>Title</th><th>Sender</th><th>ACK</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for message in recent_announcements %}
+        <tr>
+          <td>{{ message.title }}</td>
+          <td>{{ message.sender.name if message.sender else "—" }}</td>
+          <td>{{ "Yes" if message.requires_ack else "No" }}</td>
+          <td>{{ message.created_at|fmt_dt }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

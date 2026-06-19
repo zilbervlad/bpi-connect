@@ -14,6 +14,7 @@ from flask_socketio import SocketIO, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
+from app.admin_web import admin_web_bp
 from app.models import (
     Area,
     Store,
@@ -344,6 +345,7 @@ def create_app():
     CORS(app)
     db.init_app(app)
     socketio.init_app(app, cors_allowed_origins="*")
+    app.register_blueprint(admin_web_bp)
 
     def ensure_user_phone_number_column():
         inspector = db.inspect(db.engine)
@@ -352,21 +354,34 @@ def create_app():
             return
 
         existing_columns = {column["name"] for column in inspector.get_columns("users")}
-
-        if "phone_number" in existing_columns:
-            return
-
         engine_name = db.engine.url.get_backend_name()
 
+        needed_columns = {
+            "username": "VARCHAR(120)",
+            "phone_number": "VARCHAR(40)",
+            "bpi_ops_user_id": "INTEGER",
+            "avatar_url": "TEXT",
+            "invite_token": "VARCHAR(255)",
+            "invite_sent_at": "DATETIME",
+            "invite_accepted_at": "DATETIME",
+            "password_reset_token": "VARCHAR(255)",
+            "password_reset_sent_at": "DATETIME",
+            "last_login_at": "DATETIME",
+        }
+
         with db.engine.begin() as connection:
-            if engine_name == "postgresql":
-                connection.execute(db.text(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(40)"
-                ))
-            else:
-                connection.execute(db.text(
-                    "ALTER TABLE users ADD COLUMN phone_number VARCHAR(40)"
-                ))
+            for column_name, column_type in needed_columns.items():
+                if column_name in existing_columns:
+                    continue
+
+                if engine_name == "postgresql":
+                    connection.execute(db.text(
+                        f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                    ))
+                else:
+                    connection.execute(db.text(
+                        f"ALTER TABLE users ADD COLUMN {column_name} {column_type}"
+                    ))
 
     with app.app_context():
         ensure_user_phone_number_column()

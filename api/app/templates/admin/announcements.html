@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+{% block title %}Announcements · BPI Connect Admin{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>Announcements</h1>
+    <div class="subtitle">Create official company announcements and review read/ack progress.</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-grid">
+      <div>
+        <label>Title</label>
+        <input name="title" placeholder="Example: New store procedure">
+      </div>
+      <div>
+        <label>Require acknowledgement</label>
+        <select name="requires_ack">
+          <option value="">No</option>
+          <option value="1">Yes</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <label>Message</label>
+      <textarea name="body" placeholder="Write the announcement..."></textarea>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn primary" type="submit">Send Company Announcement</button>
+    </div>
+  </form>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr><th>Announcement</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Acked</th><th>Requires ACK</th></tr>
+    </thead>
+    <tbody>
+      {% for message in announcements %}
+        {% set row = stats.get(message.id, {}) %}
+        <tr>
+          <td><strong>{{ message.title }}</strong><br><span class="muted">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</span></td>
+          <td>{{ message.created_at|fmt_dt }}</td>
+          <td>{{ row.delivered }}</td>
+          <td>{{ row.read }}</td>
+          <td>{{ row.acked }}</td>
+          <td><span class="pill">{{ "Yes" if message.requires_ack else "No" }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

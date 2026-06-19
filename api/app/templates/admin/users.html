@@ -1,0 +1,84 @@
+{% extends "admin/base.html" %}
+{% block title %}Users · BPI Connect Admin{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>Users</h1>
+    <div class="subtitle">Search users, review roles, stores, and active status.</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" class="filters">
+    <div>
+      <label>Search</label>
+      <input name="q" value="{{ q }}" placeholder="Name, email, username, phone">
+    </div>
+    <div>
+      <label>Role</label>
+      <select name="role">
+        <option value="">All roles</option>
+        {% for row in roles %}
+          <option value="{{ row }}" {% if role == row %}selected{% endif %}>{{ row }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Status</label>
+      <select name="status">
+        <option value="">All</option>
+        <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if status == "inactive" %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button class="btn primary" type="submit">Filter</button>
+  </form>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Role</th>
+        <th>Stores</th>
+        <th>Phone</th>
+        <th>Last Login</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+        <tr>
+          <td>
+            <strong>{{ user.name }}</strong><br>
+            <span class="muted">{{ user.email or user.username or "—" }}</span>
+          </td>
+          <td>
+            <form class="inline-form" method="post" action="{{ url_for('admin_web.update_user_role', user_id=user.id) }}">
+              <select name="role">
+                {% for option in ["admin", "hr", "coach", "supervisor", "general_manager", "manager", "tm"] %}
+                  <option value="{{ option }}" {% if user.role == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn small" type="submit">Save</button>
+            </form>
+          </td>
+          <td>{{ user|stores_display }}</td>
+          <td>{{ user.phone_number or "—" }}</td>
+          <td>{{ user.last_login_at|fmt_dt }}</td>
+          <td><span class="pill">{{ "Active" if user.is_active else "Inactive" }}</span></td>
+          <td>
+            <form method="post" action="{{ url_for('admin_web.toggle_user_active', user_id=user.id) }}">
+              <button class="btn small {% if user.is_active %}danger{% endif %}" type="submit">
+                {{ "Deactivate" if user.is_active else "Activate" }}
+              </button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

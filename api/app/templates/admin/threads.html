@@ -1,0 +1,46 @@
+{% extends "admin/base.html" %}
+{% block title %}Threads · BPI Connect Admin{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>Threads</h1>
+    <div class="subtitle">Review group chats, members, message counts, and rename threads.</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" class="filters" style="grid-template-columns: 1fr auto;">
+    <div>
+      <label>Search</label>
+      <input name="q" value="{{ q }}" placeholder="Thread name, type, or key">
+    </div>
+    <button class="btn primary" type="submit">Search</button>
+  </form>
+</div>
+
+<div class="section card">
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Group Key</th><th>Members</th><th>Messages</th><th>Created</th><th>Rename</th></tr>
+    </thead>
+    <tbody>
+      {% for thread in threads %}
+        <tr>
+          <td><strong>{{ thread.name }}</strong></td>
+          <td><span class="pill">{{ thread.thread_type }}</span></td>
+          <td class="muted">{{ thread.group_key }}</td>
+          <td>{{ member_counts.get(thread.id, 0) }}</td>
+          <td>{{ message_counts.get(thread.id, 0) }}</td>
+          <td>{{ thread.created_at|fmt_dt }}</td>
+          <td>
+            <form class="inline-form" method="post" action="{{ url_for('admin_web.rename_thread', thread_id=thread.id) }}">
+              <input name="name" value="{{ thread.name }}">
+              <button class="btn small" type="submit">Save</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
