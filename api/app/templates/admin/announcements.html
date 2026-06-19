@@ -23,20 +23,84 @@
         </select>
       </div>
     </div>
+
+    <div class="form-grid" style="margin-top:14px;">
+      <div>
+        <label>Audience</label>
+        <select name="target_type" id="targetType" onchange="updateTargetPicker()">
+          <option value="company">Company-wide</option>
+          <option value="store">Specific Store</option>
+          <option value="role">Specific Role</option>
+          <option value="area">Specific Area</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Target</label>
+
+        <select name="target_value" id="targetCompany" class="target-picker">
+          <option value="">All active users</option>
+        </select>
+
+        <select name="target_value" id="targetStore" class="target-picker" style="display:none;" disabled>
+          <option value="">Choose store</option>
+          {% for store in stores %}
+            <option value="{{ store.store_number }}">Store {{ store.store_number }}{% if store.name %} · {{ store.name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+
+        <select name="target_value" id="targetRole" class="target-picker" style="display:none;" disabled>
+          <option value="">Choose role</option>
+          {% for role in roles %}
+            <option value="{{ role }}">{{ role }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="target_value" id="targetArea" class="target-picker" style="display:none;" disabled>
+          <option value="">Choose area</option>
+          {% for area in areas %}
+            <option value="{{ area.id }}">{{ area.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
     <div style="margin-top:14px;">
       <label>Message</label>
       <textarea name="body" placeholder="Write the announcement..."></textarea>
     </div>
+
     <div style="margin-top:14px;">
-      <button class="btn primary" type="submit">Send Company Announcement</button>
+      <button class="btn primary" type="submit">Send Announcement</button>
     </div>
   </form>
 </div>
 
+<script>
+function updateTargetPicker() {
+  const type = document.getElementById("targetType").value;
+  const pickers = {
+    company: document.getElementById("targetCompany"),
+    store: document.getElementById("targetStore"),
+    role: document.getElementById("targetRole"),
+    area: document.getElementById("targetArea"),
+  };
+
+  Object.keys(pickers).forEach((key) => {
+    const el = pickers[key];
+    const active = key === type;
+    el.style.display = active ? "block" : "none";
+    el.disabled = !active;
+  });
+}
+
+updateTargetPicker();
+</script>
+
 <div class="section card">
   <table>
     <thead>
-      <tr><th>Announcement</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Acked</th><th>Requires ACK</th></tr>
+      <tr><th>Announcement</th><th>Audience</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Acked</th><th>Requires ACK</th></tr>
     </thead>
     <tbody>
       {% for message in announcements %}
@@ -48,6 +112,7 @@
             </a><br>
             <span class="muted">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</span>
           </td>
+          <td><span class="pill">{{ message.target_label or message.target_type or "Company" }}</span></td>
           <td>{{ message.created_at|fmt_dt }}</td>
           <td>{{ row.delivered }}</td>
           <td>{{ row.read }}</td>

@@ -362,10 +362,20 @@ def update_user_role(user_id):
 @admin_web_bp.route("/announcements", methods=["GET", "POST"])
 @admin_required
 def announcements():
+    stores = Store.query.filter_by(is_active=True).order_by(Store.store_number.asc()).all()
+    areas = Area.query.order_by(Area.name.asc()).all()
+    roles = [
+        role
+        for (role,) in db.session.query(User.role).distinct().order_by(User.role.asc()).all()
+        if role
+    ]
+
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
         body = (request.form.get("body") or "").strip()
         requires_ack = bool(request.form.get("requires_ack"))
+        target_type = (request.form.get("target_type") or "company").strip()
+        target_value = (request.form.get("target_value") or "").strip()
 
         if not title or not body:
             flash("Title and body are required.", "error")
@@ -382,7 +392,74 @@ def announcements():
             flash("No user exists to use as announcement sender.", "error")
             return redirect(url_for("admin_web.announcements"))
 
-        recipients = User.query.filter_by(is_active=True).all()
+        recipients_by_id = {}
+        target_label = "Company"
+
+        if target_type == "company":
+            recipients = User.query.filter_by(is_active=True).all()
+            target_label = "Company"
+
+            for user in recipients:
+                recipients_by_id[user.id] = user
+
+        elif target_type == "store":
+            if not target_value:
+                flash("Pick a store.", "error")
+                return redirect(url_for("admin_web.announcements"))
+
+            store = Store.query.filter_by(store_number=target_value).first()
+
+            if not store:
+                flash("Store not found.", "error")
+                return redirect(url_for("admin_web.announcements"))
+
+            target_label = f"Store {store.store_number}"
+
+            for user in User.query.filter_by(is_active=True, store_id=store.id).all():
+                recipients_by_id[user.id] = user
+
+            assignments = UserStoreAssignment.query.filter_by(store_id=store.id).all()
+            for assignment in assignments:
+                if assignment.user and assignment.user.is_active:
+                    recipients_by_id[assignment.user.id] = assignment.user
+
+        elif target_type == "role":
+            if not target_value:
+                flash("Pick a role.", "error")
+                return redirect(url_for("admin_web.announcements"))
+
+            target_label = target_value
+            recipients = User.query.filter_by(is_active=True, role=target_value).all()
+
+            for user in recipients:
+                recipients_by_id[user.id] = user
+
+        elif target_type == "area":
+            if not target_value or not target_value.isdigit():
+                flash("Pick an area.", "error")
+                return redirect(url_for("admin_web.announcements"))
+
+            area = Area.query.get(int(target_value))
+
+            if not area:
+                flash("Area not found.", "error")
+                return redirect(url_for("admin_web.announcements"))
+
+            target_label = f"{area.name} Area"
+            recipients = User.query.filter_by(is_active=True, area_id=area.id).all()
+
+            for user in recipients:
+                recipients_by_id[user.id] = user
+
+        else:
+            flash("Invalid target type.", "error")
+            return redirect(url_for("admin_web.announcements"))
+
+        recipients = list(recipients_by_id.values())
+
+        if not recipients:
+            flash(f"No active recipients found for {target_label}.", "error")
+            return redirect(url_for("admin_web.announcements"))
 
         message = Message(
             sender_user_id=sender.id,
@@ -390,8 +467,8 @@ def announcements():
             body=body,
             message_type="announcement",
             priority="ack" if requires_ack else "normal",
-            target_type="company",
-            target_label="Company",
+            target_type=target_type,
+            target_label=target_label,
             requires_ack=requires_ack,
         )
         db.session.add(message)
@@ -401,7 +478,7 @@ def announcements():
             db.session.add(MessageRecipient(message_id=message.id, user_id=user.id))
 
         db.session.commit()
-        flash(f"Announcement sent to {len(recipients)} active users.", "success")
+        flash(f"Announcement sent to {len(recipients)} active users: {target_label}.", "success")
         return redirect(url_for("admin_web.announcements"))
 
     rows = (
@@ -421,8 +498,14 @@ def announcements():
             "acked": sum(1 for row in recipients if row.acknowledged_at),
         }
 
-    return render_template("admin/announcements.html", announcements=rows, stats=stats)
-
+    return render_template(
+        "admin/announcements.html",
+        announcements=rows,
+        stats=stats,
+        stores=stores,
+        areas=areas,
+        roles=roles,
+    )
 
 
 @admin_web_bp.route("/announcements/<int:message_id>")
