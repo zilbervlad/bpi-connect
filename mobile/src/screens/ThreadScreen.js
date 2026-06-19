@@ -99,7 +99,7 @@ export function ThreadScreen({
 
     const interval = setInterval(() => {
       onRefreshThread(thread.id);
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [thread?.id, onRefreshThread]);

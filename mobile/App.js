@@ -144,6 +144,41 @@ function mapApiThreadToAppThread(apiThread) {
   };
 }
 
+function mergeThreadMessages(existingMessages = [], freshMessages = []) {
+  const existingById = new Map(
+    existingMessages
+      .filter((message) => message?.id)
+      .map((message) => [String(message.id), message])
+  );
+
+  const mergedFreshMessages = freshMessages.map((freshMessage) => {
+    const existingMessage = existingById.get(String(freshMessage.id));
+
+    if (!existingMessage) {
+      return freshMessage;
+    }
+
+    return {
+      ...existingMessage,
+      ...freshMessage,
+      status:
+        existingMessage.status === "sending" || existingMessage.status === "failed"
+          ? existingMessage.status
+          : freshMessage.status || existingMessage.status || "sent",
+    };
+  });
+
+  const pendingMessages = existingMessages.filter((message) => {
+    if (!message?.status || !["sending", "failed"].includes(message.status)) {
+      return false;
+    }
+
+    return !freshMessages.some((freshMessage) => String(freshMessage.id) === String(message.id));
+  });
+
+  return [...mergedFreshMessages, ...pendingMessages];
+}
+
 function mapApiThreadMessageToBubble(apiMessageResponse) {
   const apiMessage =
     apiMessageResponse?.message ||
@@ -984,7 +1019,7 @@ export default function App() {
             members,
             memberNames: members.map((member) => member.name),
             subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`,
-            messages: mappedMessages,
+            messages: mergeThreadMessages(thread.messages || [], mappedMessages),
           };
         })
       );
