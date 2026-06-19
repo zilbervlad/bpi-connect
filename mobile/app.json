@@ -2,7 +2,7 @@
   "expo": {
     "name": "BPI Connect",
     "slug": "bpi-connect",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "scheme": "bpiconnect",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "30"
+      "buildNumber": "34"
     },
     "android": {
       "package": "com.bostonpie.bpiconnect",
@@ -36,6 +36,13 @@
       "eas": {
         "projectId": "9673de76-13f5-4771-897a-e9da5d14dc8c"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9673de76-13f5-4771-897a-e9da5d14dc8c",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
