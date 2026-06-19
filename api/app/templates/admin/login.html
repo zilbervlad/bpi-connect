@@ -36,7 +36,7 @@
 <body>
   <div class="card">
     <h1>BPI Connect Admin</h1>
-    <p>Enter the admin password to continue.</p>
+    <p>Login with a BPI Connect Admin/HR account. Emergency password fallback is still available.</p>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
@@ -49,7 +49,8 @@
     {% endif %}
 
     <form method="post">
-      <input type="password" name="password" placeholder="Admin password" autofocus>
+      <input name="identifier" placeholder="Email or username" autofocus>
+      <input type="password" name="password" placeholder="Password">
       <button type="submit">Login</button>
     </form>
   </div>

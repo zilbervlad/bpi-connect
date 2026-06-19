@@ -2,6 +2,8 @@ import os
 from functools import wraps
 from datetime import datetime
 
+from werkzeug.security import check_password_hash
+
 from flask import (
     Blueprint,
     flash,
@@ -41,8 +43,38 @@ def _admin_password():
     )
 
 
+def _find_admin_user(identifier):
+    identifier = (identifier or "").strip().lower()
+
+    if not identifier:
+        return None
+
+    return User.query.filter(
+        db.or_(
+            db.func.lower(User.email) == identifier,
+            db.func.lower(User.username) == identifier,
+        )
+    ).first()
+
+
+def _user_can_access_admin(user):
+    if not user or not user.is_active:
+        return False
+
+    return (user.role or "").strip().lower() in {"admin", "hr"}
+
+
 def _is_logged_in():
     return bool(session.get("bpi_connect_admin_web"))
+
+
+def _current_admin_user():
+    user_id = session.get("bpi_connect_admin_user_id")
+
+    if not user_id:
+        return None
+
+    return User.query.get(user_id)
 
 
 def admin_required(view):
@@ -92,24 +124,42 @@ def login():
     configured_password = _admin_password()
 
     if request.method == "POST":
+        identifier = (request.form.get("identifier") or "").strip()
         password = request.form.get("password", "")
 
-        if not configured_password:
-            flash("Admin password is not configured. Set BPI_CONNECT_ADMIN_PASSWORD on Render.", "error")
-            return redirect(url_for("admin_web.login"))
+        # Legit login path: BPI Connect Admin/HR user credentials.
+        user = _find_admin_user(identifier)
 
-        if password == configured_password:
+        if user and _user_can_access_admin(user) and user.password_hash:
+            if check_password_hash(user.password_hash, password):
+                session["bpi_connect_admin_web"] = True
+                session["bpi_connect_admin_user_id"] = user.id
+                session["bpi_connect_admin_name"] = user.name
+                session["bpi_connect_admin_role"] = user.role
+                return redirect(request.args.get("next") or url_for("admin_web.dashboard"))
+
+        # Emergency fallback: env password, useful if user passwords are not set yet.
+        if configured_password and password == configured_password:
             session["bpi_connect_admin_web"] = True
+            session["bpi_connect_admin_name"] = "Admin"
+            session["bpi_connect_admin_role"] = "system"
             return redirect(request.args.get("next") or url_for("admin_web.dashboard"))
 
-        flash("Wrong password.", "error")
+        flash("Invalid admin login.", "error")
 
     return render_template("admin/login.html", has_password=bool(configured_password))
 
 
 @admin_web_bp.route("/logout")
 def logout():
-    session.pop("bpi_connect_admin_web", None)
+    for key in [
+        "bpi_connect_admin_web",
+        "bpi_connect_admin_user_id",
+        "bpi_connect_admin_name",
+        "bpi_connect_admin_role",
+    ]:
+        session.pop(key, None)
+
     return redirect(url_for("admin_web.login"))
 
 
