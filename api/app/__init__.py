@@ -4061,6 +4061,7 @@ def serialize_user(user):
         "name": user.name,
         "username": getattr(user, "username", None),
         "email": user.email,
+        "phone_number": user.phone_number,
         "bpi_ops_user_id": getattr(user, "bpi_ops_user_id", None),
         "avatar_url": user.avatar_url,
         "role": user.role,
