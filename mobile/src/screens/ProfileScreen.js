@@ -1,4 +1,6 @@
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView,
+  Alert,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -131,6 +133,11 @@ export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpd
 
       <View style={styles.quickCard}>
         <Text style={styles.sectionTitle}>Account</Text>
+        <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccountPress}>
+          <Text style={styles.deleteAccountButtonText}>Delete My Account</Text>
+        </TouchableOpacity>
+
+
 
         <TouchableOpacity style={styles.primaryButton} onPress={onLogout}>
           <Text style={styles.primaryButtonText}>Sign Out</Text>
