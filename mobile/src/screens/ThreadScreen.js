@@ -29,15 +29,15 @@ function getSeenStatusText(message) {
     return "";
   }
 
-  if (seenByCount <= 0) {
-    return "";
+  if (seenByCount > 0) {
+    return seenByCount === 1 ? "Seen" : `Seen by ${seenByCount}`;
   }
 
-  if (deliveredToCount <= 1) {
-    return "Seen";
+  if (deliveredToCount > 0) {
+    return deliveredToCount === 1 ? "Delivered" : `Delivered to ${deliveredToCount}`;
   }
 
-  return `Seen by ${seenByCount}`;
+  return "Sent";
 }
 
 export function ThreadScreen({
@@ -331,6 +331,12 @@ export function ThreadScreen({
                       Failed — tap to retry
                     </Text>
                   </TouchableOpacity>
+                ) : null}
+
+                {message.isMe && getSeenStatusText(message) ? (
+                  <Text style={localStyles.messageStatusText}>
+                    {getSeenStatusText(message)}
+                  </Text>
                 ) : null}
 
                 {message.reactions?.length ? (
