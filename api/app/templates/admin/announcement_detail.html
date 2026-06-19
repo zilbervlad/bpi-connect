@@ -1,0 +1,83 @@
+{% extends "admin/base.html" %}
+{% block title %}Announcement Detail · BPI Connect Admin{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>{{ message.title }}</h1>
+    <div class="subtitle">
+      Sent {{ message.created_at|fmt_dt }} by {{ message.sender.name if message.sender else "—" }}
+    </div>
+  </div>
+  <a class="btn" href="{{ url_for('admin_web.announcements') }}">Back to Announcements</a>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="metric">Delivered</div>
+    <div class="metric-value">{{ delivered_count }}</div>
+  </div>
+  <div class="card">
+    <div class="metric">Read</div>
+    <div class="metric-value">{{ read_count }}</div>
+  </div>
+  <div class="card">
+    <div class="metric">Acknowledged</div>
+    <div class="metric-value">{{ acked_count }}</div>
+  </div>
+  <div class="card">
+    <div class="metric">Needs Attention</div>
+    <div class="metric-value">{{ pending_ack_count if message.requires_ack else unread_count }}</div>
+  </div>
+</div>
+
+<div class="section card">
+  <div class="metric">Announcement Message</div>
+  <div style="margin-top: 12px; white-space: pre-wrap; line-height: 1.55;">{{ message.body }}</div>
+</div>
+
+<div class="section card">
+  <div class="metric">Recipient Status</div>
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Role</th>
+        <th>Stores</th>
+        <th>Delivered</th>
+        <th>Read</th>
+        <th>Acknowledged</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in recipients %}
+        {% set needs_ack = message.requires_ack and not row.acknowledged_at %}
+        {% set unread = not row.read_at %}
+        <tr>
+          <td>
+            <strong>{{ row.user.name if row.user else "—" }}</strong><br>
+            <span class="muted">{{ row.user.email if row.user else "—" }}</span>
+          </td>
+          <td>
+            <span class="pill">{{ row.user.role if row.user else "—" }}</span>
+          </td>
+          <td>{{ row.user|stores_display if row.user else "—" }}</td>
+          <td>{{ row.delivered_at|fmt_dt }}</td>
+          <td>{{ row.read_at|fmt_dt }}</td>
+          <td>{{ row.acknowledged_at|fmt_dt }}</td>
+          <td>
+            {% if needs_ack %}
+              <span class="pill" style="border-color: rgba(239,68,68,.45); color:#fecaca;">Needs ACK</span>
+            {% elif unread %}
+              <span class="pill" style="border-color: rgba(245,158,11,.45); color:#fde68a;">Unread</span>
+            {% else %}
+              <span class="pill" style="border-color: rgba(34,197,94,.45); color:#bbf7d0;">Complete</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

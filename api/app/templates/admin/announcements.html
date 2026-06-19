@@ -42,7 +42,12 @@
       {% for message in announcements %}
         {% set row = stats.get(message.id, {}) %}
         <tr>
-          <td><strong>{{ message.title }}</strong><br><span class="muted">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</span></td>
+          <td>
+            <a href="{{ url_for('admin_web.announcement_detail', message_id=message.id) }}">
+              <strong>{{ message.title }}</strong>
+            </a><br>
+            <span class="muted">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</span>
+          </td>
           <td>{{ message.created_at|fmt_dt }}</td>
           <td>{{ row.delivered }}</td>
           <td>{{ row.read }}</td>

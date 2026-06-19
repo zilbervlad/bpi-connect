@@ -344,6 +344,41 @@ def announcements():
     return render_template("admin/announcements.html", announcements=rows, stats=stats)
 
 
+
+@admin_web_bp.route("/announcements/<int:message_id>")
+@admin_required
+def announcement_detail(message_id):
+    message = Message.query.get_or_404(message_id)
+
+    recipients = (
+        MessageRecipient.query
+        .filter_by(message_id=message.id)
+        .join(User)
+        .order_by(User.name.asc())
+        .all()
+    )
+
+    delivered_count = len(recipients)
+    read_count = sum(1 for row in recipients if row.read_at)
+    acked_count = sum(1 for row in recipients if row.acknowledged_at)
+    unread_count = sum(1 for row in recipients if not row.read_at)
+    pending_ack_count = sum(
+        1 for row in recipients
+        if message.requires_ack and not row.acknowledged_at
+    )
+
+    return render_template(
+        "admin/announcement_detail.html",
+        message=message,
+        recipients=recipients,
+        delivered_count=delivered_count,
+        read_count=read_count,
+        acked_count=acked_count,
+        unread_count=unread_count,
+        pending_ack_count=pending_ack_count,
+    )
+
+
 @admin_web_bp.route("/threads")
 @admin_required
 def threads():
