@@ -74,12 +74,13 @@ export async function updateApiUser(userId, updates) {
   return data.user;
 }
 
-export async function createInviteApiUser({ name, email, role, storeNumber, area, actorUserId, bpiOpsUserId }) {
+export async function createInviteApiUser({ name, email, phoneNumber, role, storeNumber, area, actorUserId, bpiOpsUserId }) {
   return apiRequest("/api/users/invite", {
     method: "POST",
     body: JSON.stringify({
       name,
       email,
+      phone_number: phoneNumber,
       role,
       store_number: storeNumber,
       area,

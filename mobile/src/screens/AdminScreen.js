@@ -68,6 +68,7 @@ export function AdminScreen({ user }) {
 
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhoneNumber, setInvitePhoneNumber] = useState("");
   const [inviteRole, setInviteRole] = useState("tm");
   const [inviteStoreNumber, setInviteStoreNumber] = useState("");
   const [inviteArea, setInviteArea] = useState("");
@@ -196,6 +197,7 @@ export function AdminScreen({ user }) {
       const invite = await createInviteApiUser({
         name: inviteName.trim(),
         email: inviteEmail.trim().toLowerCase(),
+        phoneNumber: invitePhoneNumber.trim(),
         role: inviteRole,
         storeNumber: shouldShowPrimaryStoreControls(inviteRole) ? inviteStoreNumber : "",
         area: inviteArea,
@@ -206,6 +208,7 @@ export function AdminScreen({ user }) {
       setStatusMessage("Invite created.");
       setInviteName("");
       setInviteEmail("");
+      setInvitePhoneNumber("");
       setInviteRole("tm");
       await loadAdminData();
     } catch (error) {
@@ -640,6 +643,16 @@ export function AdminScreen({ user }) {
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="Email"
+            placeholderTextColor="#7b8da0"
+            style={localStyles.input}
+          />
+
+          <Text style={localStyles.label}>Phone</Text>
+          <TextInput
+            value={invitePhoneNumber}
+            onChangeText={setInvitePhoneNumber}
+            keyboardType="phone-pad"
+            placeholder="Phone number"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
           />

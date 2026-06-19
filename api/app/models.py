@@ -30,6 +30,7 @@ class User(db.Model):
     name = db.Column(db.String(120), nullable=False)
     username = db.Column(db.String(120), unique=True, nullable=True)
     email = db.Column(db.String(180), unique=True, nullable=True)
+    phone_number = db.Column(db.String(40), nullable=True)
     bpi_ops_user_id = db.Column(db.Integer, unique=True, nullable=True)
     avatar_url = db.Column(db.Text, nullable=True)
     role = db.Column(db.String(50), nullable=False)

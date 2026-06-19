@@ -6,6 +6,7 @@ import {
   TextInput,
   FlatList,
   StyleSheet,
+  Linking,
 } from "react-native";
 
 import { styles } from "../styles/styles";
@@ -118,6 +119,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
         return (
           item.name?.toLowerCase().includes(searchValue) ||
           item.email?.toLowerCase().includes(searchValue) ||
+          item.phone_number?.toLowerCase().includes(searchValue) ||
           formatRole(item.role).toLowerCase().includes(searchValue) ||
           getStoreLabel(item).toLowerCase().includes(searchValue)
         );
@@ -147,7 +149,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search name, role, email, or store..."
+                placeholder="Search name, role, phone, email, or store..."
                 placeholderTextColor="#7b8da0"
                 autoCorrect={false}
                 spellCheck={false}
@@ -246,20 +248,46 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
                   {formatRole(item.role)} · {getStoreLabel(item)}
                 </Text>
 
-                {item.email ? (
+                {item.phone_number ? (
+                  <Text style={localStyles.personEmail} numberOfLines={1}>
+                    {item.phone_number}
+                  </Text>
+                ) : item.email ? (
                   <Text style={localStyles.personEmail} numberOfLines={1}>
                     {item.email}
                   </Text>
                 ) : null}
               </View>
 
-              <TouchableOpacity
-                style={localStyles.messageButton}
-                onPress={() => onStartMessage?.(item)}
-                activeOpacity={0.84}
-              >
-                <Text style={localStyles.messageButtonText}>Message</Text>
-              </TouchableOpacity>
+              <View style={localStyles.contactActions}>
+                {item.phone_number ? (
+                  <>
+                    <TouchableOpacity
+                      style={localStyles.contactButton}
+                      onPress={() => callPhoneNumber(item.phone_number)}
+                      activeOpacity={0.84}
+                    >
+                      <Text style={localStyles.contactButtonText}>Call</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={localStyles.contactButton}
+                      onPress={() => textPhoneNumber(item.phone_number)}
+                      activeOpacity={0.84}
+                    >
+                      <Text style={localStyles.contactButtonText}>Text</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+
+                <TouchableOpacity
+                  style={localStyles.messageButton}
+                  onPress={() => onStartMessage?.(item)}
+                  activeOpacity={0.84}
+                >
+                  <Text style={localStyles.messageButtonText}>Message</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -268,6 +296,26 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
       />
     </View>
   );
+}
+
+function cleanPhoneNumber(phoneNumber) {
+  return String(phoneNumber || "").replace(/[^0-9+]/g, "");
+}
+
+function callPhoneNumber(phoneNumber) {
+  const cleaned = cleanPhoneNumber(phoneNumber);
+
+  if (!cleaned) return;
+
+  Linking.openURL(`tel:${cleaned}`);
+}
+
+function textPhoneNumber(phoneNumber) {
+  const cleaned = cleanPhoneNumber(phoneNumber);
+
+  if (!cleaned) return;
+
+  Linking.openURL(`sms:${cleaned}`);
 }
 
 function getDirectoryScopeLabel(user) {
@@ -469,6 +517,21 @@ const localStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     marginTop: 1,
+  },
+  contactActions: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  contactButton: {
+    backgroundColor: "#26364a",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  contactButtonText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "900",
   },
   messageButton: {
     backgroundColor: "#ef1745",

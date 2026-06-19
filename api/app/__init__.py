@@ -345,6 +345,33 @@ def create_app():
     db.init_app(app)
     socketio.init_app(app, cors_allowed_origins="*")
 
+    def ensure_user_phone_number_column():
+        inspector = db.inspect(db.engine)
+
+        if "users" not in inspector.get_table_names():
+            return
+
+        existing_columns = {column["name"] for column in inspector.get_columns("users")}
+
+        if "phone_number" in existing_columns:
+            return
+
+        engine_name = db.engine.url.get_backend_name()
+
+        with db.engine.begin() as connection:
+            if engine_name == "postgresql":
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(40)"
+                ))
+            else:
+                connection.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN phone_number VARCHAR(40)"
+                ))
+
+    with app.app_context():
+        ensure_user_phone_number_column()
+
+
     @app.post("/dev/remove-company-area-chat")
     def dev_remove_company_area_chat():
         auth_error = require_dev_admin_secret()
@@ -1495,6 +1522,7 @@ def create_app():
 
         name = " ".join((data.get("name") or "").strip().split())
         email = (data.get("email") or "").strip().lower()
+        phone_number = (data.get("phone_number") or data.get("phoneNumber") or "").strip()
         role = (data.get("role") or "").strip().lower()
         bpi_ops_user_id = data.get("bpi_ops_user_id") or data.get("bpiOpsUserId")
         store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
@@ -1549,6 +1577,7 @@ def create_app():
         user = User(
             name=name,
             email=email,
+            phone_number=phone_number or None,
             bpi_ops_user_id=bpi_ops_user_id,
             role=role,
             store_id=store.id if store else None,
@@ -1996,6 +2025,7 @@ def create_app():
             "notified": bool(tokens),
             "user_id": user.id,
             "email": user.email,
+        "phone_number": user.phone_number,
             "token_count": len(tokens),
             "push_result": push_result,
         })
@@ -2012,6 +2042,7 @@ def create_app():
         name = " ".join((data.get("name") or "").strip().split())
         username = (data.get("username") or "").strip().lower()
         email = (data.get("email") or "").strip().lower()
+        phone_number = (data.get("phone_number") or data.get("phoneNumber") or "").strip()
         password_hash = (data.get("password_hash") or data.get("passwordHash") or "").strip()
         role = normalize_bpi_connect_role(data.get("role"), data.get("position"))
         store_number = (data.get("store_number") or data.get("storeNumber") or "").strip()
@@ -2089,6 +2120,7 @@ def create_app():
                 name=name,
                 username=username or None,
                 email=email,
+                phone_number=phone_number or None,
                 bpi_ops_user_id=bpi_ops_user_id,
                 role=role,
                 store_id=store.id if store else None,
@@ -2101,6 +2133,7 @@ def create_app():
             user.name = name
             user.username = username or user.username
             user.email = email
+            user.phone_number = phone_number or None
             user.bpi_ops_user_id = bpi_ops_user_id
             user.role = role
             user.store_id = store.id if store else None
@@ -2651,6 +2684,10 @@ def create_app():
                     }), 409
 
                 user.email = new_email
+
+        if "phone_number" in data or "phoneNumber" in data:
+            phone_number = (data.get("phone_number") or data.get("phoneNumber") or "").strip()
+            user.phone_number = phone_number or None
 
         role_changed = False
 
