@@ -8,7 +8,7 @@ import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
 import { canSendBroadcast } from "../data/recipientGroups";
 
-export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpdated }) {
+export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpdated, onDeleteAccount }) {
   async function handleChangeProfilePicture() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -33,7 +33,22 @@ export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpd
 
       const base64 = await FileSystem.readAsStringAsync(asset.uri, {
         encoding: "base64",
-      });
+        deleteAccountButton: {
+    marginTop: 16,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff1f2",
+    borderWidth: 1,
+    borderColor: "#fecdd3",
+    alignItems: "center",
+  },
+  deleteAccountButtonText: {
+    color: "#be123c",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+});
 
       const mimeType = asset.mimeType || "image/jpeg";
       const imageData = `data:${mimeType};base64,${base64}`;
@@ -45,6 +60,27 @@ export function ProfileScreen({ user, unreadCount, ackCount, onLogout, onUserUpd
     } catch (error) {
       alert(error.message || "Could not update profile picture.");
     }
+  }
+
+  function handleDeleteAccountPress() {
+    Alert.alert(
+      "Delete My Account?",
+      "This will remove your access to BPI Connect and delete personal contact information from your account. Message history may remain for business records.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await onDeleteAccount?.("DELETE");
+            } catch (error) {
+              Alert.alert("Could not delete account", error.message || "Please try again.");
+            }
+          },
+        },
+      ]
+    );
   }
 
   return (

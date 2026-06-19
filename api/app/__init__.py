@@ -2716,6 +2716,81 @@ def create_app():
         })
 
 
+
+    @app.post("/api/users/<int:user_id>/delete-account")
+    def delete_own_account(user_id):
+        data = request.get_json(silent=True) or {}
+
+        requester_user_id = data.get("requester_user_id")
+        confirm_text = (data.get("confirm_text") or "").strip().upper()
+
+        if int(requester_user_id or 0) != int(user_id):
+            return jsonify({
+                "success": False,
+                "error": "You can only delete your own account from the app.",
+            }), 403
+
+        if confirm_text != "DELETE":
+            return jsonify({
+                "success": False,
+                "error": "Type DELETE to confirm account deletion.",
+            }), 400
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        deleted_label = f"Deleted User {user.id}"
+        deleted_email = f"deleted-user-{user.id}@deleted.bpi-connect.local"
+        deleted_username = f"deleted_user_{user.id}"
+
+        # Remove access and personal/contact data.
+        # Keep non-personal placeholder email/username so uniqueness/null edge cases do not break later.
+        user.is_active = False
+        user.name = deleted_label
+        user.email = deleted_email
+        user.username = deleted_username
+        user.phone_number = None
+        user.avatar_url = None
+        user.password_hash = None
+        user.invite_token = None
+        user.invite_sent_at = None
+        user.invite_accepted_at = None
+        user.password_reset_token = None
+        user.password_reset_sent_at = None
+        user.last_login_at = None
+        user.bpi_ops_user_id = None
+
+        # Stop notifications and remove future chat membership/access.
+        try:
+            PushToken.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        try:
+            ThreadFavorite.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        try:
+            UserStoreAssignment.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        try:
+            ThreadMember.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Your BPI Connect account has been deleted.",
+        })
+
+
     @app.post("/api/users/<int:user_id>/store-assignments")
     def add_store_assignment(user_id):
         data = request.get_json() or {}

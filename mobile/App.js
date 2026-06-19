@@ -24,6 +24,7 @@ import {
   saveApiUserPushToken,
   setApiThreadMuted,
   setApiThreadFavorite,
+  deleteApiAccount,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -404,6 +405,29 @@ export default function App() {
       loadApiData();
     }
   }, [isLoggedIn]);
+
+  async function handleDeleteAccount(confirmText) {
+    if (!currentUser?.id) {
+      return { success: false, error: "No signed-in user." };
+    }
+
+    const result = await deleteApiAccount(currentUser.id, currentUser.id, confirmText);
+
+    await AsyncStorage.removeItem(SAVED_USER_KEY);
+
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setMessages([]);
+    setThreads([]);
+    setApiUsers([]);
+    setSelectedMessageId(null);
+    setSelectedThreadId(null);
+    setStartingRecipient(null);
+    setUsingApi(false);
+    setActiveTab("Home");
+
+    return result;
+  }
 
   async function registerPushTokenForUser(user) {
     if (!user?.id || !user?.apiUser) return;
@@ -1493,6 +1517,7 @@ export default function App() {
             ackCount={ackCount}
             onLogout={handleLogout}
             onUserUpdated={handleUserUpdated}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
       </View>

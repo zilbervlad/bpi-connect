@@ -74,6 +74,18 @@ export async function updateApiUser(userId, updates) {
   return data.user;
 }
 
+
+export async function deleteApiAccount(userId, requesterUserId, confirmText) {
+  return apiRequest(`/api/users/${userId}/delete-account`, {
+    method: "POST",
+    body: JSON.stringify({
+      requester_user_id: requesterUserId,
+      confirm_text: confirmText,
+    }),
+  });
+}
+
+
 export async function createInviteApiUser({ name, email, phoneNumber, role, storeNumber, area, actorUserId, bpiOpsUserId }) {
   return apiRequest("/api/users/invite", {
     method: "POST",
