@@ -3299,6 +3299,78 @@ def create_app():
             "thread": serialize_thread(thread, user_id=sender.id),
         })
 
+
+    @app.delete("/api/thread-messages/<int:message_id>")
+    def delete_thread_message(message_id):
+        data = request.get_json(silent=True) or {}
+        actor_user_id = data.get("user_id") or data.get("actor_user_id")
+
+        if not actor_user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        actor = User.query.get(actor_user_id)
+        message = ThreadMessage.query.get(message_id)
+
+        if not actor:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        if not message:
+            return jsonify({"success": False, "error": "Message not found."}), 404
+
+        actor_role = (actor.role or "").strip().lower()
+        can_delete = (
+            int(message.sender_user_id) == int(actor.id)
+            or actor_role in ["admin", "hr"]
+        )
+
+        if not can_delete:
+            return jsonify({
+                "success": False,
+                "error": "You do not have permission to delete this message.",
+            }), 403
+
+        deleted_body = "This message was deleted"
+
+        message.body = deleted_body
+        message.requires_ack = False
+
+        try:
+            ThreadMessageAttachment.query.filter_by(
+                thread_message_id=message.id
+            ).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        try:
+            ThreadMessageReaction.query.filter_by(
+                thread_message_id=message.id
+            ).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        try:
+            ThreadMessageAck.query.filter_by(
+                thread_message_id=message.id
+            ).delete(synchronize_session=False)
+        except Exception:
+            db.session.rollback()
+
+        db.session.commit()
+
+        thread = Thread.query.get(message.thread_id)
+
+        if thread:
+            emit_thread_message_created(thread, message)
+
+        return jsonify({
+            "success": True,
+            "message": serialize_thread_message(message, user_id=actor.id),
+        })
+
+
     @app.post("/api/thread-messages/<int:message_id>/ack")
     def acknowledge_thread_message_short(message_id):
         data = request.get_json() or {}

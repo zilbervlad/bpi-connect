@@ -24,6 +24,7 @@ import {
   saveApiUserPushToken,
   setApiThreadMuted,
   setApiThreadFavorite,
+  deleteApiThreadMessage,
   deleteApiAccount,
 } from "./src/api/client";
 
@@ -193,6 +194,8 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     senderRole: normalizeApiRole(apiMessage.sender?.role || ""),
     body: apiMessage.body || "",
     text: apiMessage.body || "",
+    deleted: apiMessage.body === "This message was deleted" || Boolean(apiMessage.deleted_at),
+    deleted_at: apiMessage.deleted_at || null,
     time: formatApiTime(apiMessage.created_at),
     created_at: apiMessage.created_at,
     createdAt: apiMessage.created_at,
@@ -936,9 +939,15 @@ export default function App() {
             : existingMessages;
 
         const nextMessages =
-          isOpenThread && !alreadyExists
-            ? [...withoutMatchingPending, { ...incomingMessage, status: "sent" }]
-            : withoutMatchingPending;
+          isOpenThread && alreadyExists
+            ? withoutMatchingPending.map((message) =>
+                String(message.id) === String(incomingMessage.id)
+                  ? { ...message, ...incomingMessage, status: message.status || "sent" }
+                  : message
+              )
+            : isOpenThread
+              ? [...withoutMatchingPending, { ...incomingMessage, status: "sent" }]
+              : withoutMatchingPending;
 
         return {
           ...thread,
@@ -1182,6 +1191,62 @@ export default function App() {
 
   function closeThread() {
     setSelectedThreadId(null);
+  }
+
+  async function deleteThreadMessage(messageId) {
+    if (!selectedThreadId || !currentUser?.id || !messageId) return;
+
+    const deletedBubblePatch = {
+      body: "This message was deleted",
+      text: "This message was deleted",
+      deleted: true,
+      requiresAck: false,
+      responded: false,
+      acknowledged: false,
+      reactions: [],
+      attachments: [],
+      status: "sent",
+    };
+
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) => {
+        if (Number(thread.id) !== Number(selectedThreadId)) return thread;
+
+        return {
+          ...thread,
+          messages: (thread.messages || []).map((message) =>
+            String(message.id) === String(messageId)
+              ? { ...message, ...deletedBubblePatch }
+              : message
+          ),
+        };
+      })
+    );
+
+    if (!usingApi || !currentUser?.apiUser) return;
+
+    try {
+      const result = await deleteApiThreadMessage(messageId, currentUser.id);
+      const updatedBubble = mapApiThreadMessageToBubble(result.message || result);
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) => {
+          if (Number(thread.id) !== Number(selectedThreadId)) return thread;
+
+          return {
+            ...thread,
+            messages: (thread.messages || []).map((message) =>
+              String(message.id) === String(messageId)
+                ? { ...message, ...updatedBubble, deleted: true }
+                : message
+            ),
+          };
+        })
+      );
+    } catch (error) {
+      console.log("Could not delete thread message:", error.message);
+      await refreshOpenThreadMessages(selectedThreadId);
+    }
   }
 
   async function retryFailedThreadMessage(threadId, failedMessage) {
@@ -1464,6 +1529,7 @@ export default function App() {
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
         onRetryThreadMessage={retryFailedThreadMessage}
+            onDeleteThreadMessage={deleteThreadMessage}
         onTypingChange={sendTypingStatus}
         typingUsers={Object.values(typingByThread[String(selectedThread.id)] || {})}
         onRefreshThread={refreshOpenThreadMessages}

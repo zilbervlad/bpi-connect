@@ -296,6 +296,16 @@ export async function markApiThreadRead(threadId, userId) {
   });
 }
 
+
+export async function deleteApiThreadMessage(messageId, userId) {
+  return apiRequest(`/api/thread-messages/${messageId}`, {
+    method: "DELETE",
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+}
+
 export async function toggleApiThreadMessageReaction(messageId, userId, emoji) {
   return apiRequest(`/api/thread-messages/${messageId}/reactions`, {
     method: "POST",

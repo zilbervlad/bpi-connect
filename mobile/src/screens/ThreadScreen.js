@@ -11,6 +11,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
@@ -42,10 +43,12 @@ function getSeenStatusText(message) {
 
 export function ThreadScreen({
   thread,
+  user,
   onBack,
   onSendThreadMessage,
   onSendThreadImageMessage,
   onRetryThreadMessage,
+  onDeleteThreadMessage,
   onRefreshThread,
   onReact,
   onAcknowledge,
@@ -53,6 +56,35 @@ export function ThreadScreen({
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageCaption, setPendingImageCaption] = useState("");
+  const currentUserRole = String(user?.role || "").toLowerCase();
+
+  function isDeletedMessage(message) {
+    return Boolean(message?.deleted) || String(message?.body || "") === "This message was deleted";
+  }
+
+  function canDeleteMessage(message) {
+    if (!message?.id || String(message.id).startsWith("pending-")) return false;
+    if (isDeletedMessage(message)) return false;
+    if (message.isMe) return true;
+
+    return ["admin", "hr"].includes(currentUserRole);
+  }
+
+  function confirmDeleteMessage(message) {
+    Alert.alert(
+      "Delete Message?",
+      "This will remove the message content from the chat. A deleted-message note will remain.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDeleteThreadMessage?.(message.id),
+        },
+      ]
+    );
+  }
+
   const scrollViewRef = useRef(null);
   const previousMessageCountRef = useRef(thread?.messages?.length || 0);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
@@ -290,7 +322,14 @@ export function ThreadScreen({
                   message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
                 ]}
                 activeOpacity={0.9}
-                onLongPress={() => setReactionPickerMessageId(message.id)}
+                onLongPress={() => {
+                  if (canDeleteMessage(message)) {
+                    confirmDeleteMessage(message);
+                    return;
+                  }
+
+                  setReactionPickerMessageId(message.id);
+                }}
                 onPress={() =>
                   setReactionPickerMessageId(
                     reactionPickerMessageId === message.id ? null : message.id
@@ -313,6 +352,7 @@ export function ThreadScreen({
                     style={[
                       localStyles.bubbleText,
                       message.isMe ? localStyles.bubbleTextMe : localStyles.bubbleTextOther,
+                      isDeletedMessage(message) && localStyles.deletedMessageText,
                     ]}
                   >
                     {message.body}
@@ -961,5 +1001,9 @@ const localStyles = StyleSheet.create({
   },
   iMessageReactionText: {
     fontSize: 22,
+  },
+  deletedMessageText: {
+    fontStyle: "italic",
+    opacity: 0.72,
   },
 });
