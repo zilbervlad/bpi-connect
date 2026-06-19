@@ -7,8 +7,8 @@ export function InboxScreen({ messages, unreadCount, ackCount, onOpenMessage }) 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       <HeaderBlock
-        eyebrow="INBOX"
-        title="Messages"
+        eyebrow="ANNOUNCEMENTS"
+        title="Company Announcements"
         subtitle={`${unreadCount} unread · ${ackCount} need acknowledgement`}
       />
 

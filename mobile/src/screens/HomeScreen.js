@@ -11,11 +11,23 @@ export function HomeScreen({
   onOpenInbox,
   onOpenChats,
   onOpenThread,
+  onOpenMessage,
   onOpenPeople,
   onOpenSend,
   onOpenAdmin,
 }) {
-  const recentThreads = threads.slice(0, 4);
+  const announcementMessages = (messages || []).filter(
+    (message) => message.type === "announcement"
+  );
+  const pinnedAnnouncements = announcementMessages
+    .filter((message) => message.requiresAck && !message.acknowledged)
+    .slice(0, 2);
+  const latestAnnouncements = announcementMessages
+    .filter((message) => !(message.requiresAck && !message.acknowledged))
+    .slice(0, 3);
+  const recentThreads = threads
+    .filter((thread) => String(thread.name || "").toLowerCase() !== "company announcements")
+    .slice(0, 4);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={localStyles.content}>
@@ -49,6 +61,40 @@ export function HomeScreen({
           </View>
         </View>
       </View>
+
+      {announcementMessages.length ? (
+        <>
+          <View style={localStyles.sectionHeader}>
+            <View>
+              <Text style={localStyles.sectionTitle}>Company Announcements</Text>
+              <Text style={localStyles.sectionSub}>Official posts and required updates</Text>
+            </View>
+
+            <TouchableOpacity onPress={onOpenInbox} activeOpacity={0.8}>
+              <Text style={localStyles.viewAll}>View all</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={localStyles.announcementCard}>
+            {pinnedAnnouncements.map((message) => (
+              <AnnouncementRow
+                key={`pinned-${message.id}`}
+                message={message}
+                pinned
+                onPress={() => onOpenMessage?.(message)}
+              />
+            ))}
+
+            {latestAnnouncements.map((message) => (
+              <AnnouncementRow
+                key={message.id}
+                message={message}
+                onPress={() => onOpenMessage?.(message)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <View style={localStyles.sectionHeader}>
         <View>
@@ -107,6 +153,40 @@ export function HomeScreen({
       </View>
 
     </ScrollView>
+  );
+}
+
+function AnnouncementRow({ message, pinned, onPress }) {
+  return (
+    <TouchableOpacity
+      style={localStyles.announcementRow}
+      onPress={onPress}
+      activeOpacity={0.86}
+    >
+      <View style={[localStyles.announcementIcon, pinned && localStyles.announcementIconPinned]}>
+        <Text style={localStyles.announcementIconText}>{pinned ? "!" : "i"}</Text>
+      </View>
+
+      <View style={localStyles.announcementMain}>
+        <View style={localStyles.announcementTop}>
+          <Text style={localStyles.announcementTitle} numberOfLines={1}>
+            {message.title}
+          </Text>
+
+          {pinned ? (
+            <Text style={localStyles.pinnedPill}>PINNED</Text>
+          ) : null}
+        </View>
+
+        <Text style={localStyles.announcementBody} numberOfLines={2}>
+          {message.body}
+        </Text>
+
+        <Text style={localStyles.announcementMeta} numberOfLines={1}>
+          {message.from} · {message.time}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -254,6 +334,79 @@ const localStyles = StyleSheet.create({
     marginTop: 0,
   },
 
+  announcementCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    padding: 8,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+  announcementRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: "#f8fafc",
+    marginBottom: 7,
+  },
+  announcementIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    backgroundColor: "#10212b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  announcementIconPinned: {
+    backgroundColor: "#e91f3f",
+  },
+  announcementIconText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  announcementMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  announcementTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 3,
+  },
+  announcementTitle: {
+    flex: 1,
+    color: "#10212b",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  announcementBody: {
+    color: "#526273",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+  },
+  announcementMeta: {
+    color: "#91a1b2",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 5,
+  },
+  pinnedPill: {
+    color: "#e91f3f",
+    backgroundColor: "#ffe4e8",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    fontSize: 9,
+    fontWeight: "900",
+  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

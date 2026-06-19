@@ -10,6 +10,7 @@ import { demoUsers } from "./src/data/users";
 import {
   fetchApiUsers,
   fetchApiMessages,
+  createApiMessage,
   markApiMessageRead,
   acknowledgeApiMessage,
   fetchApiThreads,
@@ -34,6 +35,7 @@ import { HomeScreen } from "./src/screens/HomeScreen";
 import { ChatsScreen } from "./src/screens/ChatsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { MessageScreen } from "./src/screens/MessageScreen";
+import { InboxScreen } from "./src/screens/InboxScreen";
 import { BroadcastScreen } from "./src/screens/BroadcastScreen";
 import { PeopleScreen } from "./src/screens/PeopleScreen";
 import { ThreadScreen } from "./src/screens/ThreadScreen";
@@ -92,9 +94,16 @@ function mapApiMessageToAppMessage(apiMessage) {
     priority: apiMessage.requires_ack ? "ACK" : "STORE",
     title: apiMessage.title,
     from: apiMessage.sender?.name || "BPI Connect",
-    time: "API",
+    sender: apiMessage.sender || null,
+    time: formatApiTime(apiMessage.created_at) || "Now",
+    created_at: apiMessage.created_at,
     body: apiMessage.body,
+    targetType: apiMessage.target_type,
+    targetLabel: apiMessage.target_label,
     requiresAck: apiMessage.requires_ack,
+    acknowledged: Boolean(apiMessage.acknowledged_at),
+    read_at: apiMessage.read_at || null,
+    acknowledged_at: apiMessage.acknowledged_at || null,
     responded,
     unread,
   };
@@ -223,7 +232,7 @@ export default function App() {
 
   const sendUpdate = async ({ title, body, targetGroup, requiresAck }) => {
     if (!currentUser?.id || !targetGroup || !body?.trim()) {
-      console.log("Cannot send update: missing current user, target thread, or body.");
+      console.log("Cannot send update: missing current user, target, or body.");
       return;
     }
 
@@ -231,15 +240,62 @@ export default function App() {
       (thread) => String(thread.id) === String(targetGroup)
     );
 
-    const messageBody = title?.trim()
-      ? `${title.trim()}\n\n${body.trim()}`
-      : body.trim();
+    if (!selectedThread) {
+      console.log("Cannot send update: target not found.");
+      return;
+    }
+
+    const messageTitle = title?.trim() || selectedThread.name || "Company Announcement";
+    const messageBody = body.trim();
+
+    // Company announcements are official bulletin posts, not chat messages.
+    if (selectedThread.type === "company") {
+      if (!usingApi || !currentUser?.apiUser) {
+        return;
+      }
+
+      const recipientUserIds = (apiUsers || [])
+        .map((user) => user.id)
+        .filter(Boolean);
+
+      if (!recipientUserIds.length) {
+        console.log("Cannot send announcement: no recipients loaded.");
+        return;
+      }
+
+      try {
+        const apiMessage = await createApiMessage({
+          senderUserId: currentUser.id,
+          title: messageTitle,
+          body: messageBody,
+          recipientUserIds,
+          messageType: "announcement",
+          priority: requiresAck ? "ack" : "normal",
+          targetType: "company",
+          targetLabel: "Company-wide",
+          requiresAck: !!requiresAck,
+        });
+
+        const mappedMessage = mapApiMessageToAppMessage(apiMessage);
+        setMessages((currentMessages) => [mappedMessage, ...currentMessages]);
+        setActiveTab("Home");
+      } catch (error) {
+        console.log("Failed to send company announcement:", error.message);
+      }
+
+      return;
+    }
+
+    // Store / area / role updates remain chat posts for now.
+    const threadMessageBody = messageTitle
+      ? `${messageTitle}\n\n${messageBody}`
+      : messageBody;
 
     try {
       await sendApiThreadMessage({
         threadId: targetGroup,
         userId: currentUser.id,
-        body: messageBody,
+        body: threadMessageBody,
         requiresAck: !!requiresAck,
       });
 
@@ -252,7 +308,7 @@ export default function App() {
       console.log("Failed object-style send update, trying positional send:", error);
 
       try {
-        await sendApiThreadMessage(targetGroup, currentUser.id, messageBody, {
+        await sendApiThreadMessage(targetGroup, currentUser.id, threadMessageBody, {
           requiresAck: !!requiresAck,
         });
 
@@ -763,6 +819,33 @@ export default function App() {
       } catch (error) {
         console.log("Could not mark read:", error.message);
       }
+    }
+  }
+
+  async function acknowledgeMessage(messageId) {
+    if (!currentUser?.id) return;
+
+    setMessages((currentMessages) =>
+      currentMessages.map((message) =>
+        Number(message.id) === Number(messageId)
+          ? {
+              ...message,
+              acknowledged: true,
+              responded: true,
+              unread: false,
+              acknowledged_at: new Date().toISOString(),
+            }
+          : message
+      )
+    );
+
+    if (!usingApi) return;
+
+    try {
+      await acknowledgeApiMessage(messageId, currentUser.id);
+    } catch (error) {
+      console.log("Could not acknowledge message:", error.message);
+      await reloadDataForUser(currentUser);
     }
   }
 
@@ -1561,12 +1644,22 @@ export default function App() {
             ackCount={ackCount}
             messages={messages}
             threads={threads}
-            onOpenInbox={() => changeTab("Chats")}
+            onOpenInbox={() => changeTab("Announcements")}
             onOpenChats={() => changeTab("Chats")}
             onOpenThread={(threadId) => openThread(threadId)}
+            onOpenMessage={openMessage}
             onOpenPeople={() => changeTab("People")}
             onOpenSend={() => changeTab("Broadcast")}
             onOpenAdmin={() => changeTab("Admin")}
+          />
+        )}
+
+        {activeTab === "Announcements" && (
+          <InboxScreen
+            messages={messages.filter((message) => message.type === "announcement")}
+            unreadCount={messages.filter((message) => message.type === "announcement" && message.unread).length}
+            ackCount={messages.filter((message) => message.type === "announcement" && message.requiresAck && !message.acknowledged).length}
+            onOpenMessage={openMessage}
           />
         )}
 
