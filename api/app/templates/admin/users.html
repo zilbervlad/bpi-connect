@@ -52,7 +52,9 @@
       {% for user in users %}
         <tr>
           <td>
-            <strong>{{ user.name }}</strong><br>
+            <a href="{{ url_for('admin_web.user_detail', user_id=user.id) }}">
+              <strong>{{ user.name }}</strong>
+            </a><br>
             <span class="muted">{{ user.email or user.username or "—" }}</span>
           </td>
           <td>

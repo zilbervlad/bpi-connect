@@ -253,6 +253,86 @@ def users():
     return render_template("admin/users.html", users=rows, q=q, role=role, status=status, roles=roles)
 
 
+
+@admin_web_bp.route("/users/<int:user_id>", methods=["GET", "POST"])
+@admin_required
+def user_detail(user_id):
+    user = User.query.get_or_404(user_id)
+    stores = Store.query.order_by(Store.store_number.asc()).all()
+    areas = Area.query.order_by(Area.name.asc()).all()
+
+    if request.method == "POST":
+        user.name = (request.form.get("name") or "").strip() or user.name
+        user.email = (request.form.get("email") or "").strip() or None
+        user.username = (request.form.get("username") or "").strip() or None
+        user.phone_number = (request.form.get("phone_number") or "").strip() or None
+        user.role = (request.form.get("role") or "").strip() or user.role
+        user.is_active = bool(request.form.get("is_active"))
+
+        primary_store_id = request.form.get("store_id") or ""
+        user.store_id = int(primary_store_id) if primary_store_id else None
+
+        area_id = request.form.get("area_id") or ""
+        user.area_id = int(area_id) if area_id else None
+
+        selected_store_ids = {
+            int(value)
+            for value in request.form.getlist("assigned_store_ids")
+            if str(value).isdigit()
+        }
+
+        if user.store_id:
+            selected_store_ids.add(user.store_id)
+
+        existing_assignments = {
+            row.store_id: row
+            for row in UserStoreAssignment.query.filter_by(user_id=user.id).all()
+        }
+
+        for store_id in selected_store_ids:
+            if store_id not in existing_assignments:
+                db.session.add(UserStoreAssignment(
+                    user_id=user.id,
+                    store_id=store_id,
+                    assignment_type="oversight",
+                ))
+
+        for store_id, assignment in existing_assignments.items():
+            if store_id not in selected_store_ids:
+                db.session.delete(assignment)
+
+        db.session.commit()
+
+        # Keep auto group chats aligned with store/role/area changes.
+        try:
+            from app import sync_user_to_default_chats
+            sync_user_to_default_chats(user)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash("User saved, but chat sync failed. Run default chat backfill if needed.", "error")
+            return redirect(url_for("admin_web.user_detail", user_id=user.id))
+
+        flash("User updated.", "success")
+        return redirect(url_for("admin_web.user_detail", user_id=user.id))
+
+    assigned_store_ids = {
+        row.store_id
+        for row in UserStoreAssignment.query.filter_by(user_id=user.id).all()
+    }
+
+    if user.store_id:
+        assigned_store_ids.add(user.store_id)
+
+    return render_template(
+        "admin/user_detail.html",
+        user=user,
+        stores=stores,
+        areas=areas,
+        assigned_store_ids=assigned_store_ids,
+    )
+
+
 @admin_web_bp.route("/users/<int:user_id>/toggle-active", methods=["POST"])
 @admin_required
 def toggle_user_active(user_id):

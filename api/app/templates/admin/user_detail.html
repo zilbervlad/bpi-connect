@@ -1,0 +1,125 @@
+{% extends "admin/base.html" %}
+{% block title %}User Detail · BPI Connect Admin{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>{{ user.name }}</h1>
+    <div class="subtitle">
+      {{ user.role }} · {{ "Active" if user.is_active else "Inactive" }} · Created {{ user.created_at|fmt_dt }}
+    </div>
+  </div>
+  <a class="btn" href="{{ url_for('admin_web.users') }}">Back to Users</a>
+</div>
+
+<form method="post">
+  <div class="grid">
+    <div class="card" style="grid-column: span 2;">
+      <div class="metric">Profile</div>
+
+      <div style="margin-top:14px;">
+        <label>Name</label>
+        <input name="name" value="{{ user.name or '' }}">
+      </div>
+
+      <div class="form-grid" style="margin-top:14px;">
+        <div>
+          <label>Email</label>
+          <input name="email" value="{{ user.email or '' }}">
+        </div>
+        <div>
+          <label>Username</label>
+          <input name="username" value="{{ user.username or '' }}">
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <label>Phone</label>
+        <input name="phone_number" value="{{ user.phone_number or '' }}">
+      </div>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <div class="metric">Access</div>
+
+      <div class="form-grid" style="margin-top:14px;">
+        <div>
+          <label>Role</label>
+          <select name="role">
+            {% for option in ["admin", "hr", "coach", "supervisor", "general_manager", "manager", "tm"] %}
+              <option value="{{ option }}" {% if user.role == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select name="is_active">
+            <option value="1" {% if user.is_active %}selected{% endif %}>Active</option>
+            <option value="" {% if not user.is_active %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:14px;">
+        <div>
+          <label>Primary Store</label>
+          <select name="store_id">
+            <option value="">No primary store</option>
+            {% for store in stores %}
+              <option value="{{ store.id }}" {% if user.store_id == store.id %}selected{% endif %}>
+                {{ store.store_number }}{% if store.name %} · {{ store.name }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Area</label>
+          <select name="area_id">
+            <option value="">No area</option>
+            {% for area in areas %}
+              <option value="{{ area.id }}" {% if user.area_id == area.id %}selected{% endif %}>
+                {{ area.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <label>Assigned Stores</label>
+        <div class="store-check-grid">
+          {% for store in stores %}
+            <label class="check-card">
+              <input
+                type="checkbox"
+                name="assigned_store_ids"
+                value="{{ store.id }}"
+                {% if store.id in assigned_store_ids %}checked{% endif %}
+              >
+              <span>{{ store.store_number }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section card">
+    <div class="metric">Activity</div>
+    <table>
+      <tbody>
+        <tr><td>Last Login</td><td>{{ user.last_login_at|fmt_dt }}</td></tr>
+        <tr><td>Invite Sent</td><td>{{ user.invite_sent_at|fmt_dt }}</td></tr>
+        <tr><td>Invite Accepted</td><td>{{ user.invite_accepted_at|fmt_dt }}</td></tr>
+        <tr><td>BPI Ops User ID</td><td>{{ user.bpi_ops_user_id or "—" }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="position: sticky; bottom: 0; padding: 14px 0; background: linear-gradient(180deg, transparent, #07111f 35%);">
+    <button class="btn primary" type="submit">Save User</button>
+  </div>
+</form>
+{% endblock %}
