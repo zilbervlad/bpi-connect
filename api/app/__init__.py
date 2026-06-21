@@ -2065,6 +2065,73 @@ def create_app():
         })
 
 
+    @app.get("/api/integrations/bpi-ops/admin/users")
+    def bpi_ops_admin_users():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        users = (
+            User.query
+            .outerjoin(Store, User.store_id == Store.id)
+            .outerjoin(Area, User.area_id == Area.id)
+            .order_by(User.is_active.desc(), Store.store_number.asc(), User.role.asc(), User.name.asc())
+            .all()
+        )
+
+        serialized_users = []
+
+        for user in users:
+            store = getattr(user, "store", None)
+            area = getattr(user, "area", None)
+
+            push_tokens = getattr(user, "push_tokens", []) or []
+            active_push_tokens = [
+                token for token in push_tokens
+                if getattr(token, "is_active", True)
+            ]
+
+            has_logged_in = bool(getattr(user, "last_login_at", None))
+            invite_sent = bool(getattr(user, "invite_sent_at", None))
+            invite_accepted = bool(getattr(user, "invite_accepted_at", None))
+            pending_invite = bool(invite_sent and not invite_accepted and user.is_active)
+
+            serialized_users.append({
+                "id": user.id,
+                "bpi_ops_user_id": user.bpi_ops_user_id,
+                "name": user.name,
+                "username": user.username,
+                "email": user.email,
+                "phone_number": user.phone_number,
+                "role": user.role,
+                "store_number": getattr(store, "store_number", None),
+                "store_name": getattr(store, "name", None),
+                "area": getattr(area, "name", None),
+                "is_active": bool(user.is_active),
+                "has_logged_in": has_logged_in,
+                "pending_invite": pending_invite,
+                "invite_sent_at": user.invite_sent_at.isoformat() if user.invite_sent_at else None,
+                "invite_accepted_at": user.invite_accepted_at.isoformat() if user.invite_accepted_at else None,
+                "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "active_push_tokens": len(active_push_tokens),
+            })
+
+        return jsonify({
+            "success": True,
+            "source": "bpi_connect",
+            "users": serialized_users,
+            "counts": {
+                "total": len(serialized_users),
+                "active": sum(1 for user in serialized_users if user["is_active"]),
+                "inactive": sum(1 for user in serialized_users if not user["is_active"]),
+                "with_login": sum(1 for user in serialized_users if user["has_logged_in"]),
+                "without_login": sum(1 for user in serialized_users if not user["has_logged_in"]),
+                "pending_invites": sum(1 for user in serialized_users if user["pending_invite"]),
+            },
+        })
+
+
     @app.post("/api/integrations/bpi-ops/hr-documents/notify")
     def notify_bpi_ops_hr_document():
         auth_error = require_bpi_ops_integration_secret()
