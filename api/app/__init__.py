@@ -1964,6 +1964,103 @@ def create_app():
 
 
 
+
+
+    @app.get("/api/integrations/bpi-ops/admin/threads")
+    def bpi_ops_admin_threads():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        member_counts = (
+            db.session.query(
+                ThreadMember.thread_id.label("thread_id"),
+                db.func.count(ThreadMember.id).label("member_count"),
+            )
+            .group_by(ThreadMember.thread_id)
+            .subquery()
+        )
+
+        message_counts = (
+            db.session.query(
+                ThreadMessage.thread_id.label("thread_id"),
+                db.func.count(ThreadMessage.id).label("message_count"),
+                db.func.max(ThreadMessage.created_at).label("last_message_at"),
+            )
+            .group_by(ThreadMessage.thread_id)
+            .subquery()
+        )
+
+        rows = (
+            db.session.query(
+                Thread,
+                db.func.coalesce(member_counts.c.member_count, 0).label("member_count"),
+                db.func.coalesce(message_counts.c.message_count, 0).label("message_count"),
+                message_counts.c.last_message_at.label("last_message_at"),
+            )
+            .outerjoin(member_counts, Thread.id == member_counts.c.thread_id)
+            .outerjoin(message_counts, Thread.id == message_counts.c.thread_id)
+            .order_by(
+                message_counts.c.last_message_at.desc().nullslast(),
+                Thread.created_at.desc().nullslast(),
+            )
+            .all()
+        )
+
+        def infer_scope(thread):
+            group_key = thread.group_key or ""
+            parts = group_key.split(":", 1)
+
+            scope_type = parts[0] if parts else thread.thread_type
+            scope_value = parts[1] if len(parts) > 1 else None
+
+            return {
+                "scope_type": scope_type,
+                "scope_value": scope_value,
+            }
+
+        threads = []
+        by_type = {}
+        total_memberships = 0
+        total_messages = 0
+
+        for thread, member_count, message_count, last_message_at in rows:
+            thread_type = thread.thread_type or "unknown"
+            by_type[thread_type] = by_type.get(thread_type, 0) + 1
+
+            member_count = int(member_count or 0)
+            message_count = int(message_count or 0)
+            total_memberships += member_count
+            total_messages += message_count
+
+            scope = infer_scope(thread)
+
+            threads.append({
+                "id": thread.id,
+                "name": thread.name,
+                "type": thread_type,
+                "group_key": thread.group_key,
+                "scope_type": scope["scope_type"],
+                "scope_value": scope["scope_value"],
+                "member_count": member_count,
+                "message_count": message_count,
+                "last_message_at": last_message_at.isoformat() if last_message_at else None,
+                "created_at": thread.created_at.isoformat() if thread.created_at else None,
+            })
+
+        return jsonify({
+            "success": True,
+            "source": "bpi_connect",
+            "counts": {
+                "total": len(threads),
+                "by_type": by_type,
+                "memberships": total_memberships,
+                "messages": total_messages,
+            },
+            "threads": threads,
+        })
+
+
     @app.get("/api/integrations/bpi-ops/admin/summary")
     def bpi_ops_admin_summary():
         auth_error = require_bpi_ops_integration_secret()
