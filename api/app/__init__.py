@@ -1964,6 +1964,107 @@ def create_app():
 
 
 
+    @app.get("/api/integrations/bpi-ops/admin/summary")
+    def bpi_ops_admin_summary():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        users_total = User.query.count()
+        users_active = User.query.filter_by(is_active=True).count()
+        users_inactive = User.query.filter_by(is_active=False).count()
+
+        stores_total = Store.query.count()
+        stores_active = Store.query.filter_by(is_active=True).count()
+        stores_inactive = Store.query.filter_by(is_active=False).count()
+
+        areas_total = Area.query.count()
+        threads_total = Thread.query.count()
+        thread_messages_total = ThreadMessage.query.count()
+        legacy_messages_total = Message.query.count()
+        thread_members_total = ThreadMember.query.count()
+
+        active_push_tokens = PushToken.query.filter_by(is_active=True).count()
+
+        users_with_login = User.query.filter(User.last_login_at.isnot(None)).count()
+        users_without_login = User.query.filter(User.last_login_at.is_(None)).count()
+        pending_invites = User.query.filter(
+            User.invite_sent_at.isnot(None),
+            User.invite_accepted_at.is_(None),
+            User.is_active.is_(True),
+        ).count()
+
+        users_by_role_rows = (
+            db.session.query(User.role, db.func.count(User.id))
+            .group_by(User.role)
+            .order_by(User.role)
+            .all()
+        )
+
+        threads_by_type_rows = (
+            db.session.query(Thread.thread_type, db.func.count(Thread.id))
+            .group_by(Thread.thread_type)
+            .order_by(Thread.thread_type)
+            .all()
+        )
+
+        stores_by_area_rows = (
+            db.session.query(
+                Area.name,
+                db.func.count(Store.id),
+            )
+            .outerjoin(Store, Store.area_id == Area.id)
+            .group_by(Area.name)
+            .order_by(Area.name)
+            .all()
+        )
+
+        return jsonify({
+            "success": True,
+            "source": "bpi_connect",
+            "users": {
+                "total": users_total,
+                "active": users_active,
+                "inactive": users_inactive,
+                "with_login": users_with_login,
+                "without_login": users_without_login,
+                "pending_invites": pending_invites,
+                "by_role": {
+                    (role or "unknown"): count
+                    for role, count in users_by_role_rows
+                },
+            },
+            "stores": {
+                "total": stores_total,
+                "active": stores_active,
+                "inactive": stores_inactive,
+                "by_area": {
+                    (area_name or "Unassigned"): count
+                    for area_name, count in stores_by_area_rows
+                },
+            },
+            "areas": {
+                "total": areas_total,
+            },
+            "threads": {
+                "total": threads_total,
+                "by_type": {
+                    (thread_type or "unknown"): count
+                    for thread_type, count in threads_by_type_rows
+                },
+                "memberships": thread_members_total,
+            },
+            "messages": {
+                "thread_messages": thread_messages_total,
+                "legacy_messages": legacy_messages_total,
+                "total": thread_messages_total + legacy_messages_total,
+            },
+            "push": {
+                "active_tokens": active_push_tokens,
+            },
+        })
+
+
     @app.post("/api/integrations/bpi-ops/hr-documents/notify")
     def notify_bpi_ops_hr_document():
         auth_error = require_bpi_ops_integration_secret()
