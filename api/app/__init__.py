@@ -2054,7 +2054,7 @@ def create_app():
                 "member_count": member_count,
                 "message_count": message_count,
                 "last_message_at": last_message_at.isoformat() if last_message_at else None,
-                "created_at": thread.created_at.isoformat() if thread.created_at else None,
+                "created_at": iso_utc(thread.created_at) if thread.created_at else None,
             })
 
         return jsonify({
@@ -4445,7 +4445,7 @@ def create_app():
             {
                 "thread_id": int(thread_id),
                 "user_id": int(user_id),
-                "last_read_at": membership.last_read_at.isoformat(),
+                "last_read_at": iso_utc(membership.last_read_at),
             },
             room=f"thread:{thread_id}",
         )
@@ -4654,6 +4654,12 @@ def send_password_reset_email(user, reset_url):
         }
 
 
+def iso_utc(dt):
+    if not dt:
+        return None
+    return dt.isoformat().replace("+00:00", "Z") + ("Z" if dt.tzinfo is None and not dt.isoformat().endswith("Z") else "")
+
+
 def serialize_user(user):
     assigned_stores = []
 
@@ -4717,9 +4723,9 @@ def serialize_message(message, user_id=None):
         "target_type": message.target_type,
         "target_label": message.target_label,
         "requires_ack": message.requires_ack,
-        "created_at": message.created_at.isoformat(),
-        "read_at": recipient.read_at.isoformat() if recipient and recipient.read_at else None,
-        "acknowledged_at": recipient.acknowledged_at.isoformat() if recipient and recipient.acknowledged_at else None,
+        "created_at": iso_utc(message.created_at),
+        "read_at": iso_utc(recipient.read_at) if recipient and recipient.read_at else None,
+        "acknowledged_at": iso_utc(recipient.acknowledged_at) if recipient and recipient.acknowledged_at else None,
     }
 
 def ensure_thread_favorites_table():
@@ -4738,14 +4744,14 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
 
     if last_message:
         preview = (last_message.body or "")[:160]
-        last_time = last_message.created_at.isoformat() if last_message.created_at else None
+        last_time = last_iso_utc(message.created_at) if last_message.created_at else None
 
     return {
         "id": thread.id,
         "thread_type": thread.thread_type,
         "name": thread.name,
         "group_key": thread.group_key,
-        "created_at": thread.created_at.isoformat() if thread.created_at else None,
+        "created_at": iso_utc(thread.created_at) if thread.created_at else None,
         "last_message": preview,
         "last_time": last_time,
         "unread": int(unread_count or 0),
@@ -4797,9 +4803,9 @@ def serialize_thread(thread, user_id=None):
         "thread_type": thread.thread_type,
         "name": thread.name,
         "group_key": thread.group_key,
-        "created_at": thread.created_at.isoformat(),
+        "created_at": iso_utc(thread.created_at),
         "last_message": last_message.body if last_message else "",
-        "last_time": last_message.created_at.isoformat() if last_message else None,
+        "last_time": last_iso_utc(message.created_at) if last_message else None,
         "unread": unread_count,
         "members": [serialize_user(member.user) for member in thread.members],
         "muted": membership.muted if membership else False,
@@ -4816,7 +4822,7 @@ def serialize_thread_message_attachment(attachment):
         "original_filename": attachment.original_filename,
         "mime_type": attachment.mime_type,
         "size_bytes": attachment.size_bytes,
-        "created_at": attachment.created_at.isoformat() if attachment.created_at else None,
+        "created_at": iso_utc(attachment.created_at) if attachment.created_at else None,
     }
 
 
@@ -4855,7 +4861,7 @@ def serialize_thread_message(message, user_id=None):
         "body": message.body,
         "requires_ack": message.requires_ack,
         "acknowledged": acknowledged,
-        "created_at": message.created_at.isoformat(),
+        "created_at": iso_utc(message.created_at),
         "is_me": message.sender_user_id == user_id if user_id else False,
         "seen_by_count": seen_by_count,
         "seen_count": seen_by_count,
@@ -4879,7 +4885,7 @@ def serialize_store_assignment(assignment):
         "id": assignment.id,
         "assignment_type": assignment.assignment_type,
         "store": serialize_store(assignment.store),
-        "created_at": assignment.created_at.isoformat() if assignment.created_at else None,
+        "created_at": iso_utc(assignment.created_at) if assignment.created_at else None,
     }
 
 
@@ -4898,7 +4904,7 @@ def serialize_area(area):
     return {
         "id": area.id,
         "name": area.name,
-        "created_at": area.created_at.isoformat() if area.created_at else None,
+        "created_at": iso_utc(area.created_at) if area.created_at else None,
     }
 
 def serialize_message_reactions(message, current_user_id=None):
