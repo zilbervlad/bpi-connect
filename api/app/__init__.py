@@ -340,6 +340,15 @@ def create_app():
         database_url = database_url.replace("postgres://", "postgresql://", 1)
 
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url or "sqlite:///bpi_connect.db"
+
+    if database_url:
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_pre_ping": True,
+            "pool_recycle": 280,
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_timeout": 30,
+        }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     CORS(app)
@@ -3596,32 +3605,113 @@ def create_app():
             .all()
         )
 
-        if user_id and role in ["admin", "hr"]:
-            membership_added = False
+        thread_list_started_at = datetime.utcnow()
+        thread_ids = [thread.id for thread in threads]
 
-            for thread in threads:
-                if thread.thread_type == "direct":
-                    continue
+        latest_message_times = {}
+        latest_messages = {}
+        member_counts = {}
+        memberships_by_thread = {}
+        favorite_thread_ids = set()
 
-                membership = ThreadMember.query.filter_by(
-                    thread_id=thread.id,
-                    user_id=user_id,
-                ).first()
+        if thread_ids:
+            latest_rows = (
+                db.session.query(
+                    ThreadMessage.thread_id.label("thread_id"),
+                    db.func.max(ThreadMessage.created_at).label("last_time"),
+                )
+                .filter(ThreadMessage.thread_id.in_(thread_ids))
+                .group_by(ThreadMessage.thread_id)
+                .all()
+            )
 
-                if not membership:
-                    db.session.add(ThreadMember(
-                        thread_id=thread.id,
-                        user_id=user_id,
-                        member_role="admin",
-                    ))
-                    membership_added = True
+            latest_message_times = {
+                row.thread_id: row.last_time
+                for row in latest_rows
+                if row.last_time
+            }
 
-            if membership_added:
-                db.session.commit()
+            if latest_message_times:
+                latest_messages = {
+                    message.thread_id: message
+                    for message in ThreadMessage.query.filter(
+                        ThreadMessage.thread_id.in_(list(latest_message_times.keys())),
+                        ThreadMessage.created_at.in_(list(latest_message_times.values())),
+                    ).all()
+                }
+
+            member_counts = {
+                row.thread_id: row.member_count
+                for row in db.session.query(
+                    ThreadMember.thread_id.label("thread_id"),
+                    db.func.count(ThreadMember.id).label("member_count"),
+                )
+                .filter(ThreadMember.thread_id.in_(thread_ids))
+                .group_by(ThreadMember.thread_id)
+                .all()
+            }
+
+            if user_id:
+                memberships_by_thread = {
+                    membership.thread_id: membership
+                    for membership in ThreadMember.query.filter(
+                        ThreadMember.thread_id.in_(thread_ids),
+                        ThreadMember.user_id == user_id,
+                    ).all()
+                }
+
+                if ensure_thread_favorites_table():
+                    try:
+                        favorite_thread_ids = {
+                            favorite.thread_id
+                            for favorite in ThreadFavorite.query.filter(
+                                ThreadFavorite.thread_id.in_(thread_ids),
+                                ThreadFavorite.user_id == user_id,
+                            ).all()
+                        }
+                    except Exception:
+                        db.session.rollback()
+                        favorite_thread_ids = set()
+
+        serialized_threads = []
+
+        for thread in threads:
+            membership = memberships_by_thread.get(thread.id)
+            unread_count = 0
+
+            if user_id and membership:
+                unread_query = ThreadMessage.query.filter(
+                    ThreadMessage.thread_id == thread.id,
+                    ThreadMessage.sender_user_id != user_id,
+                )
+
+                if membership.last_read_at:
+                    unread_query = unread_query.filter(ThreadMessage.created_at > membership.last_read_at)
+
+                unread_count = unread_query.count()
+
+            serialized_threads.append(serialize_thread_light(
+                thread,
+                user_id=user_id,
+                last_message=latest_messages.get(thread.id),
+                unread_count=unread_count,
+                member_count=member_counts.get(thread.id, 0),
+                muted=membership.muted if membership else False,
+                favorite=thread.id in favorite_thread_ids,
+            ))
+
+        elapsed_ms = int((datetime.utcnow() - thread_list_started_at).total_seconds() * 1000)
+
+        app.logger.info(
+            "BPI Connect thread list user_id=%s count=%s elapsed_ms=%s",
+            user_id,
+            len(serialized_threads),
+            elapsed_ms,
+        )
 
         return jsonify({
             "success": True,
-            "threads": [serialize_thread(thread, user_id=user_id) for thread in threads],
+            "threads": serialized_threads,
         })
 
     @app.post("/api/threads/direct")
@@ -4639,6 +4729,31 @@ def ensure_thread_favorites_table():
     except Exception:
         db.session.rollback()
         return False
+
+
+
+def serialize_thread_light(thread, user_id=None, last_message=None, unread_count=0, member_count=0, muted=False, favorite=False):
+    preview = ""
+    last_time = None
+
+    if last_message:
+        preview = (last_message.body or "")[:160]
+        last_time = last_message.created_at.isoformat() if last_message.created_at else None
+
+    return {
+        "id": thread.id,
+        "thread_type": thread.thread_type,
+        "name": thread.name,
+        "group_key": thread.group_key,
+        "created_at": thread.created_at.isoformat() if thread.created_at else None,
+        "last_message": preview,
+        "last_time": last_time,
+        "unread": int(unread_count or 0),
+        "members": [],
+        "member_count": int(member_count or 0),
+        "muted": bool(muted),
+        "favorite": bool(favorite),
+    }
 
 
 def serialize_thread(thread, user_id=None):
