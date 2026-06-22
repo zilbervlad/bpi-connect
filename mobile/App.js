@@ -25,6 +25,7 @@ import {
   saveApiUserPushToken,
   setApiThreadMuted,
   setApiThreadFavorite,
+  deleteApiThreadForUser,
   deleteApiThreadMessage,
   deleteApiAccount,
 } from "./src/api/client";
@@ -1272,6 +1273,25 @@ export default function App() {
     }
   }
 
+  async function handleDeleteThread(threadId) {
+    if (!currentUser?.id) return;
+
+    const previousThreads = threads;
+
+    setThreads((currentThreads) =>
+      currentThreads.filter((thread) => thread.id !== threadId)
+    );
+
+    if (!usingApi) return;
+
+    try {
+      await deleteApiThreadForUser(threadId, currentUser.id);
+    } catch (error) {
+      console.log("Could not delete thread:", error.message);
+      setThreads(previousThreads);
+    }
+  }
+
   function closeThread() {
     setSelectedThreadId(null);
   }
@@ -1669,6 +1689,7 @@ export default function App() {
             onOpenThread={openThread}
             onToggleMute={handleToggleThreadMute}
             onToggleFavorite={handleToggleThreadFavorite}
+            onDeleteThread={handleDeleteThread}
           />
         )}
 
