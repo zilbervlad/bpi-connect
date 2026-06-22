@@ -48,6 +48,11 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
     return [...threads]
       .filter((thread) => {
         const isFavorite = Boolean(thread.favorite);
+        const threadName = String(thread.name || "").trim().toLowerCase();
+        const threadType = String(thread.type || thread.thread_type || "").trim().toLowerCase();
+
+        if (threadName === "company announcements") return false;
+        if (threadType === "announcement" || threadType === "announcements") return false;
 
         if (activeFilter === "favorites" && !isFavorite) return false;
         if (activeFilter === "unread" && !(thread.unread > 0)) return false;

@@ -16,14 +16,8 @@ export function HomeScreen({
   onOpenSend,
   onOpenAdmin,
 }) {
-  const announcementMessages = (messages || []).filter(
-    (message) => message.type === "announcement"
-  );
-  const pinnedAnnouncements = announcementMessages
-    .filter((message) => message.requiresAck && !message.acknowledged)
-    .slice(0, 2);
-  const latestAnnouncements = announcementMessages
-    .filter((message) => !(message.requiresAck && !message.acknowledged))
+  const announcementMessages = (messages || [])
+    .filter((message) => message.type === "announcement")
     .slice(0, 3);
   const recentThreads = threads
     .filter((thread) => String(thread.name || "").toLowerCase() !== "company announcements")
@@ -66,8 +60,8 @@ export function HomeScreen({
         <>
           <View style={localStyles.sectionHeader}>
             <View>
-              <Text style={localStyles.sectionTitle}>Company Announcements</Text>
-              <Text style={localStyles.sectionSub}>Official posts and required updates</Text>
+              <Text style={localStyles.sectionTitle}>Latest Announcements</Text>
+              <Text style={localStyles.sectionSub}>The 3 most recent company updates</Text>
             </View>
 
             <TouchableOpacity onPress={onOpenInbox} activeOpacity={0.8}>
@@ -76,19 +70,11 @@ export function HomeScreen({
           </View>
 
           <View style={localStyles.announcementCard}>
-            {pinnedAnnouncements.map((message) => (
-              <AnnouncementRow
-                key={`pinned-${message.id}`}
-                message={message}
-                pinned
-                onPress={() => onOpenMessage?.(message)}
-              />
-            ))}
-
-            {latestAnnouncements.map((message) => (
+            {announcementMessages.map((message) => (
               <AnnouncementRow
                 key={message.id}
                 message={message}
+                pinned={message.requiresAck && !message.acknowledged}
                 onPress={() => onOpenMessage?.(message)}
               />
             ))}
