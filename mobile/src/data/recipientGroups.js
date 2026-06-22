@@ -4,7 +4,7 @@ export const recipientGroups = [
     label: "Company-wide",
     scope: "all",
     description: "All BPI Connect users",
-    allowedRoles: ["Admin", "HR"],
+    allowedRoles: ["Admin", "HR", "Coach"],
     threadGroupKey: "company-all",
   },
   {
@@ -12,7 +12,7 @@ export const recipientGroups = [
     label: "HR Announcements",
     scope: "hr",
     description: "HR messages for all users",
-    allowedRoles: ["Admin", "HR"],
+    allowedRoles: ["Admin", "HR", "Coach"],
     threadGroupKey: "hr-announcements",
   },
   {
@@ -20,7 +20,7 @@ export const recipientGroups = [
     label: "All TMs",
     scope: "role",
     description: "All team members",
-    allowedRoles: ["Admin", "HR"],
+    allowedRoles: ["Admin", "HR", "Coach"],
     threadGroupKey: "role-tm",
   },
   {
@@ -28,7 +28,7 @@ export const recipientGroups = [
     label: "All Managers",
     scope: "role",
     description: "Managers and General Managers",
-    allowedRoles: ["Admin", "HR"],
+    allowedRoles: ["Admin", "HR", "Coach"],
     threadGroupKey: "role-general-manager",
   },
   {

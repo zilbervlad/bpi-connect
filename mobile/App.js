@@ -54,7 +54,7 @@ function normalizeApiRole(role) {
     admin: "Admin",
     hr: "HR",
     coach: "Coach",
-    supervisor: "Coach",
+    supervisor: "Supervisor",
     general_manager: "General Manager",
     manager: "MIT",
     tm: "TM",

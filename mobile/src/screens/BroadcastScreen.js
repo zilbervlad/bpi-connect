@@ -12,7 +12,7 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 
 export function BroadcastScreen({ user, threads, onSendUpdate }) {
-  const canSendCompanyMessages = ["Admin", "HR"].includes(user.role);
+  const canSendCompanyMessages = ["Admin", "HR", "Coach"].includes(user.role);
 
   const availableTargets = useMemo(() => {
     return threads

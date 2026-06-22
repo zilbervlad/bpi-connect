@@ -42,7 +42,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
     const currentStoreKey = getStoreKey(user);
     const currentArea = String(user.area || "").trim().toLowerCase();
 
-    const canViewAll = currentRole === "Admin" || currentRole === "HR";
+    const canViewAll = currentRole === "Admin" || currentRole === "HR" || currentRole === "Coach";
     const canViewArea = currentRole === "Coach";
 
     return users.filter((item) => {
@@ -94,7 +94,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
     });
 
     return [
-      { key: "All", label: currentRole === "Coach" ? "My Area" : "All Stores" },
+      { key: "All", label: "All Stores" },
       ...Array.from(storeMap.entries())
         .map(([key, label]) => ({ key, label }))
         .sort((a, b) => String(a.label).localeCompare(String(b.label))),
@@ -326,7 +326,7 @@ function getDirectoryScopeLabel(user) {
   }
 
   if (role === "Coach") {
-    return user.area ? `${user.area} area` : "Coach directory";
+    return "All stores";
   }
 
   return getStoreLabel(user);
@@ -339,7 +339,7 @@ function formatRole(role) {
     admin: "Admin",
     hr: "HR",
     coach: "Coach",
-    supervisor: "Coach",
+    supervisor: "Supervisor",
     general_manager: "General Manager",
     manager: "MIT",
     tm: "TM",

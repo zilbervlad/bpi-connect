@@ -257,6 +257,10 @@ def user_is_area_leader(user):
     return (user.role or "").strip().lower() in {"coach", "supervisor"} if user else False
 
 
+def user_is_company_messaging_role(user):
+    return (user.role or "").strip().lower() in {"admin", "hr", "coach"} if user else False
+
+
 def can_user_message_user(sender, recipient):
     if not sender or not recipient:
         return False
@@ -269,7 +273,7 @@ def can_user_message_user(sender, recipient):
 
     sender_role = (sender.role or "").strip().lower()
 
-    if sender_role in {"admin", "hr"}:
+    if sender_role in {"admin", "hr", "coach"}:
         return True
 
     sender_stores = user_store_ids(sender)
@@ -299,7 +303,7 @@ def can_user_access_thread(user, thread):
 
     # Admin/HR can access group/company/store/area/role threads without explicit membership.
     # Direct messages still require membership.
-    if user_is_admin_or_hr(user) and thread.thread_type != "direct":
+    if user_is_company_messaging_role(user) and thread.thread_type != "direct":
         return True
 
     return False
@@ -2662,7 +2666,7 @@ def create_app():
         if viewer:
             viewer_role = (viewer.role or "").strip().lower()
 
-            if viewer_role not in ["admin", "hr"]:
+            if viewer_role not in ["admin", "hr", "coach"]:
                 if viewer_role in ["coach", "supervisor"]:
                     oversight_store_ids = [
                         assignment.store_id
@@ -3561,7 +3565,7 @@ def create_app():
         query = Thread.query
 
         if user_id:
-            if role in ["admin", "hr"]:
+            if role in ["admin", "hr", "coach"]:
                 # Admin/HR should see all group threads without needing explicit membership.
                 # Direct messages should still only show when the user is a member.
                 ensure_thread_hidden_at_column()
@@ -4302,17 +4306,17 @@ def create_app():
 
         sender_role = (sender.role or "").strip().lower()
         sender_can_access_group_thread = (
-            sender_role in ["admin", "hr"]
+            sender_role in ["admin", "hr", "coach"]
             and thread.thread_type != "direct"
         )
 
         if not membership and not sender_can_access_group_thread:
             return jsonify({"success": False, "error": "Sender is not a member of this thread."}), 403
 
-        if thread.thread_type == "company" and sender_role not in ["admin", "hr"]:
+        if thread.thread_type == "company" and sender_role not in ["admin", "hr", "coach"]:
             return jsonify({
                 "success": False,
-                "error": "Only Admin or HR can send company-wide messages.",
+                "error": "Only Admin, HR, or Coach can send company-wide messages.",
             }), 403
 
         if requires_ack and sender_role not in ["admin", "hr", "coach", "supervisor"]:

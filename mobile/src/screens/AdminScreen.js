@@ -45,7 +45,7 @@ const roleLabels = {
   manager: "MIT",
   general_manager: "General Manager",
   coach: "Coach",
-  supervisor: "Coach",
+  supervisor: "Supervisor",
   hr: "HR",
   admin: "Admin",
 };
