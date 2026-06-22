@@ -16,9 +16,14 @@ export function HomeScreen({
   onOpenSend,
   onOpenAdmin,
 }) {
-  const announcementMessages = (messages || [])
-    .filter((message) => message.type === "announcement")
-    .slice(0, 3);
+  const announcementMessages = (messages || []).filter(
+    (message) => message.type === "announcement"
+  );
+
+  const featuredAnnouncement =
+    announcementMessages.find((message) => message.requiresAck && !message.acknowledged) ||
+    announcementMessages.find((message) => message.unread) ||
+    announcementMessages[0];
   const recentThreads = threads
     .filter((thread) => String(thread.name || "").toLowerCase() !== "company announcements")
     .slice(0, 4);
@@ -56,12 +61,12 @@ export function HomeScreen({
         </View>
       </View>
 
-      {announcementMessages.length ? (
+      {featuredAnnouncement ? (
         <>
           <View style={localStyles.sectionHeader}>
             <View>
-              <Text style={localStyles.sectionTitle}>Latest Announcements</Text>
-              <Text style={localStyles.sectionSub}>The 3 most recent company updates</Text>
+              <Text style={localStyles.sectionTitle}>Latest Announcement</Text>
+              <Text style={localStyles.sectionSub}>Most important company update</Text>
             </View>
 
             <TouchableOpacity onPress={onOpenInbox} activeOpacity={0.8}>
@@ -69,16 +74,47 @@ export function HomeScreen({
             </TouchableOpacity>
           </View>
 
-          <View style={localStyles.announcementCard}>
-            {announcementMessages.map((message) => (
-              <AnnouncementRow
-                key={message.id}
-                message={message}
-                pinned={message.requiresAck && !message.acknowledged}
-                onPress={() => onOpenMessage?.(message)}
-              />
-            ))}
-          </View>
+          <TouchableOpacity
+            style={[
+              localStyles.featuredAnnouncementCard,
+              featuredAnnouncement.requiresAck &&
+                !featuredAnnouncement.acknowledged &&
+                localStyles.featuredAnnouncementCardUrgent,
+            ]}
+            onPress={() => onOpenMessage?.(featuredAnnouncement)}
+            activeOpacity={0.88}
+          >
+            <View style={localStyles.featuredAnnouncementTop}>
+              <View style={localStyles.featuredAnnouncementIcon}>
+                <Text style={localStyles.featuredAnnouncementIconText}>
+                  {featuredAnnouncement.requiresAck && !featuredAnnouncement.acknowledged ? "!" : "i"}
+                </Text>
+              </View>
+
+              <View style={localStyles.featuredAnnouncementTitleWrap}>
+                <Text style={localStyles.featuredAnnouncementLabel}>
+                  {featuredAnnouncement.requiresAck && !featuredAnnouncement.acknowledged
+                    ? "NEEDS ACKNOWLEDGEMENT"
+                    : "COMPANY UPDATE"}
+                </Text>
+                <Text style={localStyles.featuredAnnouncementTitle} numberOfLines={2}>
+                  {featuredAnnouncement.title}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={localStyles.featuredAnnouncementBody} numberOfLines={3}>
+              {featuredAnnouncement.body}
+            </Text>
+
+            <View style={localStyles.featuredAnnouncementFooter}>
+              <Text style={localStyles.featuredAnnouncementMeta} numberOfLines={1}>
+                {featuredAnnouncement.from} · {featuredAnnouncement.time}
+              </Text>
+
+              <Text style={localStyles.featuredAnnouncementOpen}>Open →</Text>
+            </View>
+          </TouchableOpacity>
         </>
       ) : null}
 
@@ -318,6 +354,82 @@ const localStyles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.7,
     marginTop: 0,
+  },
+
+  featuredAnnouncementCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 26,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: "rgba(37, 99, 235, 0.14)",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  featuredAnnouncementCardUrgent: {
+    borderColor: "rgba(245, 158, 11, 0.42)",
+    backgroundColor: "#fffbeb",
+  },
+  featuredAnnouncementTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  featuredAnnouncementIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#1d4ed8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featuredAnnouncementIconText: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  featuredAnnouncementTitleWrap: {
+    flex: 1,
+  },
+  featuredAnnouncementLabel: {
+    color: "#2563eb",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    marginBottom: 3,
+  },
+  featuredAnnouncementTitle: {
+    color: "#0f172a",
+    fontSize: 20,
+    fontWeight: "900",
+    lineHeight: 25,
+  },
+  featuredAnnouncementBody: {
+    color: "#334155",
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  featuredAnnouncementFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  featuredAnnouncementMeta: {
+    flex: 1,
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  featuredAnnouncementOpen: {
+    color: "#1d4ed8",
+    fontSize: 13,
+    fontWeight: "900",
   },
 
   announcementCard: {
