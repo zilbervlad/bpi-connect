@@ -281,13 +281,6 @@ export function ThreadScreen({
           onLayout={() => scrollToLatest(false)}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={localStyles.threadInfo}>
-            <Text style={localStyles.threadInfoTitle}>{thread.name}</Text>
-            <Text style={localStyles.threadInfoText}>
-              {(thread.memberNames || thread.members?.map((member) => member.name) || []).join(", ")}
-            </Text>
-          </View>
-
           {thread.messages.map((message, index) => (
             <View key={message.id}>
               {shouldShowDateDivider(thread.messages, message, index) ? (
@@ -589,7 +582,7 @@ const localStyles = StyleSheet.create({
     borderBottomColor: "#d8d8dd",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     gap: 10,
   },
   backButton: {
@@ -622,7 +615,7 @@ const localStyles = StyleSheet.create({
   },
   headerName: {
     color: "#111111",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "800",
   },
   headerSub: {
@@ -637,7 +630,7 @@ const localStyles = StyleSheet.create({
   },
   chatContent: {
     padding: 14,
-    paddingBottom: 20,
+    paddingBottom: 18,
   },
   threadInfo: {
     alignItems: "center",
@@ -666,7 +659,7 @@ const localStyles = StyleSheet.create({
   },
   dateDividerText: {
     color: "#475569",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "900",
   },
   unreadDivider: {
@@ -707,14 +700,14 @@ const localStyles = StyleSheet.create({
   },
   senderName: {
     color: "#6e6e73",
-    fontSize: 11,
+    fontSize: 12,
     marginLeft: 8,
-    marginBottom: 3,
+    marginBottom: 4,
     fontWeight: "700",
   },
   bubble: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 20,
   },
   bubbleMe: {
@@ -733,8 +726,8 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#d1d5db",
   },
   bubbleText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 23,
   },
   bubbleTextMe: {
     color: "#ffffff",
@@ -744,8 +737,8 @@ const localStyles = StyleSheet.create({
   },
   messageTime: {
     color: "#8a8a8e",
-    fontSize: 10,
-    marginTop: 3,
+    fontSize: 11,
+    marginTop: 4,
     marginHorizontal: 8,
     fontWeight: "600",
   },
@@ -821,7 +814,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#f8f8f8",
     borderTopWidth: 1,
     borderTopColor: "#d8d8dd",
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 9,
     flexDirection: "row",
     alignItems: "flex-end",
@@ -845,20 +838,20 @@ const localStyles = StyleSheet.create({
   input: {
     flex: 1,
     minHeight: 38,
-    maxHeight: 100,
+    maxHeight: 98,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#d1d1d6",
     backgroundColor: "#ffffff",
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
     color: "#111111",
-    fontSize: 16,
+    fontSize: 17,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "#007aff",
     alignItems: "center",
     justifyContent: "center",
