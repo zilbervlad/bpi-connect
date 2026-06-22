@@ -13,7 +13,7 @@ export function MessageScreen({ message, onBack, onAcknowledge }) {
         </TouchableOpacity>
 
         <View>
-          <Text style={styles.headerTitle}>Message</Text>
+          <Text style={styles.headerTitle}>Announcement</Text>
           <Text style={styles.headerSubtitle}>{message.from}</Text>
         </View>
       </View>

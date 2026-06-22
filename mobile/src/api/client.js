@@ -201,6 +201,55 @@ export async function deleteApiArea(areaId, actorUserId) {
   });
 }
 
+
+
+export async function markApiMessageRead(messageId, userId) {
+  return apiRequest(`/api/messages/${messageId}/read`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+}
+
+export async function acknowledgeApiMessage(messageId, userId) {
+  return apiRequest(`/api/messages/${messageId}/acknowledge`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+}
+
+export async function createApiMessage({
+  senderUserId,
+  title,
+  body,
+  recipientUserIds,
+  messageType = "announcement",
+  priority = "normal",
+  targetType = "company",
+  targetLabel = "Company-wide",
+  requiresAck = false,
+}) {
+  const data = await apiRequest("/api/messages", {
+    method: "POST",
+    body: JSON.stringify({
+      sender_user_id: senderUserId,
+      title,
+      body,
+      recipient_user_ids: recipientUserIds,
+      message_type: messageType,
+      priority,
+      target_type: targetType,
+      target_label: targetLabel,
+      requires_ack: requiresAck,
+    }),
+  });
+
+  return data.message;
+}
+
 export async function fetchApiMessages(userId) {
   const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
   const data = await apiRequest(`/api/messages${query}`);
