@@ -1,5 +1,4 @@
-import {
-  Alert, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from "react-native";
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
@@ -19,40 +18,11 @@ function getThreadActivityMs(thread) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function ChatsScreen({
-  threads,
-  onOpenThread,
-  onToggleMute,
-  onToggleFavorite,
-  onDeleteThread,
-}) {
+export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavorite }) {
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
-
-  const handleLongPressThread = (thread) => {
-    const isDirect =
-      thread.thread_type === "direct" ||
-      thread.type === "direct" ||
-      thread.kind === "direct";
-
-    if (!isDirect) return;
-
-    Alert.alert(
-      "Delete conversation?",
-      "This removes the direct message thread from your inbox only.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => onDeleteThread?.(thread.id),
-        },
-      ]
-    );
-  };
-
 
   const sortedThreads = useMemo(() => {
     const searchValue = searchText.trim().toLowerCase();
@@ -185,8 +155,6 @@ export function ChatsScreen({
                   <TouchableOpacity
                     style={localStyles.threadOpenArea}
                     onPress={() => onOpenThread(thread)}
-                    onLongPress={() => handleLongPressThread(thread)}
-                    delayLongPress={450}
                     activeOpacity={0.84}
                   >
                     <ThreadAvatar thread={thread} hasUnread={hasUnread} />
