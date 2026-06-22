@@ -2229,6 +2229,109 @@ def create_app():
         })
 
 
+
+    @app.post("/api/integrations/bpi-ops/admin/announcements/send")
+    def bpi_ops_admin_send_announcement():
+        auth_error = require_bpi_ops_integration_secret()
+        if auth_error:
+            return auth_error
+
+        data = request.get_json(silent=True) or {}
+
+        target_type = (data.get("target_type") or "company").strip().lower()
+        target_value = (data.get("target_value") or "").strip()
+        title = (data.get("title") or "").strip()
+        message = (data.get("message") or "").strip()
+
+        if target_type not in {"company", "area", "store", "role"}:
+            return jsonify({
+                "success": False,
+                "error": "Invalid target_type.",
+            }), 400
+
+        if target_type != "company" and not target_value:
+            return jsonify({
+                "success": False,
+                "error": "target_value is required for this target_type.",
+            }), 400
+
+        if target_type == "company" and data.get("confirm_company_wide") is not True:
+            return jsonify({
+                "success": False,
+                "error": "Company-wide announcements require confirm_company_wide=true.",
+            }), 400
+
+        if not title or not message:
+            return jsonify({
+                "success": False,
+                "error": "Title and message are required.",
+            }), 400
+
+        title = title[:120]
+        message = message[:600]
+
+        users = User.query.all()
+
+        def is_active_user(user):
+            return bool(getattr(user, "is_active", True))
+
+        def user_matches(user):
+            if not is_active_user(user):
+                return False
+
+            if target_type == "company":
+                return True
+
+            if target_type == "store":
+                return str(getattr(user, "store_number", "") or "").strip() == target_value
+
+            if target_type == "area":
+                return str(getattr(user, "area", "") or "").strip().lower() == target_value.lower()
+
+            if target_type == "role":
+                return str(getattr(user, "role", "") or "").strip().lower() == target_value.lower()
+
+            return False
+
+        recipients = [user for user in users if user_matches(user)]
+        recipient_ids = [user.id for user in recipients]
+
+        tokens = []
+        if recipient_ids:
+            tokens = [
+                item.token
+                for item in PushToken.query.filter(
+                    PushToken.user_id.in_(recipient_ids),
+                    PushToken.is_active == True,
+                ).all()
+                if item.token
+            ]
+
+        push_result = None
+        if tokens:
+            push_result = send_expo_push_notifications(
+                tokens=tokens,
+                title=title,
+                body=message,
+                data={
+                    "type": "announcement",
+                    "target_type": target_type,
+                    "target_value": target_value,
+                    "source": "bpi_ops",
+                },
+            )
+
+        return jsonify({
+            "success": True,
+            "sent": bool(tokens),
+            "target_type": target_type,
+            "target_value": target_value,
+            "recipient_count": len(recipients),
+            "token_count": len(tokens),
+            "push_result": push_result,
+        })
+
+
     @app.post("/api/integrations/bpi-ops/hr-documents/notify")
     def notify_bpi_ops_hr_document():
         auth_error = require_bpi_ops_integration_secret()
