@@ -97,13 +97,13 @@ export function HomeScreen({
                     ? "NEEDS ACKNOWLEDGEMENT"
                     : "COMPANY UPDATE"}
                 </Text>
-                <Text style={localStyles.featuredAnnouncementTitle} numberOfLines={2}>
+                <Text style={localStyles.featuredAnnouncementTitle} numberOfLines={3}>
                   {featuredAnnouncement.title}
                 </Text>
               </View>
             </View>
 
-            <Text style={localStyles.featuredAnnouncementBody} numberOfLines={3}>
+            <Text style={localStyles.featuredAnnouncementBody}>
               {featuredAnnouncement.body}
             </Text>
 
