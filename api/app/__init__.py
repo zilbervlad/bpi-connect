@@ -3564,9 +3564,10 @@ def create_app():
             if role in ["admin", "hr"]:
                 # Admin/HR should see all group threads without needing explicit membership.
                 # Direct messages should still only show when the user is a member.
+                ensure_thread_hidden_at_column()
                 direct_thread_ids = [
                     membership.thread_id
-                    for membership in ThreadMember.query.filter_by(user_id=user_id).all()
+                    for membership in ThreadMember.query.filter_by(user_id=user_id, hidden_at=None).all()
                 ]
 
                 query = query.filter(
@@ -3580,6 +3581,7 @@ def create_app():
                     query
                     .join(ThreadMember)
                     .filter(ThreadMember.user_id == user_id)
+                    .filter(ThreadMember.hidden_at.is_(None))
                 )
 
         latest_message_subquery = (
@@ -3657,6 +3659,7 @@ def create_app():
                     for membership in ThreadMember.query.filter(
                         ThreadMember.thread_id.in_(thread_ids),
                         ThreadMember.user_id == user_id,
+                        ThreadMember.hidden_at.is_(None),
                     ).all()
                 }
 
@@ -4387,6 +4390,48 @@ def create_app():
         })
 
 
+    @app.post("/api/threads/<int:thread_id>/delete")
+    def delete_thread_for_user(thread_id):
+        ensure_thread_hidden_at_column()
+
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "user_id is required.",
+            }), 400
+
+        thread = Thread.query.get(thread_id)
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        if thread.thread_type != "direct":
+            return jsonify({
+                "success": False,
+                "error": "Only direct message threads can be deleted.",
+            }), 400
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user_id,
+        ).first()
+
+        if not membership:
+            return jsonify({"success": False, "error": "Thread membership not found."}), 404
+
+        membership.hidden_at = datetime.utcnow()
+        membership.muted = True
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "thread_id": thread.id,
+            "hidden_at": iso_utc(membership.hidden_at),
+        })
+
+
     @app.post("/api/threads/<int:thread_id>/mute")
     def toggle_thread_mute(thread_id):
         data = request.get_json() or {}
@@ -4737,6 +4782,16 @@ def ensure_thread_favorites_table():
         return False
 
 
+def ensure_thread_hidden_at_column():
+    try:
+        db.session.execute(db.text("ALTER TABLE thread_members ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMP"))
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
+
+
 
 def serialize_thread_light(thread, user_id=None, last_message=None, unread_count=0, member_count=0, muted=False, favorite=False):
     preview = ""
@@ -4744,7 +4799,7 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
 
     if last_message:
         preview = (last_message.body or "")[:160]
-        last_time = last_iso_utc(message.created_at) if last_message.created_at else None
+        last_time = iso_utc(last_message.created_at) if last_message.created_at else None
 
     return {
         "id": thread.id,
@@ -4805,7 +4860,7 @@ def serialize_thread(thread, user_id=None):
         "group_key": thread.group_key,
         "created_at": iso_utc(thread.created_at),
         "last_message": last_message.body if last_message else "",
-        "last_time": last_iso_utc(message.created_at) if last_message else None,
+        "last_time": iso_utc(last_message.created_at) if last_message else None,
         "unread": unread_count,
         "members": [serialize_user(member.user) for member in thread.members],
         "muted": membership.muted if membership else False,

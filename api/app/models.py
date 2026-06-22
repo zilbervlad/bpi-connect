@@ -131,6 +131,7 @@ class ThreadMember(db.Model):
     member_role = db.Column(db.String(40), default="member")
     muted = db.Column(db.Boolean, default=False)
     last_read_at = db.Column(db.DateTime, nullable=True)
+    hidden_at = db.Column(db.DateTime, nullable=True)
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     thread = db.relationship("Thread", backref="members")
