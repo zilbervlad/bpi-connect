@@ -1,5 +1,15 @@
-import { useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  Alert,
+  Animated,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 
@@ -18,7 +28,127 @@ function getThreadActivityMs(thread) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavorite }) {
+
+function SwipeableThreadRow({ thread, children, onDelete }) {
+  const translateX = React.useRef(new Animated.Value(0)).current;
+  const opened = React.useRef(false);
+
+  const isDirect = thread.thread_type === "direct" || thread.type === "direct" || thread.kind === "direct";
+
+  const closeRow = () => {
+    opened.current = false;
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 60,
+    }).start();
+  };
+
+  const openRow = () => {
+    if (!isDirect) return;
+    opened.current = true;
+    Animated.spring(translateX, {
+      toValue: -92,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 60,
+    }).start();
+  };
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        if (!isDirect) return false;
+        return Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (!isDirect) return;
+        const next = Math.max(-104, Math.min(0, gesture.dx + (opened.current ? -92 : 0)));
+        translateX.setValue(next);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (!isDirect) {
+          closeRow();
+          return;
+        }
+
+        if (gesture.dx < -42 || gesture.vx < -0.5) {
+          openRow();
+        } else if (gesture.dx > 24 || gesture.vx > 0.5) {
+          closeRow();
+        } else if (opened.current) {
+          openRow();
+        } else {
+          closeRow();
+        }
+      },
+      onPanResponderTerminate: () => {
+        if (opened.current) {
+          openRow();
+        } else {
+          closeRow();
+        }
+      },
+    })
+  ).current;
+
+  const confirmDelete = () => {
+    Alert.alert(
+      "Delete conversation?",
+      "This removes the direct message thread from your inbox only.",
+      [
+        { text: "Cancel", style: "cancel", onPress: closeRow },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            closeRow();
+            onDelete?.(thread.id);
+          },
+        },
+      ]
+    );
+  };
+
+  if (!isDirect) {
+    return <View>{children}</View>;
+  }
+
+  return (
+    <View style={localStyles.swipeShell}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={localStyles.deleteReveal}
+        onPress={confirmDelete}
+      >
+        <Text style={localStyles.deleteRevealIcon}>🗑️</Text>
+        <Text style={localStyles.deleteRevealText}>Delete</Text>
+      </TouchableOpacity>
+
+      <Animated.View
+        style={[
+          localStyles.swipeContent,
+          {
+            transform: [{ translateX }],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+
+export function ChatsScreen({
+  threads,
+  onOpenThread,
+  onToggleMute,
+  onToggleFavorite,
+  onDeleteThread,
+}) {
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -149,7 +279,11 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
 
             return (
               <View key={thread.id}>
-                <View style={[localStyles.threadRow, hasUnread && localStyles.threadRowUnread]}>
+                <SwipeableThreadRow
+                  thread={thread}
+                  onDelete={onDeleteThread}
+                >
+                  <View style={[localStyles.threadRow, hasUnread && localStyles.threadRowUnread]}>
                   <View style={[localStyles.unreadAccent, hasUnread && localStyles.unreadAccentActive]} />
 
                   <TouchableOpacity
@@ -217,7 +351,8 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                  </View>
+                </SwipeableThreadRow>
 
                 {index < sortedThreads.length - 1 ? (
                   <View style={[localStyles.divider, hasUnread && localStyles.dividerUnread]} />
@@ -295,6 +430,35 @@ function formatThreadType(type) {
 }
 
 const localStyles = StyleSheet.create({
+  swipeShell: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 22,
+  },
+  swipeContent: {
+    backgroundColor: "transparent",
+  },
+  deleteReveal: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 92,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ff3b30",
+    borderTopRightRadius: 22,
+    borderBottomRightRadius: 22,
+  },
+  deleteRevealIcon: {
+    fontSize: 20,
+    marginBottom: 3,
+  },
+  deleteRevealText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
   heroCard: {
     backgroundColor: "#ffffff",
     borderRadius: 22,
