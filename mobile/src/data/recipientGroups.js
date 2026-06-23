@@ -60,11 +60,11 @@ export const recipientGroups = [
 export function getVisibleRecipientGroups(user) {
   if (!user) return [];
 
-  if (user.role === "Admin" || user.role === "HR") {
+  if (user.role === "Admin" || user.role === "HR" || user.role === "Coach") {
     return recipientGroups;
   }
 
-  if (user.role === "Supervisor" || user.role === "Coach") {
+  if (user.role === "Supervisor") {
     return recipientGroups.filter((group) =>
       ["area", "store"].includes(group.scope)
     );
