@@ -1722,7 +1722,10 @@ export default function App() {
         )}
 
         {activeTab === "Admin" && (
-          <AdminScreen user={currentUser} />
+          <AdminScreen
+            user={currentUser}
+            onUsersChanged={() => reloadDataForUser(currentUser)}
+          />
         )}
 
         {activeTab === "Profile" && (

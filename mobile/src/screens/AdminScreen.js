@@ -50,7 +50,7 @@ const roleLabels = {
   admin: "Admin",
 };
 
-export function AdminScreen({ user }) {
+export function AdminScreen({ user, onUsersChanged }) {
   const [activeSection, setActiveSection] = useState("people");
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
@@ -425,6 +425,7 @@ export function AdminScreen({ user }) {
       setSelectedUser(updated);
       setStatusMessage(updated.is_active ? "User reactivated." : "User deactivated.");
       await loadAdminData();
+      await onUsersChanged?.();
     } catch (error) {
       setErrorMessage(error.message || "Could not update user.");
     } finally {
@@ -447,6 +448,7 @@ export function AdminScreen({ user }) {
       setSelectedUser(updated);
       setStatusMessage("Role updated.");
       await loadAdminData();
+      await onUsersChanged?.();
     } catch (error) {
       setErrorMessage(error.message || "Could not update role.");
     } finally {
@@ -475,6 +477,7 @@ export function AdminScreen({ user }) {
           : `Oversight store ${storeNumber} added.`
       );
       await loadAdminData();
+      await onUsersChanged?.();
     } catch (error) {
       setErrorMessage(error.message || "Could not assign store.");
     } finally {
@@ -494,6 +497,7 @@ export function AdminScreen({ user }) {
       setSelectedUser(updated);
       setStatusMessage("Store assignment removed.");
       await loadAdminData();
+      await onUsersChanged?.();
     } catch (error) {
       setErrorMessage(error.message || "Could not remove assignment.");
     } finally {
