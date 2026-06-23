@@ -305,7 +305,7 @@ export function ThreadScreen({
               >
               {shouldShowSenderName(thread.messages, message, index) ? (
                 <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
-                  {message.sender} · {message.senderRole}
+                  {formatSenderLabel(message)}
                 </Text>
               ) : null}
 
@@ -552,6 +552,31 @@ function shouldShowSenderName(messages, message, index) {
   );
 }
 
+function formatSenderLabel(message) {
+  const sender = String(message?.sender || "Unknown").trim();
+  const role = formatSenderRole(message?.senderRole);
+
+  if (!role) return sender;
+
+  return `${sender} · ${role}`;
+}
+
+function formatSenderRole(role) {
+  const value = String(role || "").trim().toLowerCase();
+
+  const map = {
+    admin: "Admin",
+    hr: "HR",
+    coach: "Coach",
+    supervisor: "Supervisor",
+    general_manager: "GM",
+    manager: "MIT",
+    tm: "TM",
+  };
+
+  return map[value] || "";
+}
+
 function ThreadHeaderAvatar({ thread }) {
   if (thread.type === "direct" && thread.members?.length) {
     const otherMember = thread.members[0];
@@ -570,20 +595,26 @@ function ThreadHeaderAvatar({ thread }) {
 const localStyles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#f2f2f7",
+    backgroundColor: "#f6f7fb",
   },
   keyboardWrap: {
     flex: 1,
   },
   header: {
-    height: 74,
-    backgroundColor: "rgba(248,248,248,0.96)",
+    minHeight: 72,
+    backgroundColor: "rgba(255,255,255,0.98)",
     borderBottomWidth: 1,
-    borderBottomColor: "#d8d8dd",
+    borderBottomColor: "#e6e8ef",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   backButton: {
     width: 34,
@@ -592,21 +623,23 @@ const localStyles = StyleSheet.create({
     justifyContent: "center",
   },
   backText: {
-    color: "#007aff",
-    fontSize: 42,
-    lineHeight: 42,
+    color: "#0a84ff",
+    fontSize: 38,
+    lineHeight: 40,
     fontWeight: "300",
   },
   headerAvatar: {
     width: 42,
     height: 42,
     borderRadius: 999,
-    backgroundColor: "#c7c7cc",
+    backgroundColor: "#eef2ff",
+    borderWidth: 1,
+    borderColor: "#dbe3ff",
     alignItems: "center",
     justifyContent: "center",
   },
   headerAvatarText: {
-    color: "#ffffff",
+    color: "#2443a6",
     fontWeight: "900",
     fontSize: 12,
   },
@@ -614,22 +647,24 @@ const localStyles = StyleSheet.create({
     flex: 1,
   },
   headerName: {
-    color: "#111111",
+    color: "#111827",
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "900",
+    letterSpacing: -0.2,
   },
   headerSub: {
-    color: "#6e6e73",
+    color: "#6b7280",
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     marginTop: 2,
   },
   chatArea: {
     flex: 1,
-    backgroundColor: "#f2f2f7",
+    backgroundColor: "#f6f7fb",
   },
   chatContent: {
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     paddingBottom: 18,
   },
   threadInfo: {
@@ -651,16 +686,20 @@ const localStyles = StyleSheet.create({
   },
   dateDivider: {
     alignSelf: "center",
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginVertical: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
   },
   dateDividerText: {
-    color: "#475569",
-    fontSize: 12,
+    color: "#64748b",
+    fontSize: 11,
     fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
   },
   unreadDivider: {
     flexDirection: "row",
@@ -683,8 +722,8 @@ const localStyles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   bubbleRow: {
-    marginBottom: 10,
-    maxWidth: "82%",
+    marginBottom: 8,
+    maxWidth: "84%",
   },
   bubbleRowMe: {
     alignSelf: "flex-end",
@@ -699,24 +738,31 @@ const localStyles = StyleSheet.create({
     textAlign: "right",
   },
   senderName: {
-    color: "#6e6e73",
-    fontSize: 12,
-    marginLeft: 8,
-    marginBottom: 4,
-    fontWeight: "700",
+    color: "#6b7280",
+    fontSize: 11,
+    marginLeft: 9,
+    marginBottom: 3,
+    fontWeight: "800",
   },
   bubble: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 20,
+    borderRadius: 19,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   bubbleMe: {
-    backgroundColor: "#007aff",
-    borderBottomRightRadius: 5,
+    backgroundColor: "#0a84ff",
+    borderBottomRightRadius: 6,
   },
   bubbleOther: {
-    backgroundColor: "#e5e5ea",
-    borderBottomLeftRadius: 5,
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: "#edf0f5",
   },
   messageImage: {
     width: 230,
@@ -726,26 +772,27 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#d1d5db",
   },
   bubbleText: {
-    fontSize: 17,
-    lineHeight: 23,
+    fontSize: 16,
+    lineHeight: 22,
+    letterSpacing: -0.1,
   },
   bubbleTextMe: {
     color: "#ffffff",
   },
   bubbleTextOther: {
-    color: "#111111",
+    color: "#111827",
   },
   messageTime: {
-    color: "#8a8a8e",
-    fontSize: 11,
-    marginTop: 4,
+    color: "#9ca3af",
+    fontSize: 10,
+    marginTop: 3,
     marginHorizontal: 8,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   pendingImagePanel: {
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
-    borderTopColor: "#d8d8dd",
+    borderTopColor: "#e5e7eb",
     padding: 12,
     gap: 10,
   },
@@ -757,11 +804,11 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#d1d5db",
   },
   pendingCaptionInput: {
-    backgroundColor: "#f2f2f7",
+    backgroundColor: "#f6f7fb",
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: "#10212b",
+    color: "#111827",
     fontSize: 15,
     maxHeight: 90,
   },
@@ -811,11 +858,12 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   composer: {
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ffffff",
     borderTopWidth: 1,
-    borderTopColor: "#d8d8dd",
+    borderTopColor: "#e5e7eb",
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingTop: 9,
+    paddingBottom: Platform.OS === "ios" ? 12 : 9,
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
@@ -824,13 +872,15 @@ const localStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#d1d1d6",
+    backgroundColor: "#eef2f7",
+    borderWidth: 1,
+    borderColor: "#d8dee8",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 4,
   },
   photoButtonText: {
-    color: "#ffffff",
+    color: "#64748b",
     fontSize: 24,
     fontWeight: "900",
     lineHeight: 27,
@@ -838,26 +888,34 @@ const localStyles = StyleSheet.create({
   input: {
     flex: 1,
     minHeight: 38,
-    maxHeight: 98,
+    maxHeight: 104,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#d1d1d6",
-    backgroundColor: "#ffffff",
+    borderColor: "#d8dee8",
+    backgroundColor: "#f9fafb",
     paddingHorizontal: 14,
     paddingVertical: 7,
-    color: "#111111",
-    fontSize: 17,
+    color: "#111827",
+    fontSize: 16,
+    lineHeight: 21,
   },
   sendButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#007aff",
+    backgroundColor: "#0a84ff",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#0a84ff",
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   sendButtonDisabled: {
-    backgroundColor: "#c7c7cc",
+    backgroundColor: "#cbd5e1",
+    shadowOpacity: 0,
+    elevation: 0,
   },
   sendText: {
     color: "#ffffff",
@@ -865,75 +923,8 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 24,
   },
-  reactionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  reactionChip: {
-    backgroundColor: "rgba(255,255,255,0.16)",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-  },
-  reactionChipActive: {
-    backgroundColor: "#ffffff",
-    borderColor: "#ffffff",
-  },
-  reactionText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  reactionTextActive: {
-    color: "#10212b",
-  },
-  quickReactButton: {
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderRadius: 999,
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  quickReactText: {
-    fontSize: 14,
-  },
-  reactionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  quickReactionButton: {
-    backgroundColor: "rgba(255,255,255,0.22)",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    minWidth: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickReactionButtonActive: {
-    backgroundColor: "#ffffff",
-  },
-  quickReactionText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  quickReactionTextActive: {
-    color: "#10212b",
-  },
   messageStatusText: {
-    color: "#8fa1b6",
+    color: "#94a3b8",
     fontSize: 10,
     fontWeight: "800",
     marginTop: 5,
@@ -950,13 +941,16 @@ const localStyles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   reactionSummaryChip: {
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.78)",
     borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.22)",
   },
   reactionSummaryChipActive: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#eef6ff",
+    borderColor: "#bfdbfe",
   },
   reactionSummaryText: {
     fontSize: 12,
