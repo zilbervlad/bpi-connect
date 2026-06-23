@@ -3770,9 +3770,22 @@ def create_app():
             db.session.add(thread)
             db.session.flush()
 
-            db.session.add(ThreadMember(thread_id=thread.id, user_id=sender.id))
-            db.session.add(ThreadMember(thread_id=thread.id, user_id=recipient.id))
-            db.session.commit()
+        for member_user in [sender, recipient]:
+            membership = ThreadMember.query.filter_by(
+                thread_id=thread.id,
+                user_id=member_user.id,
+            ).first()
+
+            if membership:
+                membership.hidden_at = None
+                membership.muted = False
+            else:
+                db.session.add(ThreadMember(
+                    thread_id=thread.id,
+                    user_id=member_user.id,
+                ))
+
+        db.session.commit()
 
         return jsonify({
             "success": True,
