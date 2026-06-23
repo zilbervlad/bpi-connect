@@ -4,7 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   TextInput,
   StyleSheet,
   Image,
@@ -85,7 +85,7 @@ export function ThreadScreen({
     );
   }
 
-  const scrollViewRef = useRef(null);
+  const messageListRef = useRef(null);
   const previousMessageCountRef = useRef(thread?.messages?.length || 0);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -100,7 +100,7 @@ export function ThreadScreen({
 
   function scrollToLatest(animated = true) {
     requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollToEnd({ animated });
+      messageListRef.current?.scrollToEnd({ animated });
     });
   }
 
@@ -255,6 +255,157 @@ export function ThreadScreen({
     setPendingImageCaption("");
   }
 
+  function renderMessage({ item: message, index }) {
+    const isLastInGroup = isLastMessageInGroup(thread.messages, message, index);
+    const groupedBubbleStyle = getBubbleGroupStyle(thread.messages, message, index);
+
+    return (
+      <View>
+        {shouldShowDateDivider(thread.messages, message, index) ? (
+          <View style={localStyles.dateDivider}>
+            <Text style={localStyles.dateDividerText}>{getMessageDateLabel(message)}</Text>
+          </View>
+        ) : null}
+
+        {index === unreadStartIndex ? (
+          <View style={localStyles.unreadDivider}>
+            <View style={localStyles.unreadDividerLine} />
+            <Text style={localStyles.unreadDividerText}>Unread messages</Text>
+            <View style={localStyles.unreadDividerLine} />
+          </View>
+        ) : null}
+
+        <View
+          style={[
+            localStyles.bubbleRow,
+            message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
+          ]}
+        >
+          {shouldShowSenderName(thread.messages, message, index) ? (
+            <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
+              {formatSenderLabel(message)}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={[
+              localStyles.bubble,
+              message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
+              groupedBubbleStyle,
+            ]}
+            activeOpacity={0.9}
+            onLongPress={() => {
+              if (canDeleteMessage(message)) {
+                confirmDeleteMessage(message);
+                return;
+              }
+
+              setReactionPickerMessageId(message.id);
+            }}
+            onPress={() =>
+              setReactionPickerMessageId(
+                reactionPickerMessageId === message.id ? null : message.id
+              )
+            }
+          >
+            {message.attachments?.map((attachment) =>
+              attachment.file_type === "image" ? (
+                <Image
+                  key={attachment.id}
+                  source={{ uri: attachment.url || attachment.localUri }}
+                  style={localStyles.messageImage}
+                  resizeMode="cover"
+                />
+              ) : null
+            )}
+
+            {message.body && message.body !== "Photo" ? (
+              <Text
+                style={[
+                  localStyles.bubbleText,
+                  message.isMe ? localStyles.bubbleTextMe : localStyles.bubbleTextOther,
+                  isDeletedMessage(message) && localStyles.deletedMessageText,
+                ]}
+              >
+                {message.body}
+              </Text>
+            ) : null}
+
+            {message.isMe && message.status === "sending" ? (
+              <Text style={localStyles.messageStatusText}>Sending…</Text>
+            ) : null}
+
+            {message.isMe && message.status === "failed" ? (
+              <TouchableOpacity
+                onPress={() => onRetryThreadMessage?.(thread.id, message)}
+                activeOpacity={0.85}
+              >
+                <Text style={[localStyles.messageStatusText, localStyles.messageStatusFailed]}>
+                  Failed — tap to retry
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {message.isMe && getSeenStatusText(message) ? (
+              <Text style={localStyles.messageStatusText}>
+                {getSeenStatusText(message)}
+              </Text>
+            ) : null}
+
+            {message.reactions?.length ? (
+              <View style={localStyles.reactionSummaryRow}>
+                {message.reactions.map((reaction) => (
+                  <TouchableOpacity
+                    key={reaction.emoji}
+                    style={[
+                      localStyles.reactionSummaryChip,
+                      reaction.reacted_by_me && localStyles.reactionSummaryChipActive,
+                    ]}
+                    onPress={() => onReact?.(message.id, reaction.emoji)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={localStyles.reactionSummaryText}>
+                      {reaction.emoji}{reaction.count > 1 ? ` ${reaction.count}` : ""}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+
+            {reactionPickerMessageId === message.id ? (
+              <View
+                style={[
+                  localStyles.iMessageReactionPicker,
+                  message.isMe
+                    ? localStyles.iMessageReactionPickerMe
+                    : localStyles.iMessageReactionPickerOther,
+                ]}
+              >
+                {quickReactions.map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={localStyles.iMessageReactionButton}
+                    onPress={() => {
+                      onReact?.(message.id, emoji);
+                      setReactionPickerMessageId(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={localStyles.iMessageReactionText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </TouchableOpacity>
+
+          {isLastInGroup ? (
+            <Text style={localStyles.messageTime}>{message.time}</Text>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={localStyles.safe}>
       <StatusBar style="dark" />
@@ -276,165 +427,27 @@ export function ThreadScreen({
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollViewRef}
+        <FlatList
+          ref={messageListRef}
+          data={thread.messages || []}
+          keyExtractor={(message) => String(message.id)}
+          renderItem={renderMessage}
           style={localStyles.chatArea}
           contentContainerStyle={localStyles.chatContent}
           onScroll={handleChatScroll}
           scrollEventThrottle={80}
+          onContentSizeChange={() => {
+            if (isNearBottom) {
+              scrollToLatest(false);
+            }
+          }}
           onLayout={() => scrollToLatest(false)}
           keyboardShouldPersistTaps="handled"
-        >
-          {thread.messages.map((message, index) => {
-            const isLastInGroup = isLastMessageInGroup(thread.messages, message, index);
-            const groupedBubbleStyle = getBubbleGroupStyle(thread.messages, message, index);
-
-            return (
-            <View key={message.id}>
-              {shouldShowDateDivider(thread.messages, message, index) ? (
-                <View style={localStyles.dateDivider}>
-                  <Text style={localStyles.dateDividerText}>{getMessageDateLabel(message)}</Text>
-                </View>
-              ) : null}
-
-              {index === unreadStartIndex ? (
-                <View style={localStyles.unreadDivider}>
-                  <View style={localStyles.unreadDividerLine} />
-                  <Text style={localStyles.unreadDividerText}>Unread messages</Text>
-                  <View style={localStyles.unreadDividerLine} />
-                </View>
-              ) : null}
-
-              <View
-                style={[
-                  localStyles.bubbleRow,
-                  message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
-                ]}
-              >
-              {shouldShowSenderName(thread.messages, message, index) ? (
-                <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
-                  {formatSenderLabel(message)}
-                </Text>
-              ) : null}
-
-              <TouchableOpacity
-                style={[
-                  localStyles.bubble,
-                  message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
-                  groupedBubbleStyle,
-                ]}
-                activeOpacity={0.9}
-                onLongPress={() => {
-                  if (canDeleteMessage(message)) {
-                    confirmDeleteMessage(message);
-                    return;
-                  }
-
-                  setReactionPickerMessageId(message.id);
-                }}
-                onPress={() =>
-                  setReactionPickerMessageId(
-                    reactionPickerMessageId === message.id ? null : message.id
-                  )
-                }
-              >
-                {message.attachments?.map((attachment) =>
-                  attachment.file_type === "image" ? (
-                    <Image
-                      key={attachment.id}
-                      source={{ uri: attachment.url }}
-                      style={localStyles.messageImage}
-                      resizeMode="cover"
-                    />
-                  ) : null
-                )}
-
-                {message.body && message.body !== "Photo" ? (
-                  <Text
-                    style={[
-                      localStyles.bubbleText,
-                      message.isMe ? localStyles.bubbleTextMe : localStyles.bubbleTextOther,
-                      isDeletedMessage(message) && localStyles.deletedMessageText,
-                    ]}
-                  >
-                    {message.body}
-                  </Text>
-                ) : null}
-                {message.isMe && message.status === "sending" ? (
-                  <Text style={localStyles.messageStatusText}>Sending…</Text>
-                ) : null}
-
-                {message.isMe && message.status === "failed" ? (
-                  <TouchableOpacity
-                    onPress={() => onRetryThreadMessage?.(thread.id, message)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={[localStyles.messageStatusText, localStyles.messageStatusFailed]}>
-                      Failed — tap to retry
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-
-                {message.isMe && getSeenStatusText(message) ? (
-                  <Text style={localStyles.messageStatusText}>
-                    {getSeenStatusText(message)}
-                  </Text>
-                ) : null}
-
-                {message.reactions?.length ? (
-                  <View style={localStyles.reactionSummaryRow}>
-                    {message.reactions.map((reaction) => (
-                      <TouchableOpacity
-                        key={reaction.emoji}
-                        style={[
-                          localStyles.reactionSummaryChip,
-                          reaction.reacted_by_me && localStyles.reactionSummaryChipActive,
-                        ]}
-                        onPress={() => onReact?.(message.id, reaction.emoji)}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={localStyles.reactionSummaryText}>
-                          {reaction.emoji}{reaction.count > 1 ? ` ${reaction.count}` : ""}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
-
-                {reactionPickerMessageId === message.id ? (
-                  <View
-                    style={[
-                      localStyles.iMessageReactionPicker,
-                      message.isMe
-                        ? localStyles.iMessageReactionPickerMe
-                        : localStyles.iMessageReactionPickerOther,
-                    ]}
-                  >
-                    {quickReactions.map((emoji) => (
-                      <TouchableOpacity
-                        key={emoji}
-                        style={localStyles.iMessageReactionButton}
-                        onPress={() => {
-                          onReact?.(message.id, emoji);
-                          setReactionPickerMessageId(null);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={localStyles.iMessageReactionText}>{emoji}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-
-              {isLastInGroup ? (
-                <Text style={localStyles.messageTime}>{message.time}</Text>
-              ) : null}
-              </View>
-            </View>
-            );
-          })}
-        </ScrollView>
+          initialNumToRender={24}
+          maxToRenderPerBatch={16}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS !== "ios"}
+        />
 
         {pendingImage ? (
           <View style={localStyles.pendingImagePanel}>

@@ -660,13 +660,18 @@ export default function App() {
   useEffect(() => {
     if (!selectedThreadId || !usingApi || !currentUser?.id) return undefined;
 
-    refreshOpenThreadMessages(selectedThreadId);
+    const initialRefresh = setTimeout(() => {
+      refreshOpenThreadMessages(selectedThreadId);
+    }, 250);
 
     const interval = setInterval(() => {
       refreshOpenThreadMessages(selectedThreadId);
     }, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialRefresh);
+      clearInterval(interval);
+    };
   }, [selectedThreadId, usingApi, currentUser?.id]);
 
   useEffect(() => {
@@ -763,9 +768,9 @@ export default function App() {
         })
       );
 
-      await refreshOpenThreadMessages(selectedThreadId);
     } catch (error) {
       console.log("Could not update reaction:", error.message);
+      await refreshOpenThreadMessages(selectedThreadId);
     }
   }
 
