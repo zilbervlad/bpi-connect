@@ -1372,17 +1372,65 @@ export default function App() {
   }
 
   async function sendThreadImageMessage(threadId, imageData, body = "", metadata = {}) {
+    const cleanBody = String(body || "").trim();
+    const previewUri = metadata.previewUri || metadata.uri || imageData;
+
     if (usingApi && currentUser?.apiUser) {
+      const pendingId = `pending-image-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const pendingMessage = {
+        id: pendingId,
+        sender: currentUser.name,
+        senderUser: currentUser,
+        senderRole: currentUser.role,
+        body: cleanBody || "Photo",
+        text: cleanBody || "Photo",
+        time: "Now",
+        isMe: true,
+        requiresAck: false,
+        responded: false,
+        acknowledged: false,
+        reactions: [],
+        attachments: [
+          {
+            id: `${pendingId}-attachment`,
+            file_type: "image",
+            url: previewUri,
+            localUri: previewUri,
+          },
+        ],
+        status: "sending",
+        retryImageData: imageData,
+        retryBody: cleanBody,
+        retryMetadata: metadata,
+      };
+
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) => {
+          if (thread.id !== threadId) return thread;
+
+          return {
+            ...thread,
+            messages: [...(thread.messages || []), pendingMessage],
+            lastMessage: cleanBody || "Photo",
+            lastTime: "Now",
+          };
+        })
+      );
+
       try {
         const apiMessageResponse = await sendApiThreadImageMessage(
           threadId,
           currentUser.id,
           imageData,
-          body,
+          cleanBody,
           metadata
         );
 
-        const bubbleMessage = mapApiThreadMessageToBubble(apiMessageResponse);
+        const bubbleMessage = {
+          ...mapApiThreadMessageToBubble(apiMessageResponse),
+          status: "sent",
+        };
 
         if (!bubbleMessage.body && !bubbleMessage.attachments?.length) {
           await refreshOpenThreadMessages(threadId);
@@ -1394,14 +1442,18 @@ export default function App() {
             if (thread.id !== threadId) return thread;
 
             const existingMessages = thread.messages || [];
-            const alreadyExists = existingMessages.some(
+            const withoutPending = existingMessages.filter(
+              (message) => String(message.id) !== String(pendingId)
+            );
+
+            const alreadyExists = withoutPending.some(
               (message) => String(message.id) === String(bubbleMessage.id)
             );
 
             return {
               ...thread,
-              messages: alreadyExists ? existingMessages : [...existingMessages, bubbleMessage],
-              lastMessage: body || "Photo",
+              messages: alreadyExists ? withoutPending : [...withoutPending, bubbleMessage],
+              lastMessage: cleanBody || "Photo",
               lastTime: "Now",
             };
           })
@@ -1410,6 +1462,27 @@ export default function App() {
         return;
       } catch (error) {
         console.log("Could not send API image message:", error.message);
+
+        setThreads((currentThreads) =>
+          currentThreads.map((thread) => {
+            if (thread.id !== threadId) return thread;
+
+            return {
+              ...thread,
+              messages: (thread.messages || []).map((message) =>
+                String(message.id) === String(pendingId)
+                  ? {
+                      ...message,
+                      status: "failed",
+                      failed: true,
+                      errorMessage: error.message || "Could not send photo",
+                    }
+                  : message
+              ),
+            };
+          })
+        );
+
         throw error;
       }
     }

@@ -228,19 +228,23 @@ export function ThreadScreen({
   async function handleSendPendingImage() {
     if (!pendingImage) return;
 
+    const imageToSend = pendingImage;
+    const captionToSend = pendingImageCaption.trim();
+
+    setPendingImage(null);
+    setPendingImageCaption("");
+
     try {
       await onSendThreadImageMessage?.(
         thread.id,
-        pendingImage.imageData,
-        pendingImageCaption.trim(),
+        imageToSend.imageData,
+        captionToSend,
         {
-          mimeType: pendingImage.mimeType,
-          fileName: pendingImage.fileName,
+          mimeType: imageToSend.mimeType,
+          fileName: imageToSend.fileName,
+          previewUri: imageToSend.uri,
         }
       );
-
-      setPendingImage(null);
-      setPendingImageCaption("");
     } catch (error) {
       alert(error.message || "Could not send picture.");
     }
@@ -281,7 +285,11 @@ export function ThreadScreen({
           onLayout={() => scrollToLatest(false)}
           keyboardShouldPersistTaps="handled"
         >
-          {thread.messages.map((message, index) => (
+          {thread.messages.map((message, index) => {
+            const isLastInGroup = isLastMessageInGroup(thread.messages, message, index);
+            const groupedBubbleStyle = getBubbleGroupStyle(thread.messages, message, index);
+
+            return (
             <View key={message.id}>
               {shouldShowDateDivider(thread.messages, message, index) ? (
                 <View style={localStyles.dateDivider}>
@@ -313,6 +321,7 @@ export function ThreadScreen({
                 style={[
                   localStyles.bubble,
                   message.isMe ? localStyles.bubbleMe : localStyles.bubbleOther,
+                  groupedBubbleStyle,
                 ]}
                 activeOpacity={0.9}
                 onLongPress={() => {
@@ -418,10 +427,13 @@ export function ThreadScreen({
                 ) : null}
               </TouchableOpacity>
 
-              <Text style={localStyles.messageTime}>{message.time}</Text>
+              {isLastInGroup ? (
+                <Text style={localStyles.messageTime}>{message.time}</Text>
+              ) : null}
               </View>
             </View>
-          ))}
+            );
+          })}
         </ScrollView>
 
         {pendingImage ? (
@@ -548,8 +560,55 @@ function shouldShowSenderName(messages, message, index) {
 
   return (
     previousMessage.sender !== message.sender ||
-    previousMessage.isMe !== message.isMe
+    previousMessage.isMe !== message.isMe ||
+    shouldShowDateDivider(messages, message, index)
   );
+}
+
+function isLastMessageInGroup(messages, message, index) {
+  const nextMessage = messages[index + 1];
+
+  if (!nextMessage) return true;
+
+  if (shouldShowDateDivider(messages, nextMessage, index + 1)) {
+    return true;
+  }
+
+  return (
+    nextMessage.sender !== message.sender ||
+    nextMessage.isMe !== message.isMe
+  );
+}
+
+function getBubbleGroupStyle(messages, message, index) {
+  const previousMessage = messages[index - 1];
+  const nextMessage = messages[index + 1];
+
+  const continuesFromPrevious =
+    previousMessage &&
+    previousMessage.sender === message.sender &&
+    previousMessage.isMe === message.isMe &&
+    !shouldShowDateDivider(messages, message, index);
+
+  const continuesToNext =
+    nextMessage &&
+    nextMessage.sender === message.sender &&
+    nextMessage.isMe === message.isMe &&
+    !shouldShowDateDivider(messages, nextMessage, index + 1);
+
+  if (!continuesFromPrevious && !continuesToNext) return null;
+
+  if (message.isMe) {
+    if (continuesFromPrevious && continuesToNext) return localStyles.bubbleMeMiddle;
+    if (continuesFromPrevious) return localStyles.bubbleMeLast;
+    if (continuesToNext) return localStyles.bubbleMeFirst;
+  }
+
+  if (continuesFromPrevious && continuesToNext) return localStyles.bubbleOtherMiddle;
+  if (continuesFromPrevious) return localStyles.bubbleOtherLast;
+  if (continuesToNext) return localStyles.bubbleOtherFirst;
+
+  return null;
 }
 
 function formatSenderLabel(message) {
@@ -763,6 +822,28 @@ const localStyles = StyleSheet.create({
     borderBottomLeftRadius: 6,
     borderWidth: 1,
     borderColor: "#edf0f5",
+  },
+  bubbleMeFirst: {
+    borderBottomRightRadius: 14,
+  },
+  bubbleMeMiddle: {
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  bubbleMeLast: {
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 6,
+  },
+  bubbleOtherFirst: {
+    borderBottomLeftRadius: 14,
+  },
+  bubbleOtherMiddle: {
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
+  },
+  bubbleOtherLast: {
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 6,
   },
   messageImage: {
     width: 230,
