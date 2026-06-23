@@ -180,9 +180,21 @@ export function ThreadScreen({
   }, []);
 
   function handleSend() {
-    if (!draft.trim()) return;
-    onSendThreadMessage(thread.id, draft.trim());
+    const messageToSend = draft.trim();
+    if (!messageToSend) return;
+
     setDraft("");
+    setIsNearBottom(true);
+    setHasNewMessages(false);
+
+    scrollToLatest(true);
+
+    requestAnimationFrame(() => {
+      onSendThreadMessage?.(thread.id, messageToSend);
+
+      setTimeout(() => scrollToLatest(true), 40);
+      setTimeout(() => scrollToLatest(true), 160);
+    });
   }
 
   async function handlePickImage() {

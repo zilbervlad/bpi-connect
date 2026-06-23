@@ -1614,18 +1614,24 @@ export default function App() {
         retryBody: cleanBody,
       };
 
-      setThreads((currentThreads) =>
-        currentThreads.map((thread) => {
-          if (thread.id !== threadId) return thread;
+      setThreads((currentThreads) => {
+        let updatedThread = null;
 
-          return {
+        const otherThreads = currentThreads.filter((thread) => {
+          if (String(thread.id) !== String(threadId)) return true;
+
+          updatedThread = {
             ...thread,
             messages: [...(thread.messages || []), pendingMessage],
             lastMessage: cleanBody,
             lastTime: "Now",
           };
-        })
-      );
+
+          return false;
+        });
+
+        return updatedThread ? [updatedThread, ...otherThreads] : currentThreads;
+      });
 
       try {
         const apiMessageResponse = await sendApiThreadMessage(
@@ -1645,9 +1651,11 @@ export default function App() {
           return;
         }
 
-        setThreads((currentThreads) =>
-          currentThreads.map((thread) => {
-            if (thread.id !== threadId) return thread;
+        setThreads((currentThreads) => {
+          let updatedThread = null;
+
+          const otherThreads = currentThreads.filter((thread) => {
+            if (String(thread.id) !== String(threadId)) return true;
 
             const existingMessages = thread.messages || [];
             const withoutPending = existingMessages.filter(
@@ -1658,14 +1666,18 @@ export default function App() {
               (message) => String(message.id) === String(bubbleMessage.id)
             );
 
-            return {
+            updatedThread = {
               ...thread,
               messages: alreadyExists ? withoutPending : [...withoutPending, bubbleMessage],
               lastMessage: cleanBody,
               lastTime: "Now",
             };
-          })
-        );
+
+            return false;
+          });
+
+          return updatedThread ? [updatedThread, ...otherThreads] : currentThreads;
+        });
 
         return;
       } catch (error) {
