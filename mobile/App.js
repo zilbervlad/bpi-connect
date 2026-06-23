@@ -222,6 +222,48 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
 }
 
 const SAVED_USER_KEY = "bpi_connect_saved_user";
+
+const THREAD_CACHE_KEY_PREFIX = "bpi-connect:threads:";
+
+function getThreadCacheKey(userId) {
+  return `${THREAD_CACHE_KEY_PREFIX}${userId}`;
+}
+
+function prepareThreadsForCache(threads) {
+  return (threads || []).map((thread) => ({
+    ...thread,
+    messages: (thread.messages || []).slice(-80),
+  }));
+}
+
+async function loadCachedThreadsForUser(userId) {
+  if (!userId) return [];
+
+  try {
+    const cachedJson = await AsyncStorage.getItem(getThreadCacheKey(userId));
+    if (!cachedJson) return [];
+
+    const cachedThreads = JSON.parse(cachedJson);
+    return Array.isArray(cachedThreads) ? cachedThreads : [];
+  } catch (error) {
+    console.log("Could not load cached threads:", error.message);
+    return [];
+  }
+}
+
+async function saveCachedThreadsForUser(userId, threads) {
+  if (!userId) return;
+
+  try {
+    await AsyncStorage.setItem(
+      getThreadCacheKey(userId),
+      JSON.stringify(prepareThreadsForCache(threads))
+    );
+  } catch (error) {
+    console.log("Could not save cached threads:", error.message);
+  }
+}
+
 const REALTIME_URL = "https://bpi-connect.onrender.com";
 
 export default function App() {
@@ -420,6 +462,18 @@ export default function App() {
   }, [selectedThreadId]);
 
   useEffect(() => {
+    if (!isLoggedIn || !currentUser?.id || !currentUser?.apiUser || !threads.length) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      saveCachedThreadsForUser(currentUser.id, threads);
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [isLoggedIn, currentUser?.id, currentUser?.apiUser, threads]);
+
+  useEffect(() => {
     if (!isLoggedIn || !currentUser?.id || !currentUser?.apiUser) {
       return undefined;
     }
@@ -471,6 +525,10 @@ export default function App() {
 
           if (!savedUser?.id) {
             await AsyncStorage.removeItem(SAVED_USER_KEY);
+      if (currentUser?.id) {
+        await AsyncStorage.removeItem(getThreadCacheKey(currentUser.id));
+      }
+    await AsyncStorage.removeItem(getThreadCacheKey(currentUser.id));
             return;
           }
 
@@ -482,8 +540,8 @@ export default function App() {
           setCurrentUser(restoredUser);
           setIsLoggedIn(true);
           setActiveTab("Home");
-          await reloadDataForUser(restoredUser);
-          await registerPushTokenForUser(restoredUser);
+          loadCachedThreadsThenRefresh(restoredUser);
+          registerPushTokenForUser(restoredUser);
         }
       } catch (error) {
         console.log("Could not load saved user:", error.message);
@@ -645,8 +703,8 @@ export default function App() {
 
       await AsyncStorage.setItem(SAVED_USER_KEY, JSON.stringify(savedUser));
 
-      await reloadDataForUser(savedUser);
-      await registerPushTokenForUser(savedUser);
+      loadCachedThreadsThenRefresh(savedUser);
+      registerPushTokenForUser(savedUser);
     } catch (error) {
       setLoginError(error.message || "Could not sign in.");
     } finally {
@@ -788,6 +846,17 @@ export default function App() {
     }
   }
 
+  async function loadCachedThreadsThenRefresh(user) {
+    if (!user?.id) return;
+
+    const cachedThreads = await loadCachedThreadsForUser(user.id);
+    if (cachedThreads.length) {
+      setThreads(cachedThreads);
+    }
+
+    reloadDataForUser(user);
+  }
+
   async function reloadDataForUser(user) {
     if (!user?.id) return;
 
@@ -795,10 +864,26 @@ export default function App() {
       const loadedUsers = await fetchApiUsers();
       const loadedMessages = await fetchApiMessages(user.id);
       const loadedThreads = await fetchApiThreads(user.id);
+      const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
 
       setApiUsers(loadedUsers.map(mapApiUserToDemoUser));
       setMessages(loadedMessages.map(mapApiMessageToAppMessage));
-      setThreads(loadedThreads.map(mapApiThreadToAppThread));
+      setThreads((currentThreads) => {
+        const nextThreads = mappedThreads.map((freshThread) => {
+          const existingThread = currentThreads.find(
+            (item) => String(item.id) === String(freshThread.id)
+          );
+
+          return {
+            ...freshThread,
+            messages: existingThread?.messages || freshThread.messages || [],
+            unreadAtOpen: existingThread?.unreadAtOpen || 0,
+          };
+        });
+
+        saveCachedThreadsForUser(user.id, nextThreads);
+        return nextThreads;
+      });
       setUsingApi(true);
     } catch (error) {
       console.log("Could not reload user data:", error.message);
@@ -1003,8 +1088,10 @@ export default function App() {
         ];
       }
 
-      return currentThreads.map((thread) => {
-        if (Number(thread.id) !== Number(threadId)) return thread;
+      let updatedThread = null;
+
+      const otherThreads = currentThreads.filter((thread) => {
+        if (Number(thread.id) !== Number(threadId)) return true;
 
         const existingMessages = thread.messages || [];
         const alreadyExists = existingMessages.some(
@@ -1033,7 +1120,7 @@ export default function App() {
               ? [...withoutMatchingPending, { ...incomingMessage, status: "sent" }]
               : withoutMatchingPending;
 
-        return {
+        updatedThread = {
           ...thread,
           ...(incomingThread || {}),
           messages: nextMessages,
@@ -1041,7 +1128,11 @@ export default function App() {
           lastTime: incomingMessage.time || incomingThread?.lastTime || "Now",
           unread: isOpenThread || incomingMessage.isMe ? 0 : (thread.unread || 0) + 1,
         };
+
+        return false;
       });
+
+      return updatedThread ? [updatedThread, ...otherThreads] : currentThreads;
     });
 
     if (isOpenThread && !incomingMessage.isMe && usingApi && currentUser?.id) {
@@ -1061,8 +1152,8 @@ export default function App() {
       const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
       const openThreadId = selectedThreadIdRef.current;
 
-      setThreads((currentThreads) =>
-        mappedThreads.map((freshThread) => {
+      setThreads((currentThreads) => {
+        const nextThreads = mappedThreads.map((freshThread) => {
           const existingThread = currentThreads.find(
             (item) => String(item.id) === String(freshThread.id)
           );
@@ -1076,8 +1167,11 @@ export default function App() {
             unreadAtOpen: existingThread?.unreadAtOpen || 0,
             unread: isOpenThread || wasLocallyRead ? 0 : freshThread.unread || 0,
           };
-        })
-      );
+        });
+
+        saveCachedThreadsForUser(currentUser.id, nextThreads);
+        return nextThreads;
+      });
     } catch (error) {
       console.log("Could not refresh thread list:", error.message);
     }
