@@ -1894,6 +1894,7 @@ export default function App() {
     return (
       <ThreadScreen
         thread={selectedThread}
+        user={currentUser}
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
