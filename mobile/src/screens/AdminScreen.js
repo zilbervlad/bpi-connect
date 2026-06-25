@@ -73,6 +73,8 @@ export function AdminScreen({ user, onUsersChanged }) {
   const [inviteStoreNumber, setInviteStoreNumber] = useState("");
   const [inviteArea, setInviteArea] = useState("");
   const [detailStoreNumber, setDetailStoreNumber] = useState("");
+  const [detailEmail, setDetailEmail] = useState("");
+  const [detailPhoneNumber, setDetailPhoneNumber] = useState("");
   const [createdInvite, setCreatedInvite] = useState(null);
   const [resentInvite, setResentInvite] = useState(null);
   const [passwordResetResult, setPasswordResetResult] = useState(null);
@@ -171,11 +173,54 @@ export function AdminScreen({ user, onUsersChanged }) {
       const detail = await fetchApiUserDetail(userId);
       setSelectedUser(detail);
       setDetailStoreNumber(detail.store || detail.store_number || "");
+      setDetailEmail(detail.email || "");
+      setDetailPhoneNumber(detail.phone_number || detail.phoneNumber || "");
       setResentInvite(null);
       setPasswordResetResult(null);
       setActiveSection("detail");
     } catch (error) {
       setErrorMessage(error.message || "Could not load user.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleUpdateUserContact() {
+    if (!selectedUser?.id) return;
+
+    setErrorMessage("");
+    setStatusMessage("");
+
+    const email = detailEmail.trim().toLowerCase();
+    const phoneNumber = detailPhoneNumber.trim();
+
+    if (!email) {
+      setErrorMessage("Email is required.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const updated = await updateApiUser(selectedUser.id, {
+        email,
+        phone_number: phoneNumber,
+        actor_user_id: user.id,
+      });
+
+      setSelectedUser(updated);
+      setDetailEmail(updated.email || "");
+      setDetailPhoneNumber(updated.phone_number || updated.phoneNumber || "");
+      setUsers((currentUsers) =>
+        currentUsers.map((item) =>
+          Number(item.id) === Number(updated.id) ? { ...item, ...updated } : item
+        )
+      );
+
+      setStatusMessage("Contact info updated.");
+      await onUsersChanged?.();
+    } catch (error) {
+      setErrorMessage(error.message || "Could not update contact info.");
     } finally {
       setIsLoading(false);
     }
@@ -960,8 +1005,46 @@ export function AdminScreen({ user, onUsersChanged }) {
             <View style={localStyles.detailMain}>
               <Text style={localStyles.detailName}>{selectedUser.name}</Text>
               <Text style={localStyles.detailMeta}>{selectedUser.email}</Text>
+              <Text style={localStyles.detailMeta}>
+                {selectedUser.phone_number || selectedUser.phoneNumber || "No phone number on file"}
+              </Text>
               <Text style={localStyles.detailMeta}>{formatRole(selectedUser.role)} · {selectedUser.area || "Company"}</Text>
             </View>
+          </View>
+
+          <View style={localStyles.detailSection}>
+            <Text style={localStyles.sectionMiniTitle}>Contact Info</Text>
+
+            <Text style={localStyles.label}>Email</Text>
+            <TextInput
+              value={detailEmail}
+              onChangeText={setDetailEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Email"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+            />
+
+            <Text style={localStyles.label}>Phone</Text>
+            <TextInput
+              value={detailPhoneNumber}
+              onChangeText={setDetailPhoneNumber}
+              keyboardType="phone-pad"
+              placeholder="Phone number"
+              placeholderTextColor="#7b8da0"
+              style={localStyles.input}
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && localStyles.disabledButton]}
+              onPress={handleUpdateUserContact}
+              disabled={isLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isLoading ? "Saving..." : "Save Contact Info"}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={localStyles.label}>Role</Text>
