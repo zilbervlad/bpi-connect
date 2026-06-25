@@ -4985,6 +4985,31 @@ def serialize_thread_message(message, user_id=None):
         seen_by_count = 0
         delivered_to_count = 0
 
+    seen_by_users = []
+    delivered_to_users = []
+
+    try:
+        memberships = (
+            ThreadMember.query
+            .filter(ThreadMember.thread_id == message.thread_id)
+            .filter(ThreadMember.user_id != message.sender_user_id)
+            .all()
+        )
+
+        for membership in memberships:
+            if not membership.user:
+                continue
+
+            user_data = serialize_user(membership.user)
+
+            if membership.last_read_at and message.created_at and membership.last_read_at >= message.created_at:
+                seen_by_users.append(user_data)
+            else:
+                delivered_to_users.append(user_data)
+    except Exception:
+        seen_by_users = []
+        delivered_to_users = []
+
     return {
         "id": message.id,
         "thread_id": message.thread_id,
@@ -4995,8 +5020,10 @@ def serialize_thread_message(message, user_id=None):
         "created_at": iso_utc(message.created_at),
         "is_me": message.sender_user_id == user_id if user_id else False,
         "seen_by_count": seen_by_count,
+        "seen_by": seen_by_users,
         "seen_count": seen_by_count,
         "delivered_to_count": delivered_to_count,
+        "delivered_to": delivered_to_users,
         "reactions": serialize_message_reactions(message, user_id),
         "attachments": [serialize_thread_message_attachment(item) for item in message.attachments],
     }

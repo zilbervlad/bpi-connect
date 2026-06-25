@@ -72,6 +72,57 @@ export function ThreadScreen({
     return ["admin", "hr"].includes(currentUserRole);
   }
 
+  function formatSeenUserList(users = []) {
+    if (!users.length) return "No one has seen this yet.";
+
+    return users
+      .map((item) => {
+        const role = formatSenderRole(item.role);
+        const name = String(item.name || "Unknown").trim();
+        return role ? `${name} · ${role}` : name;
+      })
+      .join("\n");
+  }
+
+  function showSeenBy(message) {
+    const seenUsers = message.seenByUsers || [];
+    const deliveredUsers = message.deliveredToUsers || [];
+
+    const sections = [];
+
+    sections.push(`Seen by (${seenUsers.length})`);
+    sections.push(formatSeenUserList(seenUsers));
+
+    if (deliveredUsers.length) {
+      sections.push("");
+      sections.push(`Delivered to (${deliveredUsers.length})`);
+      sections.push(formatSeenUserList(deliveredUsers));
+    }
+
+    Alert.alert("Message Status", sections.join("\n"));
+  }
+
+  function showMessageOptions(message) {
+    const options = [
+      {
+        text: "View Seen By",
+        onPress: () => showSeenBy(message),
+      },
+    ];
+
+    if (canDeleteMessage(message)) {
+      options.push({
+        text: "Delete Message",
+        style: "destructive",
+        onPress: () => confirmDeleteMessage(message),
+      });
+    }
+
+    options.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Message Options", "What do you want to do?", options);
+  }
+
   function confirmDeleteMessage(message) {
     Alert.alert(
       "Delete Message?",
@@ -308,19 +359,8 @@ export function ThreadScreen({
               groupedBubbleStyle,
             ]}
             activeOpacity={0.9}
-            onLongPress={() => {
-              if (canDeleteMessage(message)) {
-                confirmDeleteMessage(message);
-                return;
-              }
-
-              setReactionPickerMessageId(message.id);
-            }}
-            onPress={() =>
-              setReactionPickerMessageId(
-                reactionPickerMessageId === message.id ? null : message.id
-              )
-            }
+            onLongPress={() => showMessageOptions(message)}
+            onPress={() => showMessageOptions(message)}
           >
             {message.attachments?.map((attachment) =>
               attachment.file_type === "image" ? (

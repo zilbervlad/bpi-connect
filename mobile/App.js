@@ -220,6 +220,8 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     acknowledged: Boolean(apiMessage.acknowledged),
     seenByCount: Number(apiMessage.seen_by_count || apiMessage.seen_count || 0),
     deliveredToCount: Number(apiMessage.delivered_to_count || 0),
+    seenByUsers: apiMessage.seen_by || apiMessage.seenBy || [],
+    deliveredToUsers: apiMessage.delivered_to || apiMessage.deliveredTo || [],
     reactions: apiMessage.reactions || [],
     attachments: apiMessage.attachments || [],
     status: "sent",
