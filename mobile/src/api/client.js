@@ -334,6 +334,41 @@ export async function deleteApiThreadForUser(threadId, userId) {
 }
 
 
+export async function deleteApiThreadForEveryone(threadId, actorUserId) {
+  return apiRequest(`/api/threads/${threadId}`, {
+    method: "DELETE",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
+  });
+}
+
+
+export async function addApiThreadMember(threadId, userId, actorUserId, memberRole = "member") {
+  const data = await apiRequest(`/api/threads/${threadId}/members`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      actor_user_id: actorUserId,
+      member_role: memberRole,
+    }),
+  });
+
+  return data.thread;
+}
+
+export async function removeApiThreadMember(threadId, userId, actorUserId) {
+  const data = await apiRequest(`/api/threads/${threadId}/members/${userId}`, {
+    method: "DELETE",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
+  });
+
+  return data.thread;
+}
+
+
 export async function setApiThreadMuted(threadId, userId, muted) {
   const data = await apiRequest(`/api/threads/${threadId}/mute`, {
     method: "POST",

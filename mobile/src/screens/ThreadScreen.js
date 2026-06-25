@@ -52,11 +52,13 @@ export function ThreadScreen({
   onRefreshThread,
   onReact,
   onAcknowledge,
+  onManageThread,
 }) {
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageCaption, setPendingImageCaption] = useState("");
   const currentUserRole = String(user?.role || "").toLowerCase();
+  const canManageThread = ["admin", "hr", "coach"].includes(currentUserRole) && thread.type !== "direct";
 
   function isDeletedMessage(message) {
     return Boolean(message?.deleted) || String(message?.body || "") === "This message was deleted";
@@ -437,6 +439,16 @@ export function ThreadScreen({
             <Text style={localStyles.headerName}>{thread.name}</Text>
             <Text style={localStyles.headerSub}>{thread.subtitle}</Text>
           </View>
+
+          {canManageThread ? (
+            <TouchableOpacity
+              style={localStyles.manageButton}
+              onPress={() => onManageThread?.(thread.id)}
+              activeOpacity={0.85}
+            >
+              <Text style={localStyles.manageButtonText}>Manage</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <FlatList
@@ -711,6 +723,19 @@ const localStyles = StyleSheet.create({
     fontSize: 38,
     lineHeight: 40,
     fontWeight: "300",
+  },
+  manageButton: {
+    backgroundColor: "#eef6ff",
+    borderWidth: 1,
+    borderColor: "#cfe4ff",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  manageButtonText: {
+    color: "#0a84ff",
+    fontSize: 12,
+    fontWeight: "900",
   },
   headerAvatar: {
     width: 42,

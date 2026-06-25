@@ -4407,6 +4407,65 @@ def create_app():
         })
 
 
+    @app.delete("/api/threads/<int:thread_id>")
+    def delete_thread_everyone(thread_id):
+        data = request.get_json(silent=True) or {}
+        actor, actor_error = require_admin_actor(data)
+        if actor_error:
+            return actor_error
+
+        thread = Thread.query.get(thread_id)
+        if not thread:
+            return jsonify({"success": False, "error": "Thread not found."}), 404
+
+        if thread.thread_type == "direct":
+            return jsonify({
+                "success": False,
+                "error": "Direct message threads can only be removed per user.",
+            }), 400
+
+        message_ids = [
+            row.id
+            for row in ThreadMessage.query
+            .with_entities(ThreadMessage.id)
+            .filter_by(thread_id=thread.id)
+            .all()
+        ]
+
+        if message_ids:
+            ThreadMessageReaction.query.filter(
+                ThreadMessageReaction.message_id.in_(message_ids)
+            ).delete(synchronize_session=False)
+
+            ThreadMessageAck.query.filter(
+                ThreadMessageAck.message_id.in_(message_ids)
+            ).delete(synchronize_session=False)
+
+            ThreadMessageAttachment.query.filter(
+                ThreadMessageAttachment.message_id.in_(message_ids)
+            ).delete(synchronize_session=False)
+
+            ThreadMessage.query.filter_by(
+                thread_id=thread.id
+            ).delete(synchronize_session=False)
+
+        ThreadFavorite.query.filter_by(
+            thread_id=thread.id
+        ).delete(synchronize_session=False)
+
+        ThreadMember.query.filter_by(
+            thread_id=thread.id
+        ).delete(synchronize_session=False)
+
+        db.session.delete(thread)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "deleted_thread_id": thread_id,
+        })
+
+
     @app.post("/api/threads/<int:thread_id>/delete")
     def delete_thread_for_user(thread_id):
         ensure_thread_hidden_at_column()

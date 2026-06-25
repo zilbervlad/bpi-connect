@@ -26,6 +26,10 @@ import {
   setApiThreadMuted,
   setApiThreadFavorite,
   deleteApiThreadForUser,
+  deleteApiThreadForEveryone,
+  updateApiThread,
+  addApiThreadMember,
+  removeApiThreadMember,
   deleteApiThreadMessage,
   deleteApiAccount,
 } from "./src/api/client";
@@ -43,6 +47,7 @@ import { ThreadScreen } from "./src/screens/ThreadScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { AdminScreen } from "./src/screens/AdminScreen";
 import { MoreScreen } from "./src/screens/MoreScreen";
+import { GroupManageScreen } from "./src/screens/GroupManageScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -438,6 +443,7 @@ export default function App() {
   const [threads, setThreads] = useState([]);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
   const [selectedThreadId, setSelectedThreadId] = useState(null);
+  const [selectedManageThreadId, setSelectedManageThreadId] = useState(null);
   const [startingRecipient, setStartingRecipient] = useState(null);
   const [apiUsers, setApiUsers] = useState([]);
   const [usingApi, setUsingApi] = useState(false);
@@ -451,6 +457,7 @@ export default function App() {
 
   const selectedMessage = messages.find((message) => message.id === selectedMessageId);
   const selectedThread = threads.find((thread) => thread.id === selectedThreadId);
+  const selectedManageThread = threads.find((thread) => String(thread.id) === String(selectedManageThreadId));
 
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
   const ackCount = messages.filter(
@@ -575,6 +582,7 @@ export default function App() {
     setApiUsers([]);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
+    setSelectedManageThreadId(null);
     setStartingRecipient(null);
     setUsingApi(false);
     setActiveTab("Home");
@@ -829,6 +837,7 @@ export default function App() {
     setCurrentUser(null);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
+    setSelectedManageThreadId(null);
     setStartingRecipient(null);
     setActiveTab("Home");
   }
@@ -1776,7 +1785,65 @@ export default function App() {
     setActiveTab(nextTab);
     setSelectedMessageId(null);
     setSelectedThreadId(null);
+    setSelectedManageThreadId(null);
     setStartingRecipient(null);
+  }
+
+
+  function mergeUpdatedThread(apiThread) {
+    const mappedThread = mapApiThreadToAppThread(apiThread);
+
+    setThreads((currentThreads) =>
+      currentThreads.map((item) =>
+        String(item.id) === String(mappedThread.id)
+          ? {
+              ...item,
+              ...mappedThread,
+              messages: item.messages || mappedThread.messages || [],
+            }
+          : item
+      )
+    );
+
+    return mappedThread;
+  }
+
+  async function handleRenameManagedThread(threadId, nextName) {
+    const apiThread = await updateApiThread(threadId, { name: nextName }, currentUser.id);
+    mergeUpdatedThread(apiThread);
+
+    if (typeof refreshThreadList === "function") {
+      await refreshThreadList();
+    }
+  }
+
+  async function handleAddManagedThreadMember(threadId, userId) {
+    const apiThread = await addApiThreadMember(threadId, userId, currentUser.id);
+    mergeUpdatedThread(apiThread);
+
+    if (typeof refreshThreadList === "function") {
+      await refreshThreadList();
+    }
+  }
+
+  async function handleRemoveManagedThreadMember(threadId, userId) {
+    const apiThread = await removeApiThreadMember(threadId, userId, currentUser.id);
+    mergeUpdatedThread(apiThread);
+
+    if (typeof refreshThreadList === "function") {
+      await refreshThreadList();
+    }
+  }
+
+  async function handleDeleteManagedThread(threadId) {
+    await deleteApiThreadForEveryone(threadId, currentUser.id);
+
+    setThreads((currentThreads) =>
+      currentThreads.filter((thread) => String(thread.id) !== String(threadId))
+    );
+    setSelectedManageThreadId(null);
+    setSelectedThreadId(null);
+    setActiveTab("Chats");
   }
 
   const profileUsers = usingApi && apiUsers.length ? apiUsers : demoUsers;
@@ -1808,6 +1875,21 @@ export default function App() {
     );
   }
 
+  if (selectedManageThread) {
+    return (
+      <GroupManageScreen
+        thread={selectedManageThread}
+        user={currentUser}
+        users={profileUsers}
+        onBack={() => setSelectedManageThreadId(null)}
+        onRenameThread={handleRenameManagedThread}
+        onAddMember={handleAddManagedThreadMember}
+        onRemoveMember={handleRemoveManagedThreadMember}
+        onDeleteThread={handleDeleteManagedThread}
+      />
+    );
+  }
+
   if (selectedThread) {
     return (
       <ThreadScreen
@@ -1822,6 +1904,7 @@ export default function App() {
         onRefreshThread={refreshOpenThreadMessages}
         onReact={handleReactToThreadMessage}
         onAcknowledge={handleAcknowledgeThreadMessage}
+        onManageThread={() => setSelectedManageThreadId(selectedThread.id)}
       />
     );
   }
