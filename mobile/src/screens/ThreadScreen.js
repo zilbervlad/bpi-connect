@@ -360,7 +360,11 @@ export function ThreadScreen({
             ]}
             activeOpacity={0.9}
             onLongPress={() => showMessageOptions(message)}
-            onPress={() => showMessageOptions(message)}
+            onPress={() =>
+              setReactionPickerMessageId((currentId) =>
+                currentId === message.id ? null : message.id
+              )
+            }
           >
             {message.attachments?.map((attachment) =>
               attachment.file_type === "image" ? (
