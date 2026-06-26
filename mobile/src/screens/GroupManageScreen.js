@@ -99,7 +99,7 @@ export function GroupManageScreen({
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => onRemoveMember?.(thread.id, member.id),
+          onPress: () => onDeleteMember?.(thread.id, member.id),
         },
       ]
     );
