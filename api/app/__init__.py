@@ -40,6 +40,18 @@ socketio = SocketIO(
 )
 
 
+
+def ensure_thread_pinned_message_id_column():
+    inspector = inspect(db.engine)
+    columns = {column["name"] for column in inspector.get_columns("threads")}
+
+    if "pinned_message_id" not in columns:
+        with db.engine.begin() as connection:
+            connection.execute(db.text(
+                "ALTER TABLE threads ADD COLUMN pinned_message_id INTEGER"
+            ))
+
+
 def get_store_thread_key(store):
     return f"store:{store.store_number}"
 
@@ -399,6 +411,8 @@ def create_app():
 
     with app.app_context():
         ensure_user_phone_number_column()
+        ensure_thread_pinned_message_id_column()
+        ensure_thread_hidden_at_column()
 
 
     @app.post("/dev/remove-company-area-chat")
@@ -3502,6 +3516,25 @@ def create_app():
         if "thread_type" in data:
             thread.thread_type = (data.get("thread_type") or thread.thread_type).strip()
 
+        if "pinned_message_id" in data:
+            pinned_message_id = data.get("pinned_message_id")
+
+            if pinned_message_id in ("", None):
+                thread.pinned_message_id = None
+            else:
+                pinned_message = ThreadMessage.query.filter_by(
+                    id=pinned_message_id,
+                    thread_id=thread.id,
+                ).first()
+
+                if not pinned_message:
+                    return jsonify({
+                        "success": False,
+                        "error": "Pinned message was not found in this thread.",
+                    }), 404
+
+                thread.pinned_message_id = pinned_message.id
+
         db.session.commit()
 
         return jsonify({
@@ -4915,6 +4948,7 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
         "member_count": int(member_count or 0),
         "muted": bool(muted),
         "favorite": bool(favorite),
+        "pinned_message": None,
     }
 
 
@@ -4954,6 +4988,14 @@ def serialize_thread(thread, user_id=None):
                 db.session.rollback()
                 favorite = False
 
+    pinned_message = None
+
+    if getattr(thread, "pinned_message_id", None):
+        pinned_message = ThreadMessage.query.filter_by(
+            id=thread.pinned_message_id,
+            thread_id=thread.id,
+        ).first()
+
     return {
         "id": thread.id,
         "thread_type": thread.thread_type,
@@ -4966,6 +5008,24 @@ def serialize_thread(thread, user_id=None):
         "members": [serialize_user(member.user) for member in thread.members],
         "muted": membership.muted if membership else False,
         "favorite": favorite,
+        "pinned_message": serialize_pinned_thread_message(pinned_message) if pinned_message else None,
+    }
+
+
+def serialize_pinned_thread_message(message):
+    if not message:
+        return None
+
+    sender = message.sender
+
+    return {
+        "id": message.id,
+        "thread_id": message.thread_id,
+        "sender_user_id": message.sender_user_id,
+        "sender": sender.name if sender else "Unknown",
+        "sender_role": sender.role if sender else None,
+        "body": message.body,
+        "created_at": iso_utc(message.created_at) if message.created_at else None,
     }
 
 
@@ -5091,14 +5151,30 @@ def serialize_area(area):
     }
 
 def serialize_message_reactions(message, current_user_id=None):
+    try:
+        existing_tables = set(inspect(db.engine).get_table_names())
+
+        if getattr(ThreadMessageReaction, "__tablename__", None) not in existing_tables:
+            return []
+
+        reactions = (
+            ThreadMessageReaction.query
+            .filter_by(thread_message_id=message.id)
+            .all()
+        )
+    except Exception:
+        db.session.rollback()
+        return []
+
     counts = {}
     reacted_by_me = {}
 
-    for reaction in message.reactions:
-        counts[reaction.emoji] = counts.get(reaction.emoji, 0) + 1
+    for reaction in reactions:
+        emoji = reaction.emoji or "👍"
+        counts[emoji] = counts.get(emoji, 0) + 1
 
-        if current_user_id and int(reaction.user_id) == int(current_user_id):
-            reacted_by_me[reaction.emoji] = True
+        if current_user_id and str(reaction.user_id) == str(current_user_id):
+            reacted_by_me[emoji] = True
 
     return [
         {

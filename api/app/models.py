@@ -105,6 +105,7 @@ class Thread(db.Model):
     name = db.Column(db.String(160), nullable=False)
     group_key = db.Column(db.String(160), unique=True, nullable=False)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    pinned_message_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     created_by = db.relationship("User", backref="created_threads")
