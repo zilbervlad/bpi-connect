@@ -1070,16 +1070,23 @@ export default function App() {
   async function handleRealtimeThreadReadUpdated(payload) {
     if (!payload?.thread_id || !currentUser?.id) return;
 
+    // Read receipts should not reload messages.
+    // Reloading here creates a loop:
+    // mark read -> socket read update -> refresh messages -> mark read again.
     if (Number(payload.user_id) === Number(currentUser.id)) return;
 
     const threadId = payload.thread_id;
-    const isOpenThread = Number(selectedThreadIdRef.current) === Number(threadId);
 
-    if (isOpenThread) {
-      await refreshOpenThreadMessages(threadId);
-    } else {
-      await refreshThreadList();
-    }
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) => {
+        if (Number(thread.id) !== Number(threadId)) return thread;
+
+        return {
+          ...thread,
+          messages: thread.messages || [],
+        };
+      })
+    );
   }
 
   async function handleRealtimeThreadMessage(payload) {
