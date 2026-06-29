@@ -4091,6 +4091,8 @@ def create_app():
     @app.get("/api/threads/<int:thread_id>/messages")
     def list_thread_messages(thread_id):
         user_id = request.args.get("user_id", type=int)
+        limit = request.args.get("limit", 75, type=int) or 75
+        limit = max(1, min(limit, 100))
 
         thread = Thread.query.get(thread_id)
         if not thread:
@@ -4103,14 +4105,31 @@ def create_app():
         messages = (
             ThreadMessage.query
             .filter_by(thread_id=thread.id)
-            .order_by(ThreadMessage.created_at.asc())
+            .order_by(ThreadMessage.created_at.desc(), ThreadMessage.id.desc())
+            .limit(limit)
             .all()
         )
+        messages.reverse()
+
+        membership = ThreadMember.query.filter_by(thread_id=thread.id, user_id=user_id).first() if user_id else None
+        last_message = messages[-1] if messages else None
+
+        total_messages = ThreadMessage.query.filter_by(thread_id=thread.id).count()
 
         return jsonify({
             "success": True,
-            "thread": serialize_thread(thread, user_id=user_id),
-            "messages": [serialize_thread_message(message, user_id=user_id) for message in messages],
+            "thread": serialize_thread_light(
+                thread,
+                user_id=user_id,
+                last_message=last_message,
+                unread_count=0,
+                member_count=len(thread.members),
+                muted=membership.muted if membership else False,
+                favorite=False,
+            ),
+            "messages": [serialize_thread_message(message, user_id=user_id, include_receipts=False) for message in messages],
+            "limit": limit,
+            "has_more": total_messages > limit,
         })
 
     @app.post("/api/threads/<int:thread_id>/image-messages")
@@ -4631,7 +4650,9 @@ def create_app():
 
         return jsonify({
             "success": True,
-            "thread": serialize_thread(thread, user_id=user_id) if thread else None,
+            "thread_id": int(thread_id),
+            "user_id": int(user_id),
+            "last_read_at": iso_utc(membership.last_read_at),
         })
 
     @app.post("/api/thread-messages/<int:thread_message_id>/acknowledge")
@@ -5050,7 +5071,7 @@ def serialize_thread_message_attachment(attachment):
     }
 
 
-def serialize_thread_message(message, user_id=None):
+def serialize_thread_message(message, user_id=None, include_receipts=True):
     acknowledged = False
     seen_by_count = 0
     delivered_to_count = 0
@@ -5081,27 +5102,28 @@ def serialize_thread_message(message, user_id=None):
     seen_by_users = []
     delivered_to_users = []
 
-    try:
-        memberships = (
-            ThreadMember.query
-            .filter(ThreadMember.thread_id == message.thread_id)
-            .filter(ThreadMember.user_id != message.sender_user_id)
-            .all()
-        )
+    if include_receipts:
+        try:
+            memberships = (
+                ThreadMember.query
+                .filter(ThreadMember.thread_id == message.thread_id)
+                .filter(ThreadMember.user_id != message.sender_user_id)
+                .all()
+            )
 
-        for membership in memberships:
-            if not membership.user:
-                continue
+            for membership in memberships:
+                if not membership.user:
+                    continue
 
-            user_data = serialize_user(membership.user)
+                user_data = serialize_user(membership.user)
 
-            if membership.last_read_at and message.created_at and membership.last_read_at >= message.created_at:
-                seen_by_users.append(user_data)
-            else:
-                delivered_to_users.append(user_data)
-    except Exception:
-        seen_by_users = []
-        delivered_to_users = []
+                if membership.last_read_at and message.created_at and membership.last_read_at >= message.created_at:
+                    seen_by_users.append(user_data)
+                else:
+                    delivered_to_users.append(user_data)
+        except Exception:
+            seen_by_users = []
+            delivered_to_users = []
 
     return {
         "id": message.id,
