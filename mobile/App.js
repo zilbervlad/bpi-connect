@@ -154,6 +154,9 @@ function mapApiThreadToAppThread(apiThread) {
     unread: apiThread.unread || 0,
     muted: Boolean(apiThread.muted),
     favorite: Boolean(apiThread.favorite),
+    pinnedMessage: apiThread.pinned_message
+      ? mapApiThreadMessageToBubble(apiThread.pinned_message)
+      : null,
     members,
     memberNames: members.map((member) => member.name),
     messages: [],
@@ -1810,6 +1813,20 @@ export default function App() {
     return mappedThread;
   }
 
+  async function handlePinThreadMessage(threadId, messageId) {
+    const apiThread = await updateApiThread(
+      threadId,
+      { pinned_message_id: messageId || null },
+      currentUser.id
+    );
+
+    mergeUpdatedThread(apiThread);
+
+    if (typeof refreshThreadList === "function") {
+      await refreshThreadList();
+    }
+  }
+
   async function handleRenameManagedThread(threadId, nextName) {
     const apiThread = await updateApiThread(threadId, { name: nextName }, currentUser.id);
     mergeUpdatedThread(apiThread);
@@ -1902,6 +1919,7 @@ export default function App() {
         onSendThreadImageMessage={sendThreadImageMessage}
         onRetryThreadMessage={retryFailedThreadMessage}
             onDeleteThreadMessage={deleteThreadMessage}
+        onPinThreadMessage={handlePinThreadMessage}
         onTypingChange={sendTypingStatus}
         typingUsers={Object.values(typingByThread[String(selectedThread.id)] || {})}
         onRefreshThread={refreshOpenThreadMessages}

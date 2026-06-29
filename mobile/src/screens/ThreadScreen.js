@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActionSheetIOS,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
@@ -51,6 +52,7 @@ export function ThreadScreen({
   onSendThreadImageMessage,
   onRetryThreadMessage,
   onDeleteThreadMessage,
+  onPinThreadMessage,
   onRefreshThread,
   onReact,
   onAcknowledge,
@@ -72,6 +74,21 @@ export function ThreadScreen({
     if (message.isMe) return true;
 
     return ["admin", "hr"].includes(currentUserRole);
+  }
+
+  function canPinMessage(message) {
+    if (!canManageThread) return false;
+    if (!message?.id || String(message.id).startsWith("pending-")) return false;
+    if (isDeletedMessage(message)) return false;
+    return true;
+  }
+
+  function isPinnedMessage(message) {
+    return String(thread?.pinnedMessage?.id || thread?.pinned_message?.id || "") === String(message?.id || "");
+  }
+
+  function getPinnedMessage() {
+    return thread?.pinnedMessage || thread?.pinned_message || null;
   }
 
   function formatSeenUserList(users = []) {
@@ -105,24 +122,78 @@ export function ThreadScreen({
   }
 
   function showMessageOptions(message) {
-    const options = [
-      {
-        text: "View Seen By",
+    const actions = [];
+
+    if (canPinMessage(message)) {
+      actions.push({
+        label: isPinnedMessage(message) ? "Unpin Message" : "Pin Message",
+        onPress: async () => {
+          try {
+            await onPinThreadMessage?.(
+              thread.id,
+              isPinnedMessage(message) ? null : message.id
+            );
+          } catch (error) {
+            Alert.alert("Could not pin message", error.message || "Try again.");
+          }
+        },
+      });
+    }
+
+    actions.push({
+      label: "React",
+      onPress: () => setReactionPickerMessageId(message.id),
+    });
+
+    if (message.isMe) {
+      actions.push({
+        label: "View Seen By",
         onPress: () => showSeenBy(message),
-      },
-    ];
+      });
+    }
 
     if (canDeleteMessage(message)) {
-      options.push({
-        text: "Delete Message",
-        style: "destructive",
+      actions.push({
+        label: "Delete Message",
+        destructive: true,
         onPress: () => confirmDeleteMessage(message),
       });
     }
 
-    options.push({ text: "Cancel", style: "cancel" });
+    if (Platform.OS === "ios") {
+      const options = [...actions.map((action) => action.label), "Cancel"];
+      const cancelButtonIndex = options.length - 1;
+      const destructiveButtonIndex = actions.findIndex((action) => action.destructive);
 
-    Alert.alert("Message Options", "What do you want to do?", options);
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: message.body ? message.body.slice(0, 80) : "Message",
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex: destructiveButtonIndex >= 0 ? destructiveButtonIndex : undefined,
+          userInterfaceStyle: "light",
+        },
+        (buttonIndex) => {
+          if (buttonIndex === cancelButtonIndex) return;
+          actions[buttonIndex]?.onPress?.();
+        }
+      );
+
+      return;
+    }
+
+    Alert.alert(
+      "Message",
+      message.body ? message.body.slice(0, 120) : "Choose an action",
+      [
+        ...actions.map((action) => ({
+          text: action.label,
+          style: action.destructive ? "destructive" : "default",
+          onPress: action.onPress,
+        })),
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
   }
 
   function confirmDeleteMessage(message) {
@@ -502,6 +573,40 @@ export function ThreadScreen({
             </TouchableOpacity>
           ) : null}
         </View>
+
+        {getPinnedMessage() ? (
+          <View style={localStyles.pinnedBanner}>
+            <View style={localStyles.pinnedIcon}>
+              <Text style={localStyles.pinnedIconText}>📌</Text>
+            </View>
+
+            <TouchableOpacity
+              style={localStyles.pinnedMain}
+              activeOpacity={0.85}
+              onPress={() =>
+                Alert.alert(
+                  "Pinned Message",
+                  getPinnedMessage()?.body || "Pinned message"
+                )
+              }
+            >
+              <Text style={localStyles.pinnedLabel}>PINNED MESSAGE</Text>
+              <Text style={localStyles.pinnedText} numberOfLines={2}>
+                {getPinnedMessage()?.body || "Pinned message"}
+              </Text>
+            </TouchableOpacity>
+
+            {canManageThread ? (
+              <TouchableOpacity
+                style={localStyles.unpinButton}
+                onPress={() => onPinThreadMessage?.(thread.id, null)}
+                activeOpacity={0.85}
+              >
+                <Text style={localStyles.unpinButtonText}>Unpin</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
         <FlatList
           ref={messageListRef}
