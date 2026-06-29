@@ -48,6 +48,7 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { AdminScreen } from "./src/screens/AdminScreen";
 import { MoreScreen } from "./src/screens/MoreScreen";
 import { GroupManageScreen } from "./src/screens/GroupManageScreen";
+import { PartnerPerksScreen } from "./src/screens/PartnerPerksScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -1959,6 +1960,7 @@ export default function App() {
             onOpenPeople={() => changeTab("People")}
             onOpenSend={() => changeTab("Broadcast")}
             onOpenAdmin={() => changeTab("Admin")}
+            onOpenPerks={() => changeTab("Perks")}
           />
         )}
 
@@ -1981,6 +1983,10 @@ export default function App() {
             onDeleteThread={handleDeleteThread}
             onDeleteManagedThread={handleDeleteManagedThread}
           />
+        )}
+
+        {activeTab === "Perks" && (
+          <PartnerPerksScreen onBack={() => changeTab("Home")} />
         )}
 
         {activeTab === "People" && (

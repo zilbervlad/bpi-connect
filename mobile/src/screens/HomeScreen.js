@@ -15,6 +15,7 @@ export function HomeScreen({
   onOpenPeople,
   onOpenSend,
   onOpenAdmin,
+  onOpenPerks,
 }) {
   const announcementMessages = (messages || []).filter(
     (message) => message.type === "announcement"
@@ -174,6 +175,26 @@ export function HomeScreen({
         )}
       </View>
 
+      <TouchableOpacity
+        style={localStyles.perksCard}
+        onPress={onOpenPerks}
+        activeOpacity={0.88}
+      >
+        <View style={localStyles.perksIcon}>
+          <Text style={localStyles.perksIconText}>%</Text>
+        </View>
+
+        <View style={localStyles.perksMain}>
+          <Text style={localStyles.perksLabel}>BPI PERKS</Text>
+          <Text style={localStyles.perksTitle}>BPI team perks</Text>
+          <Text style={localStyles.perksText} numberOfLines={1}>
+            Discounts, offers, and team savings.
+          </Text>
+        </View>
+
+        <Text style={localStyles.perksArrow}>›</Text>
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -271,14 +292,14 @@ function formatRole(role) {
 const localStyles = StyleSheet.create({
   content: {
     padding: 12,
-    paddingBottom: 118,
+    paddingBottom: 88,
   },
 
   header: {
     backgroundColor: "#ffffff",
     borderRadius: 22,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 16,
@@ -343,7 +364,7 @@ const localStyles = StyleSheet.create({
   },
   footerNumber: {
     color: "#10212b",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "900",
     letterSpacing: -0.4,
   },
@@ -404,7 +425,7 @@ const localStyles = StyleSheet.create({
   },
   featuredAnnouncementTitle: {
     color: "#0f172a",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "900",
     lineHeight: 21,
     letterSpacing: -0.25,
@@ -420,7 +441,7 @@ const localStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
   featuredAnnouncementMeta: {
     flex: 1,
@@ -430,7 +451,7 @@ const localStyles = StyleSheet.create({
   },
   featuredAnnouncementOpen: {
     color: "#e91f3f",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
     backgroundColor: "#fff1f4",
     borderRadius: 999,
@@ -443,7 +464,7 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 22,
     padding: 8,
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 18,
@@ -493,8 +514,8 @@ const localStyles = StyleSheet.create({
   },
   announcementBody: {
     color: "#526273",
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
   },
   announcementMeta: {
@@ -540,9 +561,9 @@ const localStyles = StyleSheet.create({
 
   chatCard: {
     backgroundColor: "#101d2d",
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 6,
-    marginBottom: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
   },
@@ -637,5 +658,465 @@ const localStyles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: "700",
     marginTop: 4,
+  },
+  perksCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#ffd6a7",
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 7,
+  },
+  perksIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#fff3e6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  perksIconText: {
+    color: "#f97316",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  perksMain: {
+    flex: 1,
+  },
+  perksLabel: {
+    color: "#f97316",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.3,
+    marginBottom: 3,
+  },
+  perksTitle: {
+    color: "#10212b",
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  perksText: {
+    color: "#617386",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  perksArrow: {
+    color: "#f97316",
+    fontSize: 26,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  // Compact Home layout overrides
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  sectionSub: {
+    color: "#96a3b6",
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  chatCard: {
+    backgroundColor: "#111f2f",
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#26364a",
+    marginBottom: 8,
+  },
+  threadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+  },
+  threadAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadAvatarText: {
+    color: "#10212b",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  threadMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  threadTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  threadName: {
+    color: "#ffffff",
+    fontSize: 20,
+    lineHeight: 23,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    flex: 1,
+  },
+  threadPreview: {
+    color: "#96a3b6",
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  threadBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#26364a",
+  },
+  perksCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 11,
+    marginTop: 8,
+    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderWidth: 1,
+    borderColor: "#ffd6a7",
+  },
+  perksIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#fff3e6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  perksIconText: {
+    color: "#f97316",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  perksTitle: {
+    color: "#10212b",
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  perksText: {
+    color: "#617386",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  perksArrow: {
+    color: "#f97316",
+    fontSize: 25,
+    fontWeight: "900",
+    lineHeight: 25,
+  },
+  // Final compact Home overrides
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 28,
+    lineHeight: 31,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+  },
+  sectionSub: {
+    color: "#96a3b6",
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  chatCard: {
+    backgroundColor: "#111f2f",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "#26364a",
+    marginBottom: 8,
+  },
+  threadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingVertical: 6,
+    minHeight: 54,
+  },
+  threadAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadAvatarText: {
+    color: "#10212b",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  threadName: {
+    color: "#ffffff",
+    fontSize: 17,
+    lineHeight: 20,
+    fontWeight: "900",
+    letterSpacing: -0.35,
+    flex: 1,
+  },
+  threadPreview: {
+    color: "#96a3b6",
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  perksCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderWidth: 1,
+    borderColor: "#f3c98d",
+  },
+  perksIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#fff3e6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  perksIconText: {
+    color: "#f97316",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  perksLabel: {
+    color: "#f97316",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    marginBottom: 1,
+  },
+  perksTitle: {
+    color: "#10212b",
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  perksText: {
+    color: "#617386",
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  perksArrow: {
+    color: "#f97316",
+    fontSize: 23,
+    fontWeight: "900",
+    lineHeight: 23,
+  },
+  // Dense Home chat layout overrides
+  content: {
+    padding: 12,
+    paddingBottom: 92,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 25,
+    lineHeight: 28,
+    fontWeight: "900",
+    letterSpacing: -0.7,
+  },
+  sectionSub: {
+    color: "#96a3b6",
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  viewAll: {
+    color: "#f22949",
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "900",
+  },
+  chatCard: {
+    backgroundColor: "#111f2f",
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    borderWidth: 1,
+    borderColor: "#26364a",
+    marginBottom: 6,
+  },
+  threadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+    minHeight: 45,
+  },
+  threadAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadAvatarText: {
+    color: "#10212b",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  threadMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  threadTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  threadName: {
+    color: "#ffffff",
+    fontSize: 15,
+    lineHeight: 17,
+    fontWeight: "900",
+    letterSpacing: -0.25,
+    flex: 1,
+  },
+  threadPreview: {
+    color: "#96a3b6",
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  threadBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#243348",
+  },
+  unreadBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#f22949",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+  },
+  unreadBadgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  perksCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 6,
+    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#f3c98d",
+  },
+  perksIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: "#fff3e6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  perksIconText: {
+    color: "#f97316",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  perksLabel: {
+    color: "#f97316",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    marginBottom: 0,
+  },
+  perksTitle: {
+    color: "#10212b",
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: "900",
+    letterSpacing: -0.15,
+  },
+  perksText: {
+    color: "#617386",
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "800",
+    marginTop: 0,
+  },
+  perksArrow: {
+    color: "#f97316",
+    fontSize: 21,
+    fontWeight: "900",
+    lineHeight: 21,
   },
 });
