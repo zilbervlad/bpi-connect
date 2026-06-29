@@ -4935,6 +4935,14 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
         preview = (last_message.body or "")[:160]
         last_time = iso_utc(last_message.created_at) if last_message.created_at else None
 
+    pinned_message = None
+
+    if getattr(thread, "pinned_message_id", None):
+        pinned_message = ThreadMessage.query.filter_by(
+            id=thread.pinned_message_id,
+            thread_id=thread.id,
+        ).first()
+
     return {
         "id": thread.id,
         "thread_type": thread.thread_type,
@@ -4948,7 +4956,7 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
         "member_count": int(member_count or 0),
         "muted": bool(muted),
         "favorite": bool(favorite),
-        "pinned_message": None,
+        "pinned_message": serialize_pinned_thread_message(pinned_message) if pinned_message else None,
     }
 
 
