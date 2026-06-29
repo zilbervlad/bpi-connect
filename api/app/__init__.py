@@ -11,6 +11,7 @@ from secrets import token_urlsafe
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
+from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
@@ -422,7 +423,10 @@ def create_app():
 
         ThreadMember.query.filter_by(thread_id=thread.id).delete()
         ThreadMessage.query.filter_by(thread_id=thread.id).delete()
-        db.session.delete(thread)
+        Thread.query.filter_by(
+            id=thread.id
+        ).delete(synchronize_session=False)
+
         db.session.commit()
 
         return jsonify({
@@ -4433,31 +4437,52 @@ def create_app():
         ]
 
         if message_ids:
-            ThreadMessageReaction.query.filter(
-                ThreadMessageReaction.message_id.in_(message_ids)
-            ).delete(synchronize_session=False)
+            existing_tables = set(inspect(db.engine).get_table_names())
 
-            ThreadMessageAck.query.filter(
-                ThreadMessageAck.message_id.in_(message_ids)
-            ).delete(synchronize_session=False)
+            related_cleanup = [
+                (ThreadMessageReaction, "thread_message_id", "message_id"),
+                (ThreadMessageAck, "thread_message_id", "message_id"),
+                (ThreadMessageAttachment, "thread_message_id", "message_id"),
+            ]
 
-            ThreadMessageAttachment.query.filter(
-                ThreadMessageAttachment.message_id.in_(message_ids)
-            ).delete(synchronize_session=False)
+            for model, preferred_column, fallback_column in related_cleanup:
+                table_name = getattr(model, "__tablename__", None)
+
+                if table_name not in existing_tables:
+                    continue
+
+                message_column = getattr(
+                    model,
+                    preferred_column,
+                    getattr(model, fallback_column, None),
+                )
+
+                if message_column is None:
+                    continue
+
+                model.query.filter(
+                    message_column.in_(message_ids)
+                ).delete(synchronize_session=False)
 
             ThreadMessage.query.filter_by(
                 thread_id=thread.id
             ).delete(synchronize_session=False)
 
-        ThreadFavorite.query.filter_by(
-            thread_id=thread.id
-        ).delete(synchronize_session=False)
+        existing_tables = set(inspect(db.engine).get_table_names())
+
+        if getattr(ThreadFavorite, "__tablename__", None) in existing_tables:
+            ThreadFavorite.query.filter_by(
+                thread_id=thread.id
+            ).delete(synchronize_session=False)
 
         ThreadMember.query.filter_by(
             thread_id=thread.id
         ).delete(synchronize_session=False)
 
-        db.session.delete(thread)
+        Thread.query.filter_by(
+            id=thread.id
+        ).delete(synchronize_session=False)
+
         db.session.commit()
 
         return jsonify({
