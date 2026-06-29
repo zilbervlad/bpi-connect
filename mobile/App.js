@@ -1218,15 +1218,34 @@ export default function App() {
         currentThreads.map((thread) => {
           if (Number(thread.id) !== Number(threadId)) return thread;
 
+          const mergedMessages = mergeThreadMessages(thread.messages || [], mappedMessages);
+          const currentIds = (thread.messages || []).map((message) => message.id).join(",");
+          const nextIds = mergedMessages.map((message) => message.id).join(",");
+
+          const nextLastMessage = data.thread.last_message || thread.lastMessage;
+          const nextLastTime = formatApiTime(data.thread.last_time) || thread.lastTime;
+          const nextMemberNames = members.map((member) => member.name);
+          const nextSubtitle = `${getThreadSubtitle(data.thread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`;
+
+          if (
+            currentIds === nextIds &&
+            thread.unread === 0 &&
+            thread.lastMessage === nextLastMessage &&
+            thread.lastTime === nextLastTime &&
+            JSON.stringify(thread.memberNames || []) === JSON.stringify(nextMemberNames)
+          ) {
+            return thread;
+          }
+
           return {
             ...thread,
-            lastMessage: data.thread.last_message || thread.lastMessage,
-            lastTime: formatApiTime(data.thread.last_time) || thread.lastTime,
+            lastMessage: nextLastMessage,
+            lastTime: nextLastTime,
             unread: 0,
             members,
-            memberNames: members.map((member) => member.name),
-            subtitle: `${getThreadSubtitle(data.thread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`,
-            messages: mergeThreadMessages(thread.messages || [], mappedMessages),
+            memberNames: nextMemberNames,
+            subtitle: nextSubtitle,
+            messages: mergedMessages,
           };
         })
       );

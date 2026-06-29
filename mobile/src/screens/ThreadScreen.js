@@ -249,18 +249,12 @@ export function ThreadScreen({
     return () => setActiveNotificationThreadId(null);
   }, [thread?.id]);
 
-  // ThreadScreen live refresh interval
+  // Load latest messages once when opening/changing a thread.
+  // App.js owns the slower background refresh so this screen does not double-poll.
   useEffect(() => {
-    if (!thread?.id || !onRefreshThread) return undefined;
-
+    if (!thread?.id || !onRefreshThread) return;
     onRefreshThread(thread.id);
-
-    const interval = setInterval(() => {
-      onRefreshThread(thread.id);
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [thread?.id, onRefreshThread]);
+  }, [thread?.id]);
 
   // Land on latest when opening a thread
   useEffect(() => {
