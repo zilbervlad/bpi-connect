@@ -1219,7 +1219,6 @@ export default function App() {
       const data = await fetchApiThreadMessages(threadId, currentUser.id);
       await markThreadReadAndClear(threadId);
       const mappedMessages = data.messages.map(mapApiThreadMessageToBubble);
-      const members = data.thread.members || [];
 
       setThreads((currentThreads) =>
         currentThreads.map((thread) => {
@@ -1229,17 +1228,31 @@ export default function App() {
           const currentIds = (thread.messages || []).map((message) => message.id).join(",");
           const nextIds = mergedMessages.map((message) => message.id).join(",");
 
+          const incomingMembers = Array.isArray(data.thread?.members) ? data.thread.members : [];
+          const existingMembers = Array.isArray(thread.members) ? thread.members : [];
+          const members = incomingMembers.length ? incomingMembers : existingMembers;
+
+          const memberCount =
+            data.thread.member_count ??
+            data.thread.memberCount ??
+            thread.memberCount ??
+            thread.member_count ??
+            members.length;
+
           const nextLastMessage = data.thread.last_message || thread.lastMessage;
           const nextLastTime = formatApiTime(data.thread.last_time) || thread.lastTime;
-          const nextMemberNames = members.map((member) => member.name);
-          const nextSubtitle = `${getThreadSubtitle(data.thread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`;
+          const nextMemberNames = members.length
+            ? members.map((member) => member.name)
+            : thread.memberNames || [];
+          const nextSubtitle = `${getThreadSubtitle(data.thread.thread_type)} · ${memberCount} ${memberCount === 1 ? "member" : "members"}`;
 
           if (
             currentIds === nextIds &&
             thread.unread === 0 &&
             thread.lastMessage === nextLastMessage &&
             thread.lastTime === nextLastTime &&
-            JSON.stringify(thread.memberNames || []) === JSON.stringify(nextMemberNames)
+            JSON.stringify(thread.memberNames || []) === JSON.stringify(nextMemberNames) &&
+            (thread.memberCount ?? thread.member_count ?? 0) === memberCount
           ) {
             return thread;
           }
@@ -1251,6 +1264,7 @@ export default function App() {
             unread: 0,
             members,
             memberNames: nextMemberNames,
+            memberCount,
             subtitle: nextSubtitle,
             messages: mergedMessages,
           };
