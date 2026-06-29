@@ -756,7 +756,7 @@ def create_app():
     def debug_ping():
         print("🔥🔥🔥 BPI CONNECT DEBUG PING HIT 🔥🔥🔥", flush=True)
         return jsonify({"success": True, "message": "pong"})
-\n@app.get("/")
+@app.get("/")
     def health():
         return jsonify({
             "success": True,
