@@ -65,8 +65,8 @@ export function HomeScreen({
         <>
           <View style={localStyles.sectionHeader}>
             <View>
-              <Text style={localStyles.sectionTitle}>Latest Announcement</Text>
-              <Text style={localStyles.sectionSub}>Most important company update</Text>
+              <Text style={localStyles.sectionTitle}>Latest Update</Text>
+              <Text style={localStyles.sectionSub}>Company announcement</Text>
             </View>
 
             <TouchableOpacity onPress={onOpenInbox} activeOpacity={0.8}>
@@ -94,16 +94,16 @@ export function HomeScreen({
               <View style={localStyles.featuredAnnouncementTitleWrap}>
                 <Text style={localStyles.featuredAnnouncementLabel}>
                   {featuredAnnouncement.requiresAck && !featuredAnnouncement.acknowledged
-                    ? "NEEDS ACKNOWLEDGEMENT"
+                    ? "NEEDS RESPONSE"
                     : "COMPANY UPDATE"}
                 </Text>
-                <Text style={localStyles.featuredAnnouncementTitle} numberOfLines={3}>
+                <Text style={localStyles.featuredAnnouncementTitle} numberOfLines={2}>
                   {featuredAnnouncement.title}
                 </Text>
               </View>
             </View>
 
-            <Text style={localStyles.featuredAnnouncementBody}>
+            <Text style={localStyles.featuredAnnouncementBody} numberOfLines={2}>
               {featuredAnnouncement.body}
             </Text>
 
@@ -112,7 +112,7 @@ export function HomeScreen({
                 {featuredAnnouncement.from} · {featuredAnnouncement.time}
               </Text>
 
-              <Text style={localStyles.featuredAnnouncementOpen}>Open →</Text>
+              <Text style={localStyles.featuredAnnouncementOpen}>Open</Text>
             </View>
           </TouchableOpacity>
         </>
@@ -121,7 +121,7 @@ export function HomeScreen({
       <View style={localStyles.sectionHeader}>
         <View>
           <Text style={localStyles.sectionTitle}>Recent Chats</Text>
-          <Text style={localStyles.sectionSub}>Latest activity across your team</Text>
+          <Text style={localStyles.sectionSub}>Latest team activity</Text>
         </View>
 
         <TouchableOpacity onPress={onOpenChats} activeOpacity={0.8}>
@@ -276,9 +276,9 @@ const localStyles = StyleSheet.create({
 
   header: {
     backgroundColor: "#ffffff",
-    borderRadius: 18,
-    padding: 9,
-    marginBottom: 10,
+    borderRadius: 22,
+    padding: 12,
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 16,
@@ -293,25 +293,25 @@ const localStyles = StyleSheet.create({
   },
   eyebrow: {
     color: "#e91f3f",
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: "900",
-    letterSpacing: 1.5,
-    marginBottom: 2,
+    letterSpacing: 1.8,
+    marginBottom: 3,
   },
   greeting: {
     color: "#10212b",
-    fontSize: 16,
-    lineHeight: 19,
+    fontSize: 19,
+    lineHeight: 22,
     fontWeight: "900",
     letterSpacing: -0.6,
     maxWidth: 250,
   },
   subtitle: {
     color: "#617386",
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "800",
-    marginTop: 1,
+    marginTop: 4,
   },
   avatar: {
     width: 30,
@@ -329,7 +329,7 @@ const localStyles = StyleSheet.create({
   headerDivider: {
     height: 1,
     backgroundColor: "#e9eef3",
-    marginVertical: 5,
+    marginVertical: 8,
   },
   headerFooter: {
     flexDirection: "row",
@@ -338,18 +338,18 @@ const localStyles = StyleSheet.create({
   },
   footerDivider: {
     width: 1,
-    height: 18,
+    height: 16,
     backgroundColor: "#e9eef3",
   },
   footerNumber: {
     color: "#10212b",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "900",
     letterSpacing: -0.4,
   },
   footerLabel: {
     color: "#617386",
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -358,9 +358,9 @@ const localStyles = StyleSheet.create({
 
   featuredAnnouncementCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 26,
-    padding: 18,
-    marginBottom: 22,
+    borderRadius: 22,
+    padding: 12,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: "rgba(37, 99, 235, 0.14)",
     shadowColor: "#0f172a",
@@ -376,43 +376,45 @@ const localStyles = StyleSheet.create({
   featuredAnnouncementTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
+    gap: 10,
+    marginBottom: 8,
   },
   featuredAnnouncementIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "#1d4ed8",
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    backgroundColor: "#e91f3f",
     alignItems: "center",
     justifyContent: "center",
   },
   featuredAnnouncementIconText: {
     color: "#ffffff",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "900",
   },
   featuredAnnouncementTitleWrap: {
     flex: 1,
   },
   featuredAnnouncementLabel: {
-    color: "#2563eb",
-    fontSize: 11,
+    color: "#e91f3f",
+    fontSize: 10,
     fontWeight: "900",
-    letterSpacing: 0.9,
+    letterSpacing: 1.1,
     marginBottom: 3,
   },
   featuredAnnouncementTitle: {
     color: "#0f172a",
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "900",
-    lineHeight: 25,
+    lineHeight: 21,
+    letterSpacing: -0.25,
   },
   featuredAnnouncementBody: {
-    color: "#334155",
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: 16,
+    color: "#475569",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+    fontWeight: "600",
   },
   featuredAnnouncementFooter: {
     flexDirection: "row",
@@ -423,13 +425,18 @@ const localStyles = StyleSheet.create({
   featuredAnnouncementMeta: {
     flex: 1,
     color: "#64748b",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
   },
   featuredAnnouncementOpen: {
-    color: "#1d4ed8",
-    fontSize: 13,
+    color: "#e91f3f",
+    fontSize: 12,
     fontWeight: "900",
+    backgroundColor: "#fff1f4",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
 
   announcementCard: {
@@ -508,13 +515,13 @@ const localStyles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     marginBottom: 8,
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
   },
   sectionTitle: {
     color: "#ffffff",
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "900",
     letterSpacing: -0.5,
   },
@@ -533,8 +540,8 @@ const localStyles = StyleSheet.create({
 
   chatCard: {
     backgroundColor: "#101d2d",
-    borderRadius: 22,
-    padding: 4,
+    borderRadius: 24,
+    padding: 6,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
@@ -542,17 +549,17 @@ const localStyles = StyleSheet.create({
   threadRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
-    padding: 8,
+    gap: 10,
+    padding: 10,
   },
   threadBorder: {
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.07)",
   },
   threadAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 15,
     backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
@@ -573,13 +580,13 @@ const localStyles = StyleSheet.create({
   },
   threadName: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     flex: 1,
   },
   threadPreview: {
     color: "#91a3b8",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
     marginTop: 2,
   },

@@ -4,11 +4,13 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   FlatList,
   TextInput,
   StyleSheet,
   Image,
   Keyboard,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -346,7 +348,7 @@ export function ThreadScreen({
             message.isMe ? localStyles.bubbleRowMe : localStyles.bubbleRowOther,
           ]}
         >
-          {shouldShowSenderName(thread.messages, message, index) ? (
+          {shouldShowSenderName(thread.messages, message, index, thread.type) ? (
             <Text style={[localStyles.senderName, message.isMe && localStyles.senderNameMe]}>
               {formatSenderLabel(message)}
             </Text>
@@ -386,27 +388,6 @@ export function ThreadScreen({
                 ]}
               >
                 {message.body}
-              </Text>
-            ) : null}
-
-            {message.isMe && message.status === "sending" ? (
-              <Text style={localStyles.messageStatusText}>Sending…</Text>
-            ) : null}
-
-            {message.isMe && message.status === "failed" ? (
-              <TouchableOpacity
-                onPress={() => onRetryThreadMessage?.(thread.id, message)}
-                activeOpacity={0.85}
-              >
-                <Text style={[localStyles.messageStatusText, localStyles.messageStatusFailed]}>
-                  Failed — tap to retry
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {message.isMe && getSeenStatusText(message) ? (
-              <Text style={localStyles.messageStatusText}>
-                {getSeenStatusText(message)}
               </Text>
             ) : null}
 
@@ -457,7 +438,33 @@ export function ThreadScreen({
           </TouchableOpacity>
 
           {isLastInGroup ? (
-            <Text style={localStyles.messageTime}>{message.time}</Text>
+            <View
+              style={[
+                localStyles.messageMetaRow,
+                message.isMe ? localStyles.messageMetaRowMe : localStyles.messageMetaRowOther,
+              ]}
+            >
+              {message.isMe && message.status === "sending" ? (
+                <Text style={localStyles.messageMetaStatus}>Sending…</Text>
+              ) : null}
+
+              {message.isMe && message.status === "failed" ? (
+                <TouchableOpacity
+                  onPress={() => onRetryThreadMessage?.(thread.id, message)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[localStyles.messageMetaStatus, localStyles.messageStatusFailed]}>
+                    Failed — tap to retry
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {message.isMe && getSeenStatusText(message) ? (
+                <Text style={localStyles.messageMetaStatus}>{getSeenStatusText(message)}</Text>
+              ) : null}
+
+              <Text style={localStyles.messageTime}>{message.time}</Text>
+            </View>
           ) : null}
         </View>
       </View>
@@ -471,6 +478,7 @@ export function ThreadScreen({
       <KeyboardAvoidingView
         style={localStyles.keyboardWrap}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 6 : 0}
       >
         <View style={localStyles.header}>
           <TouchableOpacity style={localStyles.backButton} onPress={onBack}>
@@ -515,6 +523,17 @@ export function ThreadScreen({
           maxToRenderPerBatch={16}
           windowSize={9}
           removeClippedSubviews={Platform.OS !== "ios"}
+          ListEmptyComponent={
+            <View style={localStyles.emptyChat}>
+              <View style={localStyles.emptyIcon}>
+                <Text style={localStyles.emptyIconText}>💬</Text>
+              </View>
+              <Text style={localStyles.emptyTitle}>No messages yet</Text>
+              <Text style={localStyles.emptyText}>
+                Start the conversation. Store updates, quick questions, and team follow-ups all live here.
+              </Text>
+            </View>
+          }
         />
 
         {pendingImage ? (
@@ -574,10 +593,11 @@ export function ThreadScreen({
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="iMessage"
+            placeholder="Message"
             placeholderTextColor="#8a8a8e"
             style={localStyles.input}
             multiline
+            maxLength={2000}
           />
 
           <TouchableOpacity
@@ -585,7 +605,7 @@ export function ThreadScreen({
             onPress={handleSend}
             disabled={!draft.trim()}
           >
-            <Text style={localStyles.sendText}>↑</Text>
+            <Text style={localStyles.sendText}>➤</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -634,7 +654,9 @@ function shouldShowDateDivider(messages, message, index) {
   return currentLabel !== previousLabel;
 }
 
-function shouldShowSenderName(messages, message, index) {
+function shouldShowSenderName(messages, message, index, threadType) {
+  if (threadType === "direct") return false;
+
   const previousMessage = messages[index - 1];
 
   if (!previousMessage) return true;
@@ -735,90 +757,129 @@ function ThreadHeaderAvatar({ thread }) {
 const localStyles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: "#f3f5f9",
   },
   keyboardWrap: {
     flex: 1,
   },
   header: {
-    minHeight: 72,
+    minHeight: 68,
     backgroundColor: "rgba(255,255,255,0.98)",
     borderBottomWidth: 1,
-    borderBottomColor: "#e6e8ef",
+    borderBottomColor: "#e4e7ee",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 9,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 2,
   },
   backButton: {
     width: 34,
-    height: 44,
+    height: 42,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 999,
   },
   backText: {
-    color: "#0a84ff",
-    fontSize: 38,
-    lineHeight: 40,
+    color: "#e91f3f",
+    fontSize: 36,
+    lineHeight: 38,
     fontWeight: "300",
   },
   manageButton: {
-    backgroundColor: "#eef6ff",
+    backgroundColor: "#fff1f4",
     borderWidth: 1,
-    borderColor: "#cfe4ff",
+    borderColor: "#ffd4dd",
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
   },
   manageButtonText: {
-    color: "#0a84ff",
-    fontSize: 12,
+    color: "#e91f3f",
+    fontSize: 11,
     fontWeight: "900",
+    letterSpacing: 0.2,
   },
   headerAvatar: {
     width: 42,
     height: 42,
     borderRadius: 999,
-    backgroundColor: "#eef2ff",
+    backgroundColor: "#111827",
     borderWidth: 1,
-    borderColor: "#dbe3ff",
+    borderColor: "#263244",
     alignItems: "center",
     justifyContent: "center",
   },
   headerAvatarText: {
-    color: "#2443a6",
+    color: "#ffffff",
     fontWeight: "900",
     fontSize: 12,
   },
   headerMain: {
     flex: 1,
+    minWidth: 0,
   },
   headerName: {
     color: "#111827",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "900",
-    letterSpacing: -0.2,
+    letterSpacing: -0.25,
   },
   headerSub: {
     color: "#6b7280",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     marginTop: 2,
   },
   chatArea: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: "#f3f5f9",
   },
   chatContent: {
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 18,
+    flexGrow: 1,
+  },
+  emptyChat: {
+    flex: 1,
+    minHeight: 360,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  emptyIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 24,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  emptyIconText: {
+    fontSize: 30,
+  },
+  emptyTitle: {
+    color: "#111827",
+    fontSize: 21,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  emptyText: {
+    color: "#6b7280",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    fontWeight: "600",
   },
   threadInfo: {
     alignItems: "center",
@@ -839,43 +900,43 @@ const localStyles = StyleSheet.create({
   },
   dateDivider: {
     alignSelf: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.92)",
     borderRadius: 999,
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     paddingVertical: 5,
-    marginVertical: 12,
+    marginVertical: 13,
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
   dateDividerText: {
     color: "#64748b",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.35,
+    letterSpacing: 0.45,
   },
   unreadDivider: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginVertical: 14,
+    marginVertical: 15,
     paddingHorizontal: 10,
   },
   unreadDividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: "#e91f3f",
-    opacity: 0.45,
+    opacity: 0.42,
   },
   unreadDividerText: {
     color: "#e91f3f",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   bubbleRow: {
-    marginBottom: 8,
+    marginBottom: 6,
     maxWidth: "84%",
   },
   bubbleRowMe: {
@@ -889,67 +950,59 @@ const localStyles = StyleSheet.create({
   senderNameMe: {
     alignSelf: "flex-end",
     textAlign: "right",
+    marginRight: 8,
   },
   senderName: {
-    color: "#6b7280",
+    color: "#64748b",
     fontSize: 11,
     marginLeft: 9,
     marginBottom: 3,
     fontWeight: "800",
   },
   bubble: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 9,
     borderRadius: 19,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.045,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 1,
   },
   bubbleMe: {
-    backgroundColor: "#0a84ff",
-    borderBottomRightRadius: 6,
+    backgroundColor: "#e91f3f",
+    borderBottomRightRadius: 7,
   },
   bubbleOther: {
     backgroundColor: "#ffffff",
-    borderBottomLeftRadius: 6,
+    borderBottomLeftRadius: 7,
     borderWidth: 1,
-    borderColor: "#edf0f5",
+    borderColor: "#e9edf4",
   },
   bubbleMeFirst: {
-    borderBottomRightRadius: 14,
+    borderBottomRightRadius: 20,
   },
   bubbleMeMiddle: {
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
+    borderTopRightRadius: 7,
+    borderBottomRightRadius: 7,
   },
   bubbleMeLast: {
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 6,
+    borderTopRightRadius: 7,
   },
   bubbleOtherFirst: {
-    borderBottomLeftRadius: 14,
+    borderBottomLeftRadius: 20,
   },
   bubbleOtherMiddle: {
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
+    borderTopLeftRadius: 7,
+    borderBottomLeftRadius: 7,
   },
   bubbleOtherLast: {
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 6,
-  },
-  messageImage: {
-    width: 230,
-    height: 230,
-    borderRadius: 22,
-    marginBottom: 6,
-    backgroundColor: "#d1d5db",
+    borderTopLeftRadius: 7,
   },
   bubbleText: {
-    fontSize: 16,
-    lineHeight: 22,
-    letterSpacing: -0.1,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "500",
   },
   bubbleTextMe: {
     color: "#ffffff",
@@ -957,57 +1010,164 @@ const localStyles = StyleSheet.create({
   bubbleTextOther: {
     color: "#111827",
   },
-  messageTime: {
-    color: "#9ca3af",
+  deletedMessageText: {
+    fontStyle: "italic",
+    opacity: 0.72,
+  },
+  messageImage: {
+    width: 230,
+    height: 230,
+    borderRadius: 16,
+    marginBottom: 7,
+    backgroundColor: "#e5e7eb",
+  },
+  messageStatusText: {
+    color: "rgba(255,255,255,0.78)",
     fontSize: 10,
+    fontWeight: "800",
     marginTop: 3,
-    marginHorizontal: 8,
-    fontWeight: "700",
+    alignSelf: "flex-end",
+  },
+  messageStatusFailed: {
+    color: "#e91f3f",
+    textDecorationLine: "underline",
+  },
+  messageMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+    paddingHorizontal: 8,
+  },
+  messageMetaRowMe: {
+    alignSelf: "flex-end",
+    justifyContent: "flex-end",
+  },
+  messageMetaRowOther: {
+    alignSelf: "flex-start",
+    justifyContent: "flex-start",
+  },
+  messageMetaStatus: {
+    color: "#94a3b8",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  reactionSummaryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 7,
+  },
+  reactionSummaryChip: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.08)",
+  },
+  reactionSummaryChipActive: {
+    borderColor: "#e91f3f",
+  },
+  reactionSummaryText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  iMessageReactionPicker: {
+    position: "absolute",
+    top: -42,
+    flexDirection: "row",
+    backgroundColor: "#ffffff",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+    zIndex: 20,
+  },
+  iMessageReactionPickerMe: {
+    right: 0,
+  },
+  iMessageReactionPickerOther: {
+    left: 0,
+  },
+  iMessageReactionButton: {
+    width: 31,
+    height: 31,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+  },
+  iMessageReactionText: {
+    fontSize: 18,
+  },
+  messageTime: {
+    color: "#94a3b8",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+    paddingHorizontal: 8,
   },
   pendingImagePanel: {
+    marginHorizontal: 12,
+    marginBottom: 8,
     backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    borderRadius: 24,
     padding: 12,
-    gap: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
   pendingImagePreview: {
-    width: 170,
-    height: 170,
+    width: "100%",
+    height: 230,
     borderRadius: 18,
-    alignSelf: "center",
-    backgroundColor: "#d1d5db",
+    backgroundColor: "#e5e7eb",
+    marginBottom: 10,
   },
   pendingCaptionInput: {
-    backgroundColor: "#f6f7fb",
-    borderRadius: 18,
-    paddingHorizontal: 14,
+    minHeight: 42,
+    maxHeight: 96,
+    backgroundColor: "#f3f5f9",
+    borderRadius: 17,
+    paddingHorizontal: 13,
     paddingVertical: 10,
     color: "#111827",
     fontSize: 15,
-    maxHeight: 90,
+    fontWeight: "600",
   },
   pendingImageActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
+    marginTop: 11,
   },
   pendingCancelButton: {
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#f1f5f9",
   },
   pendingCancelText: {
-    color: "#526273",
+    color: "#475569",
     fontSize: 13,
     fontWeight: "900",
   },
   pendingSendButton: {
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: "#007aff",
+    backgroundColor: "#e91f3f",
   },
   pendingSendText: {
     color: "#ffffff",
@@ -1015,17 +1175,18 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   newMessagesButton: {
+    position: "absolute",
     alignSelf: "center",
-    backgroundColor: "#ef1745",
+    bottom: 82,
+    backgroundColor: "#111827",
     borderRadius: 999,
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginBottom: 7,
-    shadowColor: "#000",
+    paddingVertical: 9,
+    shadowColor: "#0f172a",
     shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
   },
   newMessagesButtonText: {
     color: "#ffffff",
@@ -1033,139 +1194,69 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   composer: {
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingHorizontal: 12,
-    paddingTop: 9,
-    paddingBottom: Platform.OS === "ios" ? 12 : 9,
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 12 : 10,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderTopWidth: 1,
+    borderTopColor: "#e4e7ee",
   },
   photoButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: "#eef2f7",
-    borderWidth: 1,
-    borderColor: "#d8dee8",
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 4,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   photoButtonText: {
-    color: "#64748b",
-    fontSize: 24,
-    fontWeight: "900",
-    lineHeight: 27,
+    color: "#475569",
+    fontSize: 25,
+    lineHeight: 28,
+    fontWeight: "400",
   },
   input: {
     flex: 1,
     minHeight: 38,
     maxHeight: 104,
     borderRadius: 20,
+    backgroundColor: "#f3f5f9",
     borderWidth: 1,
-    borderColor: "#d8dee8",
-    backgroundColor: "#f9fafb",
+    borderColor: "#e1e7ef",
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingTop: Platform.OS === "ios" ? 9 : 7,
+    paddingBottom: Platform.OS === "ios" ? 9 : 7,
     color: "#111827",
     fontSize: 16,
-    lineHeight: 21,
+    lineHeight: 20,
+    fontWeight: "500",
   },
   sendButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: "#0a84ff",
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#0a84ff",
+    backgroundColor: "#e91f3f",
+    shadowColor: "#e91f3f",
     shadowOpacity: 0.22,
-    shadowRadius: 8,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
   sendButtonDisabled: {
     backgroundColor: "#cbd5e1",
     shadowOpacity: 0,
-    elevation: 0,
   },
   sendText: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "900",
-    lineHeight: 24,
-  },
-  messageStatusText: {
-    color: "#94a3b8",
-    fontSize: 10,
-    fontWeight: "800",
-    marginTop: 5,
-    textAlign: "right",
-  },
-  messageStatusFailed: {
-    color: "#ef1745",
-  },
-  reactionSummaryRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    marginTop: 6,
-    alignSelf: "flex-start",
-  },
-  reactionSummaryChip: {
-    backgroundColor: "rgba(255,255,255,0.78)",
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.22)",
-  },
-  reactionSummaryChipActive: {
-    backgroundColor: "#eef6ff",
-    borderColor: "#bfdbfe",
-  },
-  reactionSummaryText: {
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  iMessageReactionPicker: {
-    position: "absolute",
-    top: -44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#ffffff",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-    zIndex: 20,
-  },
-  iMessageReactionPickerMe: {
-    right: 8,
-  },
-  iMessageReactionPickerOther: {
-    left: 8,
-  },
-  iMessageReactionButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iMessageReactionText: {
-    fontSize: 22,
-  },
-  deletedMessageText: {
-    fontStyle: "italic",
-    opacity: 0.72,
+    marginLeft: 1,
   },
 });

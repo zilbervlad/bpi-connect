@@ -142,14 +142,14 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
             <HeaderBlock
               eyebrow="DIRECTORY"
               title="People"
-              subtitle={`${visibleUsers.length} shown · ${getDirectoryScopeLabel(user)}`}
+              subtitle={`${visibleUsers.length} people · ${getDirectoryScopeLabel(user)}`}
             />
 
             <View style={localStyles.searchCard}>
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search name, role, phone, email, or store..."
+                placeholder="Search people, role, store..."
                 placeholderTextColor="#7b8da0"
                 autoCorrect={false}
                 spellCheck={false}
@@ -285,7 +285,7 @@ export function PeopleScreen({ user, users, usingApi, onStartMessage }) {
                   onPress={() => onStartMessage?.(item)}
                   activeOpacity={0.84}
                 >
-                  <Text style={localStyles.messageButtonText}>Message</Text>
+                  <Text style={localStyles.messageButtonText}>Chat</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -408,40 +408,40 @@ function sortPeople(a, b) {
 const localStyles = StyleSheet.create({
   searchCard: {
     backgroundColor: "#101d2c",
-    borderRadius: 18,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#203044",
-    padding: 10,
-    marginBottom: 8,
-    gap: 7,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
   },
   searchInput: {
     backgroundColor: "#0b1624",
     borderWidth: 1,
-    borderColor: "#203044",
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderColor: "#26384f",
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
   },
   filterRow: {
-    gap: 6,
+    gap: 7,
     paddingRight: 10,
   },
   filterPill: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
   },
   filterPillActive: {
     backgroundColor: "#ef1745",
   },
   filterPillText: {
     color: "#9aacbf",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   filterPillTextActive: {
@@ -450,16 +450,16 @@ const localStyles = StyleSheet.create({
   storePill: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    maxWidth: 130,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    maxWidth: 150,
   },
   storePillActive: {
     backgroundColor: "#26364a",
   },
   storePillText: {
     color: "#9aacbf",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   storePillTextActive: {
@@ -467,7 +467,7 @@ const localStyles = StyleSheet.create({
   },
   groupCard: {
     backgroundColor: "#101d2c",
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#203044",
     overflow: "hidden",
@@ -475,10 +475,10 @@ const localStyles = StyleSheet.create({
   personRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    minHeight: 54,
-    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    minHeight: 68,
+    gap: 10,
   },
   personMain: {
     flex: 1,
@@ -487,11 +487,11 @@ const localStyles = StyleSheet.create({
   personTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
   },
   personName: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "900",
     flex: 1,
   },
@@ -500,55 +500,55 @@ const localStyles = StyleSheet.create({
     backgroundColor: "#26364a",
     borderRadius: 999,
     overflow: "hidden",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    fontSize: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    fontSize: 9,
     fontWeight: "900",
     textTransform: "uppercase",
   },
   personMeta: {
     color: "#9aacbf",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "800",
-    marginTop: 1,
+    marginTop: 2,
   },
   personEmail: {
     color: "#708399",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
-    marginTop: 1,
+    marginTop: 2,
   },
   contactActions: {
     alignItems: "flex-end",
-    gap: 4,
+    gap: 5,
   },
   contactButton: {
     backgroundColor: "#26364a",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   contactButtonText: {
     color: "#ffffff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
   },
   messageButton: {
     backgroundColor: "#ef1745",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
   },
   messageButtonText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   rowGap: {
-    height: 5,
+    height: 7,
   },
   emptyState: {
-    padding: 12,
+    padding: 18,
   },
   emptyTitle: {
     color: "#ffffff",

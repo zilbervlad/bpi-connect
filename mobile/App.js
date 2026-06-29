@@ -1886,7 +1886,7 @@ export default function App() {
         onBack={() => setSelectedManageThreadId(null)}
         onRenameThread={handleRenameManagedThread}
         onAddMember={handleAddManagedThreadMember}
-        onRemoveMember={handleRemoveManagedThreadMember}
+        onDeleteMember={handleRemoveManagedThreadMember}
         onDeleteThread={handleDeleteManagedThread}
       />
     );
@@ -1956,10 +1956,12 @@ export default function App() {
         {activeTab === "Chats" && (
           <ChatsScreen
             threads={threads}
+            user={currentUser}
             onOpenThread={openThread}
             onToggleMute={handleToggleThreadMute}
             onToggleFavorite={handleToggleThreadFavorite}
             onDeleteThread={handleDeleteThread}
+            onDeleteManagedThread={handleDeleteManagedThread}
           />
         )}
 

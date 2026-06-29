@@ -18,24 +18,55 @@ function getThreadActivityMs(thread) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavorite, onDeleteThread }) {
+export function ChatsScreen({
+  threads,
+  user,
+  onOpenThread,
+  onToggleMute,
+  onToggleFavorite,
+  onDeleteThread,
+  onDeleteManagedThread,
+}) {
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
   const unreadCount = threads.reduce((total, thread) => total + (thread.unread || 0), 0);
 
+  function canDeleteGroupThread() {
+    const role = String(user?.role || "").toLowerCase();
+    return ["admin", "hr", "coach"].includes(role);
+  }
+
   function handleLongPressThread(thread) {
-    if (!thread || thread.type !== "direct") return;
+    if (!thread) return;
+
+    if (thread.type === "direct") {
+      Alert.alert(
+        "Delete conversation?",
+        "This removes the direct message thread from your inbox only.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => onDeleteThread?.(thread.id),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (!canDeleteGroupThread()) return;
 
     Alert.alert(
-      "Delete conversation?",
-      "This removes the direct message thread from your inbox only.",
+      "Delete group?",
+      `Delete ${thread.name || "this group"} for everyone? This removes the group and its chat history.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete",
+          text: "Delete for Everyone",
           style: "destructive",
-          onPress: () => onDeleteThread?.(thread.id),
+          onPress: () => onDeleteManagedThread?.(thread.id),
         },
       ]
     );
@@ -113,12 +144,12 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
   }, [threads, searchText, activeFilter]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+    <ScrollView style={styles.screen} contentContainerStyle={localStyles.content}>
       <View style={localStyles.heroCard}>
         <Text style={localStyles.heroEyebrow}>CHATS</Text>
         <Text style={localStyles.heroTitle}>Messages</Text>
         <Text style={localStyles.heroSubtitle}>
-          {threads.length} threads · {unreadCount} unread
+          {threads.length} conversations · {unreadCount} unread
         </Text>
       </View>
 
@@ -126,7 +157,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
         <TextInput
           value={searchText}
           onChangeText={setSearchText}
-          placeholder="Search chats..."
+          placeholder="Search conversations..."
           placeholderTextColor="#7b8da0"
           autoCapitalize="none"
           style={localStyles.searchInput}
@@ -232,7 +263,7 @@ export function ChatsScreen({ threads, onOpenThread, onToggleMute, onToggleFavor
                           localStyles.threadMuteButton,
                           thread.muted && localStyles.threadMuteButtonActive,
                         ]}
-                        onPressIn={() => onToggleMute?.(thread.id, !thread.muted)}
+                        onPress={() => onToggleMute?.(thread.id, !thread.muted)}
                         activeOpacity={0.84}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
@@ -320,50 +351,54 @@ function formatThreadType(type) {
 }
 
 const localStyles = StyleSheet.create({
+  content: {
+    padding: 20,
+    paddingBottom: 168,
+  },
   heroCard: {
     backgroundColor: "#ffffff",
     borderRadius: 22,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     marginBottom: 10,
   },
   heroEyebrow: {
     color: "#ef1745",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
-    letterSpacing: 3,
-    marginBottom: 6,
+    letterSpacing: 2.3,
+    marginBottom: 4,
   },
   heroTitle: {
     color: "#10212b",
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: "900",
-    letterSpacing: -1.5,
+    letterSpacing: -0.9,
   },
   heroSubtitle: {
     color: "#64748b",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
-    marginTop: 4,
+    marginTop: 2,
   },
   searchCard: {
     backgroundColor: "#101d2c",
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#203044",
-    padding: 8,
-    marginBottom: 8,
-    gap: 7,
+    padding: 10,
+    marginBottom: 10,
+    gap: 8,
   },
   searchInput: {
     backgroundColor: "#0b1624",
     borderWidth: 1,
-    borderColor: "#203044",
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderColor: "#26384f",
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
   },
   filterRow: {
@@ -373,15 +408,15 @@ const localStyles = StyleSheet.create({
   filterPill: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
   },
   filterPillActive: {
     backgroundColor: "#ef1745",
   },
   filterText: {
     color: "#9aacbf",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   filterTextActive: {
@@ -389,18 +424,18 @@ const localStyles = StyleSheet.create({
   },
   groupCard: {
     backgroundColor: "#101d2c",
-    borderRadius: 18,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#203044",
     overflow: "hidden",
-    marginBottom: 18,
+    marginBottom: 22,
   },
   threadRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    minHeight: 54,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    minHeight: 68,
   },
   threadRowUnread: {
     backgroundColor: "rgba(239,23,69,0.13)",
@@ -408,7 +443,7 @@ const localStyles = StyleSheet.create({
   },
   unreadAccent: {
     width: 4,
-    height: 40,
+    height: 46,
     borderRadius: 999,
     backgroundColor: "transparent",
     marginRight: 8,
@@ -420,12 +455,12 @@ const localStyles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#ef1745",
@@ -442,7 +477,7 @@ const localStyles = StyleSheet.create({
   },
   avatarText: {
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "900",
   },
   threadMain: {
@@ -456,8 +491,8 @@ const localStyles = StyleSheet.create({
   },
   threadName: {
     color: "#d9e4ef",
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "850",
     flex: 1,
   },
   threadNameUnread: {
@@ -467,7 +502,7 @@ const localStyles = StyleSheet.create({
   },
   threadTime: {
     color: "#8fa1b6",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
     textAlign: "right",
   },
@@ -477,17 +512,17 @@ const localStyles = StyleSheet.create({
   previewRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    marginTop: 1,
+    gap: 6,
+    marginTop: 3,
   },
   typePill: {
     color: "#ffffff",
     backgroundColor: "#26364a",
     borderRadius: 999,
     overflow: "hidden",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    fontSize: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    fontSize: 9,
     fontWeight: "900",
     textTransform: "uppercase",
   },
@@ -496,7 +531,7 @@ const localStyles = StyleSheet.create({
   },
   threadPreview: {
     color: "#9aacbf",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
     flex: 1,
   },
@@ -505,21 +540,21 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   rightRail: {
-    width: 56,
+    width: 58,
     alignItems: "flex-end",
     justifyContent: "center",
-    gap: 3,
+    gap: 5,
     marginLeft: 6,
   },
   iconRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
   },
   favoriteButton: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
     justifyContent: "center",
@@ -533,9 +568,9 @@ const localStyles = StyleSheet.create({
     fontWeight: "900",
   },
   threadMuteButton: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
     justifyContent: "center",
@@ -548,9 +583,9 @@ const localStyles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: "#ef1745",
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 23,
+    height: 23,
+    borderRadius: 12,
     paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
@@ -568,7 +603,7 @@ const localStyles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#203044",
-    marginLeft: 52,
+    marginLeft: 66,
   },
   dividerUnread: {
     backgroundColor: "rgba(239,23,69,0.28)",
