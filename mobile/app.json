@@ -2,7 +2,7 @@
   "expo": {
     "name": "BPI Connect",
     "slug": "bpi-connect",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "scheme": "bpiconnect",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "34"
+      "buildNumber": "35"
     },
     "android": {
       "package": "com.bostonpie.bpiconnect",
