@@ -751,7 +751,12 @@ def create_app():
         return {"success": True}
 
 
-    @app.get("/")
+    
+    @app.get("/api/debug/ping")
+    def debug_ping():
+        print("🔥🔥🔥 BPI CONNECT DEBUG PING HIT 🔥🔥🔥", flush=True)
+        return jsonify({"success": True, "message": "pong"})
+\n@app.get("/")
     def health():
         return jsonify({
             "success": True,
