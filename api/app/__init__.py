@@ -4637,17 +4637,10 @@ def create_app():
         membership.last_read_at = datetime.utcnow()
         db.session.commit()
 
-        thread = Thread.query.get(thread_id)
-
-        socketio.emit(
-            "thread_read_updated",
-            {
-                "thread_id": int(thread_id),
-                "user_id": int(user_id),
-                "last_read_at": iso_utc(membership.last_read_at),
-            },
-            room=f"thread:{thread_id}",
-        )
+        # Do not broadcast read receipts live.
+        # Old/current mobile clients can treat this socket event as a reason to reload messages,
+        # which causes chat bouncing and repeated GET messages + POST read loops.
+        # Read state is still saved in the DB above.
 
         return jsonify({
             "success": True,
