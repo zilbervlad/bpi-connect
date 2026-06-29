@@ -262,8 +262,18 @@ export async function fetchApiThreads(userId) {
   return data.threads || [];
 }
 
-export async function fetchApiThreadMessages(threadId, userId) {
-  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+export async function fetchApiThreadMessages(threadId, userId, limit = 75) {
+  const params = new URLSearchParams();
+
+  if (userId) {
+    params.set("user_id", String(userId));
+  }
+
+  if (limit) {
+    params.set("limit", String(limit));
+  }
+
+  const query = params.toString() ? `?${params.toString()}` : "";
   return apiRequest(`/api/threads/${threadId}/messages${query}`);
 }
 
