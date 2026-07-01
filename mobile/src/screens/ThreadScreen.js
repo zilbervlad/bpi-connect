@@ -106,11 +106,19 @@ export function ThreadScreen({
   function showSeenBy(message) {
     const seenUsers = message.seenByUsers || [];
     const deliveredUsers = message.deliveredToUsers || [];
+    const seenByCount = Number(message.seenByCount || seenUsers.length || 0);
 
     const sections = [];
 
-    sections.push(`Seen by (${seenUsers.length})`);
-    sections.push(formatSeenUserList(seenUsers));
+    sections.push(`Seen by (${seenByCount})`);
+
+    if (seenUsers.length) {
+      sections.push(formatSeenUserList(seenUsers));
+    } else if (seenByCount > 0) {
+      sections.push("Seen by team members. Names are still syncing for this message.");
+    } else {
+      sections.push("No one has seen this yet.");
+    }
 
     if (deliveredUsers.length) {
       sections.push("");
@@ -286,18 +294,6 @@ export function ThreadScreen({
       setHasNewMessages(true);
     }
   }, [thread?.messages?.length, isNearBottom]);
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
-      setTimeout(() => {
-        scrollToLatest(true);
-      }, 100);
-    });
-
-    return () => {
-      showSubscription.remove();
-    };
-  }, []);
 
   function handleSend() {
     const messageToSend = draft.trim();
@@ -611,12 +607,6 @@ export function ThreadScreen({
           contentContainerStyle={localStyles.chatContent}
           onScroll={handleChatScroll}
           scrollEventThrottle={80}
-          onContentSizeChange={() => {
-            if (isNearBottom) {
-              scrollToLatest(false);
-            }
-          }}
-          onLayout={() => scrollToLatest(false)}
           keyboardShouldPersistTaps="handled"
           initialNumToRender={24}
           maxToRenderPerBatch={16}

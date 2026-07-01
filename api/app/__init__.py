@@ -4127,8 +4127,9 @@ def create_app():
                 member_count=len(thread.members),
                 muted=membership.muted if membership else False,
                 favorite=False,
+                include_members=True,
             ),
-            "messages": [serialize_thread_message(message, user_id=user_id, include_receipts=False) for message in messages],
+            "messages": [serialize_thread_message(message, user_id=user_id, include_receipts=True) for message in messages],
             "limit": limit,
             "has_more": total_messages > limit,
         })
@@ -4942,7 +4943,7 @@ def ensure_thread_hidden_at_column():
 
 
 
-def serialize_thread_light(thread, user_id=None, last_message=None, unread_count=0, member_count=0, muted=False, favorite=False):
+def serialize_thread_light(thread, user_id=None, last_message=None, unread_count=0, member_count=0, muted=False, favorite=False, include_members=False):
     preview = ""
     last_time = None
 
@@ -4967,7 +4968,7 @@ def serialize_thread_light(thread, user_id=None, last_message=None, unread_count
         "last_message": preview,
         "last_time": last_time,
         "unread": int(unread_count or 0),
-        "members": [],
+        "members": [serialize_user(member.user) for member in thread.members] if include_members else [],
         "member_count": int(member_count or 0),
         "muted": bool(muted),
         "favorite": bool(favorite),

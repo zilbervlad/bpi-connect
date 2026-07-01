@@ -142,6 +142,7 @@ function formatApiTime(value) {
 
 function mapApiThreadToAppThread(apiThread) {
   const members = apiThread.members || [];
+  const memberCount = Number(apiThread.member_count ?? apiThread.memberCount ?? members.length ?? 0);
 
   return {
     id: apiThread.id,
@@ -149,7 +150,7 @@ function mapApiThreadToAppThread(apiThread) {
     type: apiThread.thread_type,
     groupKey: apiThread.group_key,
     name: apiThread.name,
-    subtitle: `${getThreadSubtitle(apiThread.thread_type)} · ${members.length} ${members.length === 1 ? "member" : "members"}`,
+    subtitle: `${getThreadSubtitle(apiThread.thread_type)} · ${memberCount} ${memberCount === 1 ? "member" : "members"}`,
     lastMessage: apiThread.last_message || "No messages yet",
     lastTime: formatApiTime(apiThread.last_time),
     unread: apiThread.unread || 0,
@@ -160,6 +161,8 @@ function mapApiThreadToAppThread(apiThread) {
       : null,
     members,
     memberNames: members.map((member) => member.name),
+    memberCount,
+    member_count: memberCount,
     messages: [],
   };
 }
@@ -224,7 +227,14 @@ function mapApiThreadMessageToBubble(apiMessageResponse) {
     acknowledged: Boolean(apiMessage.acknowledged),
     seenByCount: Number(apiMessage.seen_by_count || apiMessage.seen_count || 0),
     deliveredToCount: Number(apiMessage.delivered_to_count || 0),
-    seenByUsers: apiMessage.seen_by || apiMessage.seenBy || [],
+    seenByUsers:
+      apiMessage.seen_by_users ||
+      apiMessage.seen_users ||
+      apiMessage.read_by_users ||
+      apiMessage.read_by ||
+      apiMessage.seen_by ||
+      apiMessage.seenBy ||
+      [],
     deliveredToUsers: apiMessage.delivered_to || apiMessage.deliveredTo || [],
     reactions: apiMessage.reactions || [],
     attachments: apiMessage.attachments || [],
@@ -1216,8 +1226,8 @@ export default function App() {
     openThreadRefreshInFlightRef.current.add(refreshKey);
 
     try {
-      const data = await fetchApiThreadMessages(threadId, currentUser.id);
       await markThreadReadAndClear(threadId);
+      const data = await fetchApiThreadMessages(threadId, currentUser.id);
       const mappedMessages = data.messages.map(mapApiThreadMessageToBubble);
 
       setThreads((currentThreads) =>
@@ -1246,8 +1256,29 @@ export default function App() {
             : thread.memberNames || [];
           const nextSubtitle = `${getThreadSubtitle(data.thread.thread_type)} · ${memberCount} ${memberCount === 1 ? "member" : "members"}`;
 
+          const currentSeenSignature = (thread.messages || [])
+            .map((message) =>
+              [
+                message.id,
+                message.seenByCount ?? 0,
+                (message.seenByUsers || []).map((user) => user.id || user.name).join("|"),
+              ].join(":")
+            )
+            .join(",");
+
+          const nextSeenSignature = mergedMessages
+            .map((message) =>
+              [
+                message.id,
+                message.seenByCount ?? 0,
+                (message.seenByUsers || []).map((user) => user.id || user.name).join("|"),
+              ].join(":")
+            )
+            .join(",");
+
           if (
             currentIds === nextIds &&
+            currentSeenSignature === nextSeenSignature &&
             thread.unread === 0 &&
             thread.lastMessage === nextLastMessage &&
             thread.lastTime === nextLastTime &&

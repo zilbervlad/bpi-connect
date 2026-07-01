@@ -49,6 +49,14 @@ export function GroupManageScreen({
 
   const currentRole = String(user?.role || "").toLowerCase();
   const canManage = ["admin", "hr", "coach"].includes(currentRole);
+  const members = thread?.members || [];
+  const memberCount = Number(
+    thread?.memberCount ??
+      thread?.member_count ??
+      members.length ??
+      0
+  );
+  const hasMemberCountButNoList = memberCount > 0 && !members.length;
   const memberIds = getMemberIds(thread);
 
   const availableUsers = useMemo(() => {
@@ -131,7 +139,7 @@ export function GroupManageScreen({
           <Text style={localStyles.eyebrow}>MANAGE GROUP</Text>
           <Text style={localStyles.title}>{thread?.name || "Group"}</Text>
           <Text style={localStyles.subtitle}>
-            {(thread?.members || []).length} {(thread?.members || []).length === 1 ? "member" : "members"}
+            {memberCount} {memberCount === 1 ? "member" : "members"}
           </Text>
         </View>
       </View>
@@ -172,8 +180,8 @@ export function GroupManageScreen({
         <View style={localStyles.card}>
           <Text style={localStyles.cardTitle}>Current Members</Text>
 
-          {(thread?.members || []).length ? (
-            thread.members.map((member) => {
+          {members.length ? (
+            members.map((member) => {
               const isSelf = String(member.id) === String(user?.id);
 
               return (
@@ -197,6 +205,10 @@ export function GroupManageScreen({
                 </View>
               );
             })
+          ) : hasMemberCountButNoList ? (
+            <Text style={localStyles.emptyText}>
+              Member list is refreshing. This group has {memberCount} {memberCount === 1 ? "member" : "members"}.
+            </Text>
           ) : (
             <Text style={localStyles.emptyText}>No members found.</Text>
           )}
