@@ -1080,23 +1080,9 @@ export default function App() {
   async function handleRealtimeThreadReadUpdated(payload) {
     if (!payload?.thread_id || !currentUser?.id) return;
 
-    // Read receipts should not reload messages.
-    // Reloading here creates a loop:
-    // mark read -> socket read update -> refresh messages -> mark read again.
+    // Read receipts are refreshed by the normal open-thread refresh.
+    // Avoid setState here so reading a message does not make the chat jump/re-render.
     if (Number(payload.user_id) === Number(currentUser.id)) return;
-
-    const threadId = payload.thread_id;
-
-    setThreads((currentThreads) =>
-      currentThreads.map((thread) => {
-        if (Number(thread.id) !== Number(threadId)) return thread;
-
-        return {
-          ...thread,
-          messages: thread.messages || [],
-        };
-      })
-    );
   }
 
   async function handleRealtimeThreadMessage(payload) {

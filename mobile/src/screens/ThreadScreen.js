@@ -9,7 +9,6 @@ import {
   TextInput,
   StyleSheet,
   Image,
-  Keyboard,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -221,6 +220,7 @@ export function ThreadScreen({
 
   const messageListRef = useRef(null);
   const previousMessageCountRef = useRef(thread?.messages?.length || 0);
+  const didInitialScrollRef = useRef(false);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
@@ -257,24 +257,12 @@ export function ThreadScreen({
     return () => setActiveNotificationThreadId(null);
   }, [thread?.id]);
 
-  // Load latest messages once when opening/changing a thread.
-  // App.js owns the slower background refresh so this screen does not double-poll.
-  useEffect(() => {
-    if (!thread?.id || !onRefreshThread) return;
-    onRefreshThread(thread.id);
-  }, [thread?.id]);
-
-  // Land on latest when opening a thread
+  // Land on latest once when opening/changing a thread.
   useEffect(() => {
     previousMessageCountRef.current = thread?.messages?.length || 0;
+    didInitialScrollRef.current = false;
     setIsNearBottom(true);
     setHasNewMessages(false);
-
-    const timer = setTimeout(() => {
-      scrollToLatest(false);
-    }, 150);
-
-    return () => clearTimeout(timer);
   }, [thread?.id]);
 
   // New messages: auto-scroll only if user is already near bottom
@@ -302,15 +290,7 @@ export function ThreadScreen({
     setDraft("");
     setIsNearBottom(true);
     setHasNewMessages(false);
-
-    scrollToLatest(true);
-
-    requestAnimationFrame(() => {
-      onSendThreadMessage?.(thread.id, messageToSend);
-
-      setTimeout(() => scrollToLatest(true), 40);
-      setTimeout(() => scrollToLatest(true), 160);
-    });
+    onSendThreadMessage?.(thread.id, messageToSend);
   }
 
   async function handlePickImage() {
@@ -607,6 +587,12 @@ export function ThreadScreen({
           contentContainerStyle={localStyles.chatContent}
           onScroll={handleChatScroll}
           scrollEventThrottle={80}
+          onContentSizeChange={() => {
+            if (!didInitialScrollRef.current) {
+              didInitialScrollRef.current = true;
+              scrollToLatest(false);
+            }
+          }}
           keyboardShouldPersistTaps="handled"
           initialNumToRender={24}
           maxToRenderPerBatch={16}
