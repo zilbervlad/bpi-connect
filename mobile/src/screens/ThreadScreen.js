@@ -594,6 +594,11 @@ export function ThreadScreen({
             }
           }}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollToLatest(false)}
+          onLayout={() => scrollToLatest(false)}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
           initialNumToRender={24}
           maxToRenderPerBatch={16}
           windowSize={9}
