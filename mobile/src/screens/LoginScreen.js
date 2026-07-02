@@ -31,7 +31,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
 
   async function handleForgotPassword() {
     if (!email.trim()) {
-      setResetMessage("Enter your email first, then tap Forgot Password.");
+      setResetMessage("Enter your username/email first, then tap Forgot Password.");
       return;
     }
 
@@ -75,7 +75,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="name@company.com"
+            placeholder="username or email"
             placeholderTextColor="#7b8da0"
             style={localStyles.input}
             autoComplete="email"
@@ -143,7 +143,7 @@ export function LoginScreen({ onLogin, errorMessage, isLoading }) {
           <View style={localStyles.linkGrid}>
             <TouchableOpacity
               style={localStyles.linkButton}
-              onPress={() => openConnectLink("https://bostonpie.net/connect/request-access/")}
+              onPress={() => openConnectLink("https://ops.bostonpie.net/public/register/")}
             >
               <Text style={localStyles.linkText}>Request Access</Text>
             </TouchableOpacity>
