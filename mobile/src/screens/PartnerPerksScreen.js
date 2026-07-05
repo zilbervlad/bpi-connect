@@ -205,7 +205,7 @@ export function PartnerPerksScreen({ onBack }) {
           <Text style={localStyles.featureLabel}>TEAM PERKS</Text>
           <Text style={localStyles.featureTitle}>Save a little outside of work.</Text>
           <Text style={localStyles.featureText}>
-            Partner offers are managed in BPI Ops and updated here automatically.
+            Exclusive discounts and local deals for the BPI team.
           </Text>
         </View>
 
