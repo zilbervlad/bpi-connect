@@ -688,13 +688,8 @@ export default function App() {
       refreshOpenThreadMessages(selectedThreadId);
     }, 250);
 
-    const interval = setInterval(() => {
-      refreshOpenThreadMessages(selectedThreadId);
-    }, 30000);
-
     return () => {
       clearTimeout(initialRefresh);
-      clearInterval(interval);
     };
   }, [selectedThreadId, usingApi, currentUser?.id]);
 

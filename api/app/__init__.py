@@ -4092,8 +4092,8 @@ def create_app():
     @app.get("/api/threads/<int:thread_id>/messages")
     def list_thread_messages(thread_id):
         user_id = request.args.get("user_id", type=int)
-        limit = request.args.get("limit", 75, type=int) or 75
-        limit = max(1, min(limit, 100))
+        limit = request.args.get("limit", 30, type=int) or 30
+        limit = max(1, min(limit, 50))
 
         thread = Thread.query.get(thread_id)
         if not thread:
@@ -4127,9 +4127,12 @@ def create_app():
                 member_count=len(thread.members),
                 muted=membership.muted if membership else False,
                 favorite=False,
-                include_members=True,
+                include_members=False,
             ),
-            "messages": [serialize_thread_message(message, user_id=user_id, include_receipts=True) for message in messages],
+            "messages": [
+                serialize_thread_message(message, user_id=user_id, include_receipts=False)
+                for message in messages
+            ],
             "limit": limit,
             "has_more": total_messages > limit,
         })
