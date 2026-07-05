@@ -262,7 +262,7 @@ export async function fetchApiThreads(userId) {
   return data.threads || [];
 }
 
-export async function fetchApiThreadMessages(threadId, userId, limit = 75) {
+export async function fetchApiThreadMessages(threadId, userId, limit = 30) {
   const params = new URLSearchParams();
 
   if (userId) {
