@@ -591,10 +591,11 @@ export function ThreadScreen({
             if (!didInitialScrollRef.current) {
               didInitialScrollRef.current = true;
               scrollToLatest(false);
+            } else if (isNearBottom) {
+              scrollToLatest(false);
             }
           }}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => scrollToLatest(false)}
           onLayout={() => scrollToLatest(false)}
           bounces={false}
           alwaysBounceVertical={false}
