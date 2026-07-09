@@ -5080,27 +5080,27 @@ def serialize_thread_message(message, user_id=None, include_receipts=True):
             user_id=user_id,
         ).first() is not None
 
+    try:
+        delivered_to_count = ThreadMember.query.filter(
+            ThreadMember.thread_id == message.thread_id,
+            ThreadMember.user_id != message.sender_user_id,
+        ).count()
+
+        seen_by_count = ThreadMember.query.filter(
+            ThreadMember.thread_id == message.thread_id,
+            ThreadMember.user_id != message.sender_user_id,
+            ThreadMember.last_read_at.isnot(None),
+            ThreadMember.last_read_at >= message.created_at,
+        ).count()
+    except Exception:
+        db.session.rollback()
+        seen_by_count = 0
+        delivered_to_count = 0
+
     seen_by_users = []
     delivered_to_users = []
 
     if include_receipts:
-        try:
-            delivered_to_count = ThreadMember.query.filter(
-                ThreadMember.thread_id == message.thread_id,
-                ThreadMember.user_id != message.sender_user_id,
-            ).count()
-
-            seen_by_count = ThreadMember.query.filter(
-                ThreadMember.thread_id == message.thread_id,
-                ThreadMember.user_id != message.sender_user_id,
-                ThreadMember.last_read_at.isnot(None),
-                ThreadMember.last_read_at >= message.created_at,
-            ).count()
-        except Exception:
-            db.session.rollback()
-            seen_by_count = 0
-            delivered_to_count = 0
-
         try:
             memberships = (
                 ThreadMember.query
