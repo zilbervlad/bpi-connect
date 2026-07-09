@@ -518,7 +518,7 @@ export function ThreadScreen({
 
       <KeyboardAvoidingView
         style={localStyles.keyboardWrap}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 6 : 0}
       >
         <View style={localStyles.header}>
