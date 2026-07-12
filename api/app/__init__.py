@@ -4351,6 +4351,270 @@ def create_app():
         )
 
 
+    # --------------------------------------------------
+    # DOUGHY CONNECT INTEGRATION
+    # --------------------------------------------------
+
+    def get_or_create_doughy_user():
+        doughy = User.query.filter_by(username="doughy").first()
+
+        if doughy:
+            changed = False
+
+            if doughy.name != "Doughy":
+                doughy.name = "Doughy"
+                changed = True
+
+            if doughy.role != "coach":
+                doughy.role = "coach"
+                changed = True
+
+            if not doughy.is_active:
+                doughy.is_active = True
+                changed = True
+
+            if changed:
+                db.session.commit()
+
+            return doughy
+
+        doughy = User(
+            name="Doughy",
+            username="doughy",
+            role="coach",
+            is_active=True,
+        )
+
+        db.session.add(doughy)
+        db.session.commit()
+
+        return doughy
+
+
+    def extract_doughy_question(body):
+        raw = (body or "").strip()
+
+        if not raw:
+            return ""
+
+        patterns = [
+            r"(?i)@doughy\b[:,]?\s*",
+            r"(?i)^doughy\b[:,]?\s*",
+            r"(?i)^ask\s+doughy\b[:,]?\s*",
+        ]
+
+        for pattern in patterns:
+            if re.search(pattern, raw):
+                cleaned = re.sub(
+                    pattern,
+                    "",
+                    raw,
+                    count=1,
+                ).strip()
+
+                return cleaned or "Please review the recent conversation and help."
+
+        return ""
+
+
+    def build_doughy_thread_context(thread, requesting_user, source_message):
+        recent_messages = (
+            ThreadMessage.query
+            .filter(
+                ThreadMessage.thread_id == thread.id,
+                ThreadMessage.id != source_message.id,
+            )
+            .order_by(ThreadMessage.created_at.desc())
+            .limit(10)
+            .all()
+        )
+
+        recent_messages.reverse()
+
+        conversation_lines = []
+
+        for item in recent_messages:
+            sender_name = (
+                item.sender.name
+                if item.sender
+                else "Unknown user"
+            )
+
+            message_body = (item.body or "").strip()
+
+            if not message_body:
+                continue
+
+            conversation_lines.append(
+                f"{sender_name}: {message_body}"
+            )
+
+        context_parts = [
+            "BPI CONNECT REQUEST CONTEXT",
+            f"Thread name: {thread.name}",
+            f"Thread type: {thread.thread_type}",
+            f"Thread group key: {thread.group_key}",
+            f"Requesting user: {requesting_user.name}",
+            f"Requesting role: {requesting_user.role}",
+        ]
+
+        if requesting_user.store:
+            context_parts.append(
+                f"Requesting user's store: "
+                f"{requesting_user.store.store_number}"
+            )
+
+        if requesting_user.area:
+            context_parts.append(
+                f"Requesting user's area: "
+                f"{requesting_user.area.name}"
+            )
+
+        if conversation_lines:
+            context_parts.extend([
+                "",
+                "RECENT THREAD CONVERSATION",
+                *conversation_lines,
+            ])
+
+        context_parts.extend([
+            "",
+            "Use this conversation only as temporary context.",
+            "Do not treat employee statements as confirmed company policy.",
+            "Do not save ordinary Connect conversation into permanent memory.",
+        ])
+
+        return "\n".join(context_parts)
+
+
+    def request_doughy_answer(question, extra_context):
+        brain_url = (
+            os.getenv(
+                "DOUGHY_BRAIN_API_URL",
+                "https://brain.bostonpie.net/api/brain/ask",
+            )
+            .strip()
+        )
+
+        brain_key = (
+            os.getenv("DOUGHY_BRAIN_API_KEY", "")
+            .strip()
+        )
+
+        if not brain_key:
+            raise RuntimeError(
+                "DOUGHY_BRAIN_API_KEY is not configured."
+            )
+
+        response = requests.post(
+            brain_url,
+            headers={
+                "Authorization": f"Bearer {brain_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Doughy-Source": "bpi_connect",
+            },
+            json={
+                "question": question,
+                "extra_context": extra_context,
+                "source": "bpi_connect",
+            },
+            timeout=120,
+        )
+
+        response.raise_for_status()
+
+        payload = response.json()
+
+        if payload.get("ok") is False:
+            raise RuntimeError(
+                payload.get("error")
+                or "Doughy Brain request failed."
+            )
+
+        answer = (payload.get("answer") or "").strip()
+
+        if not answer:
+            raise RuntimeError(
+                "Doughy returned an empty response."
+            )
+
+        return answer
+
+
+    def create_doughy_thread_reply(
+        thread_id,
+        source_message_id,
+        requesting_user_id,
+        question,
+    ):
+        with app.app_context():
+            try:
+                thread = Thread.query.get(thread_id)
+                source_message = ThreadMessage.query.get(
+                    source_message_id
+                )
+                requesting_user = User.query.get(
+                    requesting_user_id
+                )
+
+                if (
+                    not thread
+                    or not source_message
+                    or not requesting_user
+                ):
+                    return
+
+                doughy = get_or_create_doughy_user()
+
+                ensure_thread_member(
+                    thread.id,
+                    doughy.id,
+                )
+
+                db.session.commit()
+
+                extra_context = build_doughy_thread_context(
+                    thread=thread,
+                    requesting_user=requesting_user,
+                    source_message=source_message,
+                )
+
+                answer = request_doughy_answer(
+                    question=question,
+                    extra_context=extra_context,
+                )
+
+                reply = ThreadMessage(
+                    thread_id=thread.id,
+                    sender_user_id=doughy.id,
+                    body=answer,
+                    requires_ack=False,
+                )
+
+                db.session.add(reply)
+                db.session.commit()
+
+                emit_thread_message_created(
+                    thread,
+                    reply,
+                )
+
+                notify_thread_members(
+                    thread,
+                    doughy,
+                    reply,
+                )
+
+            except Exception as error:
+                db.session.rollback()
+
+                app.logger.exception(
+                    "Doughy Connect reply failed: %s",
+                    error,
+                )
+
+
     @app.post("/api/threads/<int:thread_id>/messages")
     def create_thread_message(thread_id):
         data = request.get_json() or {}
@@ -4412,10 +4676,30 @@ def create_app():
 
         push_result = notify_thread_members(thread, sender, message)
 
+        doughy_question = ""
+
+        if (
+            (sender.username or "").strip().lower()
+            != "doughy"
+        ):
+            doughy_question = extract_doughy_question(
+                body
+            )
+
+        if doughy_question:
+            socketio.start_background_task(
+                create_doughy_thread_reply,
+                thread.id,
+                message.id,
+                sender.id,
+                doughy_question,
+            )
+
         return jsonify({
             "success": True,
             "message": serialize_thread_message(message, user_id=sender.id),
             "push_result": push_result,
+            "doughy_queued": bool(doughy_question),
         }), 201
 
     @app.post("/api/threads/<int:thread_id>/favorite")
