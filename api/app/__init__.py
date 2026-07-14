@@ -5,7 +5,7 @@ import base64
 import hashlib
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from secrets import token_urlsafe
 
 from flask import Flask, jsonify, request
@@ -4352,6 +4352,838 @@ def create_app():
 
 
     # --------------------------------------------------
+    # DOUGHY READ-ONLY CONNECT CONTEXT GATEWAY
+    # --------------------------------------------------
+
+    def require_doughy_connect_secret():
+        expected_secret = (
+            os.getenv(
+                "DOUGHY_CONNECT_API_KEY",
+                "",
+            ).strip()
+            or os.getenv(
+                "BPI_OPS_INTEGRATION_SECRET",
+                "",
+            ).strip()
+        )
+
+        authorization = (
+            request.headers.get(
+                "Authorization",
+                "",
+            ).strip()
+        )
+
+        bearer_secret = ""
+
+        if authorization.lower().startswith(
+            "bearer "
+        ):
+            bearer_secret = (
+                authorization[7:].strip()
+            )
+
+        provided_secret = (
+            bearer_secret
+            or request.headers.get(
+                "X-Doughy-Key",
+                "",
+            ).strip()
+            or request.headers.get(
+                "X-Integration-Secret",
+                "",
+            ).strip()
+        )
+
+        if not expected_secret:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "DOUGHY_CONNECT_API_KEY "
+                    "is not configured."
+                ),
+            }), 403
+
+        if provided_secret != expected_secret:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "Unauthorized Doughy "
+                    "Connect request."
+                ),
+            }), 403
+
+        return None
+
+
+    def parse_doughy_connect_date(
+        value,
+        end_of_day=False,
+    ):
+        raw = str(
+            value or ""
+        ).strip()
+
+        if not raw:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(
+                raw.replace(
+                    "Z",
+                    "+00:00",
+                )
+            )
+
+            if parsed.tzinfo is not None:
+                parsed = parsed.replace(
+                    tzinfo=None
+                )
+
+            if (
+                len(raw) == 10
+                and end_of_day
+            ):
+                parsed = (
+                    parsed
+                    + timedelta(days=1)
+                )
+
+            return parsed
+
+        except ValueError:
+            return None
+
+
+    def doughy_connect_thread_scope(
+        thread,
+    ):
+        group_key = (
+            thread.group_key
+            or ""
+        )
+
+        parts = group_key.split(
+            ":",
+            1,
+        )
+
+        return {
+            "scope_type": (
+                parts[0]
+                if parts
+                else thread.thread_type
+            ),
+            "scope_value": (
+                parts[1]
+                if len(parts) > 1
+                else None
+            ),
+        }
+
+
+    def doughy_connect_thread_matches(
+        thread,
+        store="",
+        area="",
+        thread_type="",
+    ):
+        requested_store = str(
+            store or ""
+        ).strip().lower()
+
+        requested_area = str(
+            area or ""
+        ).strip().lower()
+
+        requested_type = str(
+            thread_type or ""
+        ).strip().lower()
+
+        actual_type = str(
+            thread.thread_type
+            or ""
+        ).strip().lower()
+
+        name = str(
+            thread.name
+            or ""
+        ).strip().lower()
+
+        group_key = str(
+            thread.group_key
+            or ""
+        ).strip().lower()
+
+        if (
+            requested_type
+            and actual_type
+            != requested_type
+        ):
+            return False
+
+        if requested_store:
+            store_haystack = (
+                f"{name} {group_key}"
+            )
+
+            if (
+                requested_store
+                not in store_haystack
+            ):
+                return False
+
+        if requested_area:
+            area_haystack = (
+                f"{name} {group_key}"
+            )
+
+            if (
+                requested_area
+                not in area_haystack
+            ):
+                return False
+
+        return True
+
+
+    def serialize_doughy_connect_message(
+        message,
+    ):
+        sender = message.sender
+        thread = message.thread
+
+        attachments = []
+
+        try:
+            message_attachments = (
+                message.attachments
+                or []
+            )
+
+            for attachment in (
+                message_attachments
+            ):
+                attachments.append({
+                    "file_type": (
+                        attachment.file_type
+                    ),
+                    "original_filename": (
+                        attachment.original_filename
+                    ),
+                    "mime_type": (
+                        attachment.mime_type
+                    ),
+                    "size_bytes": (
+                        attachment.size_bytes
+                    ),
+                })
+
+        except Exception:
+            db.session.rollback()
+            attachments = []
+
+        acknowledgement_names = []
+
+        try:
+            acknowledgement_names = [
+                item.user.name
+                for item in (
+                    message.acks
+                    or []
+                )
+                if item.user
+            ]
+
+        except Exception:
+            db.session.rollback()
+            acknowledgement_names = []
+
+        scope = (
+            doughy_connect_thread_scope(
+                thread
+            )
+        )
+
+        return {
+            "id": message.id,
+            "thread_id": message.thread_id,
+            "thread_name": (
+                thread.name
+                if thread
+                else ""
+            ),
+            "thread_type": (
+                thread.thread_type
+                if thread
+                else ""
+            ),
+            "thread_scope_type": (
+                scope.get("scope_type")
+            ),
+            "thread_scope_value": (
+                scope.get("scope_value")
+            ),
+            "sender_id": (
+                sender.id
+                if sender
+                else None
+            ),
+            "sender_name": (
+                sender.name
+                if sender
+                else "Unknown"
+            ),
+            "sender_role": (
+                sender.role
+                if sender
+                else None
+            ),
+            "sender_store": (
+                sender.store.store_number
+                if (
+                    sender
+                    and sender.store
+                )
+                else None
+            ),
+            "sender_area": (
+                sender.area.name
+                if (
+                    sender
+                    and sender.area
+                )
+                else None
+            ),
+            "body": (
+                message.body
+                or ""
+            ),
+            "requires_ack": bool(
+                message.requires_ack
+            ),
+            "acknowledgement_count": len(
+                acknowledgement_names
+            ),
+            "acknowledged_by": (
+                acknowledgement_names
+            ),
+            "attachments": attachments,
+            "created_at": (
+                iso_utc(
+                    message.created_at
+                )
+                if message.created_at
+                else None
+            ),
+        }
+
+
+    @app.post(
+        "/api/integrations/doughy/context"
+    )
+    def doughy_connect_context():
+        auth_error = (
+            require_doughy_connect_secret()
+        )
+
+        if auth_error:
+            return auth_error
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        module = str(
+            data.get("module")
+            or "messages"
+        ).strip().lower()
+
+        allowed_modules = {
+            "messages",
+            "threads",
+            "people",
+            "acknowledgements",
+        }
+
+        if module not in allowed_modules:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "Unsupported Connect module."
+                ),
+            }), 400
+
+        requesting_user_id = (
+            data.get(
+                "requesting_user_id"
+            )
+            or data.get(
+                "requesting_connect_user_id"
+            )
+        )
+
+        try:
+            requesting_user_id = int(
+                requesting_user_id
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "requesting_user_id "
+                    "is required."
+                ),
+            }), 400
+
+        requesting_user = User.query.get(
+            requesting_user_id
+        )
+
+        if (
+            not requesting_user
+            or not requesting_user.is_active
+        ):
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "Active requesting user "
+                    "not found."
+                ),
+            }), 404
+
+        requested_limit = (
+            data.get("limit")
+            or 100
+        )
+
+        try:
+            requested_limit = int(
+                requested_limit
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            requested_limit = 100
+
+        limit = max(
+            1,
+            min(
+                requested_limit,
+                200,
+            ),
+        )
+
+        store = str(
+            data.get("store")
+            or ""
+        ).strip()
+
+        area = str(
+            data.get("area")
+            or ""
+        ).strip()
+
+        person = str(
+            data.get("person")
+            or data.get("employee")
+            or ""
+        ).strip().lower()
+
+        search_text = str(
+            data.get("query")
+            or ""
+        ).strip().lower()
+
+        thread_type = str(
+            data.get("thread_type")
+            or ""
+        ).strip().lower()
+
+        include_doughy = bool(
+            data.get(
+                "include_doughy",
+                False,
+            )
+        )
+
+        date_from = (
+            parse_doughy_connect_date(
+                data.get("date_from")
+            )
+        )
+
+        date_to = (
+            parse_doughy_connect_date(
+                data.get("date_to"),
+                end_of_day=True,
+            )
+        )
+
+        all_threads = Thread.query.all()
+
+        accessible_threads = [
+            thread
+            for thread in all_threads
+            if can_user_access_thread(
+                requesting_user,
+                thread,
+            )
+            and doughy_connect_thread_matches(
+                thread,
+                store=store,
+                area=area,
+                thread_type=thread_type,
+            )
+        ]
+
+        accessible_thread_ids = [
+            thread.id
+            for thread
+            in accessible_threads
+        ]
+
+        if module == "threads":
+            rows = []
+
+            for thread in accessible_threads:
+                message_count = (
+                    ThreadMessage.query
+                    .filter_by(
+                        thread_id=thread.id
+                    )
+                    .count()
+                )
+
+                last_message = (
+                    ThreadMessage.query
+                    .filter_by(
+                        thread_id=thread.id
+                    )
+                    .order_by(
+                        ThreadMessage
+                        .created_at
+                        .desc()
+                    )
+                    .first()
+                )
+
+                member_count = (
+                    ThreadMember.query
+                    .filter_by(
+                        thread_id=thread.id
+                    )
+                    .count()
+                )
+
+                scope = (
+                    doughy_connect_thread_scope(
+                        thread
+                    )
+                )
+
+                rows.append({
+                    "id": thread.id,
+                    "name": thread.name,
+                    "thread_type": (
+                        thread.thread_type
+                    ),
+                    "scope_type": (
+                        scope.get(
+                            "scope_type"
+                        )
+                    ),
+                    "scope_value": (
+                        scope.get(
+                            "scope_value"
+                        )
+                    ),
+                    "member_count": (
+                        member_count
+                    ),
+                    "message_count": (
+                        message_count
+                    ),
+                    "last_message_at": (
+                        iso_utc(
+                            last_message
+                            .created_at
+                        )
+                        if last_message
+                        else None
+                    ),
+                })
+
+            rows.sort(
+                key=lambda row: (
+                    row.get(
+                        "last_message_at"
+                    )
+                    or ""
+                ),
+                reverse=True,
+            )
+
+            rows = rows[:limit]
+
+            return jsonify({
+                "ok": True,
+                "source": "bpi_connect",
+                "module": "threads",
+                "count": len(rows),
+                "threads": rows,
+                "requester": {
+                    "id": (
+                        requesting_user.id
+                    ),
+                    "name": (
+                        requesting_user.name
+                    ),
+                    "role": (
+                        requesting_user.role
+                    ),
+                },
+            })
+
+        if module == "people":
+            visible_user_ids = set()
+
+            memberships = (
+                ThreadMember.query
+                .filter(
+                    ThreadMember.thread_id.in_(
+                        accessible_thread_ids
+                    )
+                )
+                .all()
+                if accessible_thread_ids
+                else []
+            )
+
+            for membership in memberships:
+                visible_user_ids.add(
+                    membership.user_id
+                )
+
+            people = (
+                User.query
+                .filter(
+                    User.id.in_(
+                        visible_user_ids
+                    )
+                )
+                .filter(
+                    User.is_active.is_(True)
+                )
+                .order_by(
+                    User.name.asc()
+                )
+                .all()
+                if visible_user_ids
+                else []
+            )
+
+            rows = []
+
+            for user in people:
+                person_haystack = (
+                    f"{user.name or ''} "
+                    f"{user.username or ''} "
+                    f"{user.role or ''} "
+                    f"{user.store.store_number if user.store else ''} "
+                    f"{user.area.name if user.area else ''}"
+                ).lower()
+
+                if (
+                    search_text
+                    and search_text
+                    not in person_haystack
+                ):
+                    continue
+
+                rows.append({
+                    "id": user.id,
+                    "name": user.name,
+                    "username": (
+                        user.username
+                    ),
+                    "role": user.role,
+                    "store": (
+                        user.store.store_number
+                        if user.store
+                        else None
+                    ),
+                    "area": (
+                        user.area.name
+                        if user.area
+                        else None
+                    ),
+                    "is_active": bool(
+                        user.is_active
+                    ),
+                })
+
+                if len(rows) >= limit:
+                    break
+
+            return jsonify({
+                "ok": True,
+                "source": "bpi_connect",
+                "module": "people",
+                "count": len(rows),
+                "people": rows,
+            })
+
+        if not accessible_thread_ids:
+            return jsonify({
+                "ok": True,
+                "source": "bpi_connect",
+                "module": module,
+                "count": 0,
+                "messages": [],
+            })
+
+        message_query = (
+            ThreadMessage.query
+            .filter(
+                ThreadMessage.thread_id.in_(
+                    accessible_thread_ids
+                )
+            )
+        )
+
+        if date_from:
+            message_query = (
+                message_query.filter(
+                    ThreadMessage.created_at
+                    >= date_from
+                )
+            )
+
+        if date_to:
+            message_query = (
+                message_query.filter(
+                    ThreadMessage.created_at
+                    < date_to
+                )
+            )
+
+        if module == "acknowledgements":
+            message_query = (
+                message_query.filter(
+                    ThreadMessage
+                    .requires_ack
+                    .is_(True)
+                )
+            )
+
+        candidates = (
+            message_query
+            .order_by(
+                ThreadMessage
+                .created_at
+                .desc()
+            )
+            .limit(
+                max(
+                    1000,
+                    limit * 10,
+                )
+            )
+            .all()
+        )
+
+        rows = []
+
+        for message in candidates:
+            sender = message.sender
+
+            if (
+                not include_doughy
+                and sender
+                and str(
+                    sender.username
+                    or ""
+                ).strip().lower()
+                == "doughy"
+            ):
+                continue
+
+            if person:
+                sender_haystack = (
+                    f"{sender.name if sender else ''} "
+                    f"{sender.username if sender else ''}"
+                ).lower()
+
+                if (
+                    person
+                    not in sender_haystack
+                ):
+                    continue
+
+            if search_text:
+                message_haystack = (
+                    f"{message.body or ''} "
+                    f"{message.thread.name if message.thread else ''}"
+                ).lower()
+
+                if (
+                    search_text
+                    not in message_haystack
+                ):
+                    continue
+
+            rows.append(
+                serialize_doughy_connect_message(
+                    message
+                )
+            )
+
+            if len(rows) >= limit:
+                break
+
+        return jsonify({
+            "ok": True,
+            "source": "bpi_connect",
+            "module": module,
+            "count": len(rows),
+            "messages": rows,
+            "requester": {
+                "id": requesting_user.id,
+                "name": requesting_user.name,
+                "role": requesting_user.role,
+            },
+            "filters": {
+                "date_from": (
+                    date_from.isoformat()
+                    if date_from
+                    else None
+                ),
+                "date_to": (
+                    date_to.isoformat()
+                    if date_to
+                    else None
+                ),
+                "store": store or None,
+                "area": area or None,
+                "person": person or None,
+                "query": (
+                    search_text
+                    or None
+                ),
+                "thread_type": (
+                    thread_type
+                    or None
+                ),
+            },
+        })
+
+
+    # --------------------------------------------------
     # DOUGHY CONNECT INTEGRATION
     # --------------------------------------------------
 
@@ -4455,6 +5287,7 @@ def create_app():
             f"Thread type: {thread.thread_type}",
             f"Thread group key: {thread.group_key}",
             f"Requesting user: {requesting_user.name}",
+            f"Requesting Connect user ID: {requesting_user.id}",
             f"Requesting role: {requesting_user.role}",
         ]
 
