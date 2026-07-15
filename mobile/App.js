@@ -466,6 +466,8 @@ export default function App() {
   const [typingByThread, setTypingByThread] = useState({});
 
   const socketRef = useRef(null);
+  const apiUsersCacheRef = useRef([]);
+  const apiUsersRequestRef = useRef(null);
   const selectedThreadIdRef = useRef(selectedThreadId);
   const locallyReadThreadIdsRef = useRef(new Set());
   const openThreadRefreshInFlightRef = useRef(new Set());
@@ -635,8 +637,8 @@ export default function App() {
     }
 
     const socket = io(REALTIME_URL, {
-      transports: ["websocket", "polling"],
-      upgrade: true,
+      transports: ["polling", "websocket"],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 600,
@@ -864,14 +866,35 @@ export default function App() {
     setActiveTab("Home");
   }
 
+  async function loadApiUsersOnce() {
+    if (apiUsersCacheRef.current.length > 0) {
+      return apiUsersCacheRef.current;
+    }
+
+    if (!apiUsersRequestRef.current) {
+      apiUsersRequestRef.current = fetchApiUsers()
+        .then((loadedUsers) =>
+          loadedUsers.map(mapApiUserToDemoUser)
+        )
+        .then((mappedUsers) => {
+          apiUsersCacheRef.current = mappedUsers;
+          setApiUsers(mappedUsers);
+          return mappedUsers;
+        })
+        .finally(() => {
+          apiUsersRequestRef.current = null;
+        });
+    }
+
+    return apiUsersRequestRef.current;
+  }
+
   async function loadApiData() {
     try {
-      const loadedUsers = await fetchApiUsers();
-      const mappedUsers = loadedUsers.map(mapApiUserToDemoUser);
+      await loadApiUsersOnce();
 
       // Do not auto-select a default API user.
       // The logged-in user must only come from handleLogin() or saved AsyncStorage.
-      setApiUsers(mappedUsers);
       setUsingApi(true);
     } catch (error) {
       console.log("API unavailable:", error.message);
@@ -897,19 +920,13 @@ export default function App() {
     if (!user?.id) return;
 
     try {
-      const shouldLoadUsers = apiUsers.length === 0;
-
-      const [loadedUsers, loadedMessages, loadedThreads] = await Promise.all([
-        shouldLoadUsers ? fetchApiUsers() : Promise.resolve(null),
+      const [, loadedMessages, loadedThreads] = await Promise.all([
+        loadApiUsersOnce(),
         fetchApiMessages(user.id),
         fetchApiThreads(user.id),
       ]);
 
       const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
-
-      if (loadedUsers) {
-        setApiUsers(loadedUsers.map(mapApiUserToDemoUser));
-      }
       setMessages(loadedMessages.map(mapApiMessageToAppMessage));
       setThreads((currentThreads) => {
         const nextThreads = mappedThreads.map((freshThread) => {
