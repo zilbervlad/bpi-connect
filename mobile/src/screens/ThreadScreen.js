@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -14,6 +14,7 @@ import {
   Platform,
   Alert,
   ActionSheetIOS,
+  Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
@@ -23,6 +24,7 @@ import { styles } from "../styles/styles";
 import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 import { setActiveNotificationThreadId } from "../services/pushNotifications";
+import { getVisibleApiPeople } from "../api/peoplePermissions";
 
 function getSeenStatusText(message) {
   const seenByCount = Number(message.seenByCount || 0);
@@ -46,6 +48,7 @@ function getSeenStatusText(message) {
 export function ThreadScreen({
   thread,
   user,
+  users = [],
   onBack,
   onSendThreadMessage,
   onSendThreadImageMessage,
@@ -58,10 +61,87 @@ export function ThreadScreen({
   onManageThread,
 }) {
   const [draft, setDraft] = useState("");
+  const [mentionQuery, setMentionQuery] = useState(null);
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageCaption, setPendingImageCaption] = useState("");
+  const [expandedImageUri, setExpandedImageUri] = useState(null);
   const currentUserRole = String(user?.role || "").toLowerCase();
   const canManageThread = ["admin", "hr", "coach"].includes(currentUserRole) && thread.type !== "direct";
+
+  const visibleMentionUsers = useMemo(() => {
+    return getVisibleApiPeople(user, users)
+      .filter((person) => person?.is_active !== false)
+      .sort((a, b) =>
+        String(a?.name || "").localeCompare(String(b?.name || ""))
+      );
+  }, [user, users]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) {
+      return [];
+    }
+
+    const searchValue = mentionQuery.trim().toLowerCase();
+
+    return visibleMentionUsers
+      .filter((person) => {
+        if (!searchValue) {
+          return true;
+        }
+
+        const searchableText = [
+          person?.name,
+          person?.username,
+          person?.role,
+          person?.store,
+          person?.store_name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(searchValue);
+      })
+      .slice(0, 8);
+  }, [mentionQuery, visibleMentionUsers]);
+
+  function handleDraftChange(value) {
+    setDraft(value);
+
+    const cursorText = String(value || "");
+
+    // Only show suggestions while typing a single mention token.
+    // Once a selected name is followed by a space and message text,
+    // the mention picker closes.
+    const mentionMatch = cursorText.match(/(?:^|\s)@([^@\s]*)$/);
+
+    if (!mentionMatch) {
+      setMentionQuery(null);
+      return;
+    }
+
+    setMentionQuery(mentionMatch[1] || "");
+  }
+
+  function insertMention(person) {
+    const displayName =
+      String(person?.name || person?.username || "").trim();
+
+    if (!displayName) {
+      return;
+    }
+
+    const updatedDraft = draft.replace(
+      /(?:^|\s)@([^@\n]*)$/,
+      (match) => {
+        const leadingSpace = match.startsWith(" ") ? " " : "";
+        return `${leadingSpace}@${displayName} `;
+      }
+    );
+
+    setDraft(updatedDraft);
+    setMentionQuery(null);
+  }
 
   function isDeletedMessage(message) {
     return Boolean(message?.deleted) || String(message?.body || "") === "This message was deleted";
@@ -288,17 +368,66 @@ export function ThreadScreen({
     if (!messageToSend) return;
 
     setDraft("");
+    setMentionQuery(null);
     setIsNearBottom(true);
     setHasNewMessages(false);
     onSendThreadMessage?.(thread.id, messageToSend);
   }
 
-  async function handlePickImage() {
+  async function preparePickedImage(asset) {
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: "base64",
+    });
+
+    const mimeType = asset.mimeType || "image/jpeg";
+    const imageData = `data:${mimeType};base64,${base64}`;
+
+    setPendingImage({
+      uri: asset.uri,
+      imageData,
+      mimeType,
+      fileName: asset.fileName || "chat-image.jpg",
+    });
+    setPendingImageCaption("");
+  }
+
+  async function handleTakePhoto() {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Camera Access Needed",
+          "Please allow camera access so you can take and send pictures."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 0.72,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return;
+      }
+
+      await preparePickedImage(result.assets[0]);
+    } catch (error) {
+      Alert.alert("Camera Error", error.message || "Could not take picture.");
+    }
+  }
+
+  async function handleChoosePhoto() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        alert("Photo access is needed to send pictures.");
+        Alert.alert(
+          "Photo Access Needed",
+          "Please allow photo access so you can choose and send pictures."
+        );
         return;
       }
 
@@ -312,25 +441,54 @@ export function ThreadScreen({
         return;
       }
 
-      const asset = result.assets[0];
-
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: "base64",
-      });
-
-      const mimeType = asset.mimeType || "image/jpeg";
-      const imageData = `data:${mimeType};base64,${base64}`;
-
-      setPendingImage({
-        uri: asset.uri,
-        imageData,
-        mimeType,
-        fileName: asset.fileName || "chat-image.jpg",
-      });
-      setPendingImageCaption("");
+      await preparePickedImage(result.assets[0]);
     } catch (error) {
-      alert(error.message || "Could not choose picture.");
+      Alert.alert(
+        "Photo Error",
+        error.message || "Could not choose picture."
+      );
     }
+  }
+
+  function handlePickImage() {
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ["Cancel", "Take Photo", "Choose From Library"],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleTakePhoto();
+          }
+
+          if (buttonIndex === 2) {
+            handleChoosePhoto();
+          }
+        }
+      );
+
+      return;
+    }
+
+    Alert.alert(
+      "Add Photo",
+      "Take a new picture or choose one from your library.",
+      [
+        {
+          text: "Take Photo",
+          onPress: handleTakePhoto,
+        },
+        {
+          text: "Choose From Library",
+          onPress: handleChoosePhoto,
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
   }
 
   async function handleSendPendingImage() {
@@ -411,12 +569,22 @@ export function ThreadScreen({
           >
             {message.attachments?.map((attachment) =>
               attachment.file_type === "image" ? (
-                <Image
+                <Pressable
                   key={attachment.id}
-                  source={{ uri: attachment.url || attachment.localUri }}
-                  style={localStyles.messageImage}
-                  resizeMode="cover"
-                />
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    setExpandedImageUri(
+                      attachment.url || attachment.localUri
+                    );
+                  }}
+                  style={localStyles.messageImagePressable}
+                >
+                  <Image
+                    source={{ uri: attachment.url || attachment.localUri }}
+                    style={localStyles.messageImage}
+                    resizeMode="cover"
+                  />
+                </Pressable>
               ) : null
             )}
 
@@ -666,6 +834,82 @@ export function ThreadScreen({
           </TouchableOpacity>
         ) : null}
 
+        {mentionQuery !== null ? (
+          <View style={localStyles.mentionPicker}>
+            <View style={localStyles.mentionPickerHeader}>
+              <Text style={localStyles.mentionPickerTitle}>
+                Mention someone
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => setMentionQuery(null)}
+                hitSlop={10}
+              >
+                <Text style={localStyles.mentionPickerClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            {mentionSuggestions.length ? (
+              mentionSuggestions.map((person) => {
+                const personName =
+                  person?.name || person?.username || "Team member";
+
+                const personMeta = [
+                  person?.role,
+                  person?.store_name || person?.store,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+
+                return (
+                  <TouchableOpacity
+                    key={person.id}
+                    style={localStyles.mentionPerson}
+                    onPress={() => insertMention(person)}
+                    activeOpacity={0.75}
+                  >
+                    <UserAvatar
+                      name={personName}
+                      imageUrl={
+                        person?.profile_photo_url ||
+                        person?.profilePhotoUrl ||
+                        person?.avatar_url
+                      }
+                      size={38}
+                    />
+
+                    <View style={localStyles.mentionPersonText}>
+                      <Text
+                        style={localStyles.mentionPersonName}
+                        numberOfLines={1}
+                      >
+                        {personName}
+                      </Text>
+
+                      {personMeta ? (
+                        <Text
+                          style={localStyles.mentionPersonMeta}
+                          numberOfLines={1}
+                        >
+                          {personMeta}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    <Text style={localStyles.mentionAddText}>@</Text>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View style={localStyles.mentionEmpty}>
+                <Text style={localStyles.mentionEmptyText}>
+                  No matching people
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
+
         <View style={localStyles.composer}>
           <TouchableOpacity style={localStyles.photoButton} onPress={handlePickImage}>
             <Text style={localStyles.photoButtonText}>＋</Text>
@@ -673,7 +917,7 @@ export function ThreadScreen({
 
           <TextInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={handleDraftChange}
             placeholder="Message"
             placeholderTextColor="#8a8a8e"
             style={localStyles.input}
@@ -689,6 +933,37 @@ export function ThreadScreen({
             <Text style={localStyles.sendText}>➤</Text>
           </TouchableOpacity>
         </View>
+
+        <Modal
+          visible={Boolean(expandedImageUri)}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setExpandedImageUri(null)}
+        >
+          <View style={localStyles.imageViewerBackdrop}>
+            <TouchableOpacity
+              style={localStyles.imageViewerCloseButton}
+              onPress={() => setExpandedImageUri(null)}
+              activeOpacity={0.8}
+            >
+              <Text style={localStyles.imageViewerCloseText}>×</Text>
+            </TouchableOpacity>
+
+            <Pressable
+              style={localStyles.imageViewerContent}
+              onPress={() => setExpandedImageUri(null)}
+            >
+              {expandedImageUri ? (
+                <Image
+                  source={{ uri: expandedImageUri }}
+                  style={localStyles.expandedImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </Pressable>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1095,12 +1370,51 @@ const localStyles = StyleSheet.create({
     fontStyle: "italic",
     opacity: 0.72,
   },
-  messageImage: {
+  messageImagePressable: {
     width: 230,
     height: 230,
     borderRadius: 16,
     marginBottom: 7,
+    overflow: "hidden",
     backgroundColor: "#e5e7eb",
+  },
+  messageImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#e5e7eb",
+  },
+  imageViewerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.96)",
+  },
+  imageViewerContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 70,
+  },
+  expandedImage: {
+    width: "100%",
+    height: "100%",
+  },
+  imageViewerCloseButton: {
+    position: "absolute",
+    top: 52,
+    right: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  imageViewerCloseText: {
+    color: "#ffffff",
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: "300",
   },
   messageStatusText: {
     color: "rgba(255,255,255,0.78)",
@@ -1194,6 +1508,87 @@ const localStyles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 2,
     paddingHorizontal: 8,
+  },
+  mentionPicker: {
+    maxHeight: 390,
+    marginHorizontal: 12,
+    marginBottom: 7,
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingVertical: 8,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  mentionPickerHeader: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  mentionPickerTitle: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  mentionPickerClose: {
+    color: "#64748b",
+    fontSize: 24,
+    lineHeight: 25,
+    fontWeight: "500",
+  },
+  mentionPerson: {
+    minHeight: 55,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mentionPersonText: {
+    flex: 1,
+    marginLeft: 10,
+    marginRight: 8,
+  },
+  mentionPersonName: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  mentionPersonMeta: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  mentionAddText: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    overflow: "hidden",
+    textAlign: "center",
+    lineHeight: 29,
+    color: "#e91f3f",
+    backgroundColor: "#fff0f3",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  mentionEmpty: {
+    minHeight: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  mentionEmptyText: {
+    color: "#94a3b8",
+    fontSize: 13,
+    fontWeight: "800",
   },
   pendingImagePanel: {
     marginHorizontal: 12,

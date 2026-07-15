@@ -635,8 +635,8 @@ export default function App() {
     }
 
     const socket = io(REALTIME_URL, {
-      transports: ["polling", "websocket"],
-      upgrade: false,
+      transports: ["websocket", "polling"],
+      upgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 600,
@@ -646,6 +646,17 @@ export default function App() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
+      console.log(
+        "Realtime connected:",
+        socket.id,
+        "transport:",
+        socket.io.engine.transport.name
+      );
+
+      socket.io.engine.on("upgrade", (transport) => {
+        console.log("Realtime upgraded to:", transport.name);
+      });
+
       socket.emit("join_user", { user_id: currentUser.id });
     });
 
@@ -886,12 +897,19 @@ export default function App() {
     if (!user?.id) return;
 
     try {
-      const loadedUsers = await fetchApiUsers();
-      const loadedMessages = await fetchApiMessages(user.id);
-      const loadedThreads = await fetchApiThreads(user.id);
+      const shouldLoadUsers = apiUsers.length === 0;
+
+      const [loadedUsers, loadedMessages, loadedThreads] = await Promise.all([
+        shouldLoadUsers ? fetchApiUsers() : Promise.resolve(null),
+        fetchApiMessages(user.id),
+        fetchApiThreads(user.id),
+      ]);
+
       const mappedThreads = loadedThreads.map(mapApiThreadToAppThread);
 
-      setApiUsers(loadedUsers.map(mapApiUserToDemoUser));
+      if (loadedUsers) {
+        setApiUsers(loadedUsers.map(mapApiUserToDemoUser));
+      }
       setMessages(loadedMessages.map(mapApiMessageToAppMessage));
       setThreads((currentThreads) => {
         const nextThreads = mappedThreads.map((freshThread) => {
@@ -1967,6 +1985,7 @@ export default function App() {
       <ThreadScreen
         thread={selectedThread}
         user={currentUser}
+        users={profileUsers}
         onBack={closeThread}
         onSendThreadMessage={sendThreadMessage}
         onSendThreadImageMessage={sendThreadImageMessage}
