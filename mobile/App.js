@@ -1781,10 +1781,42 @@ export default function App() {
           return updatedThread ? [updatedThread, ...otherThreads] : currentThreads;
         });
 
+        const messageThread = threads.find(
+          (thread) =>
+            Number(thread.id) === Number(threadId)
+        );
+
+        const threadGroupKey = String(
+          messageThread?.groupKey ||
+          messageThread?.group_key ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const threadName = String(
+          messageThread?.name ||
+          messageThread?.title ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const isMaintenanceThread =
+          threadGroupKey === "role:maintenance" ||
+          threadName === "maintenance";
+
+        const humanOnlyMessage =
+          /^\/human\b/i.test(cleanBody);
+
         const invokesDoughy =
-          /(^|\s)@doughy\b/i.test(cleanBody) ||
-          /^doughy\b/i.test(cleanBody) ||
-          /^ask\s+doughy\b/i.test(cleanBody);
+          !humanOnlyMessage &&
+          (
+            isMaintenanceThread ||
+            /(^|\s)@doughy\b/i.test(cleanBody) ||
+            /^doughy\b/i.test(cleanBody) ||
+            /^ask\s+doughy\b/i.test(cleanBody)
+          );
 
         if (invokesDoughy) {
           setTimeout(() => {

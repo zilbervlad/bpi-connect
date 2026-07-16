@@ -5385,6 +5385,80 @@ def create_app():
         return answer
 
 
+    def extract_automatic_maintenance_question(
+        thread,
+        body,
+    ):
+        """
+        Automatically route meaningful messages from the dedicated
+        Maintenance thread to Doughy Jr.
+
+        Other threads continue to require an explicit Doughy mention.
+        """
+        if (
+            (thread.group_key or "").strip().lower()
+            != "role:maintenance"
+        ):
+            return ""
+
+        text = str(body or "").strip()
+
+        if not text:
+            return ""
+
+        # Explicit escape hatch for human-only conversation.
+        if text.lower().startswith("/human"):
+            return ""
+
+        # Preserve normal @doughy parsing when someone still uses it.
+        explicitly_addressed = extract_doughy_question(text)
+
+        if explicitly_addressed:
+            return explicitly_addressed
+
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            text.lower(),
+        ).strip(" .,!?:;-'\"")
+
+        quiet_messages = {
+            "ok",
+            "okay",
+            "k",
+            "kk",
+            "yes",
+            "yep",
+            "yeah",
+            "no",
+            "nope",
+            "thanks",
+            "thank you",
+            "ty",
+            "done",
+            "got it",
+            "sounds good",
+            "perfect",
+            "great",
+            "nice",
+            "cool",
+            "noted",
+            "roger",
+            "copy",
+            "good morning",
+            "good night",
+        }
+
+        if normalized in quiet_messages:
+            return ""
+
+        # Ignore emoji/punctuation-only acknowledgements.
+        if not re.search(r"[a-z0-9]", normalized):
+            return ""
+
+        return text
+
+
     def create_doughy_thread_reply(
         thread_id,
         source_message_id,
@@ -5535,9 +5609,20 @@ def create_app():
             (sender.username or "").strip().lower()
             != "doughy"
         ):
-            doughy_question = extract_doughy_question(
-                body
-            )
+            if (
+                (thread.group_key or "").strip().lower()
+                == "role:maintenance"
+            ):
+                doughy_question = (
+                    extract_automatic_maintenance_question(
+                        thread,
+                        body,
+                    )
+                )
+            else:
+                doughy_question = extract_doughy_question(
+                    body
+                )
 
         if doughy_question:
             socketio.start_background_task(
