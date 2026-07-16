@@ -1781,6 +1781,31 @@ export default function App() {
           return updatedThread ? [updatedThread, ...otherThreads] : currentThreads;
         });
 
+        const invokesDoughy =
+          /(^|\s)@doughy\b/i.test(cleanBody) ||
+          /^doughy\b/i.test(cleanBody) ||
+          /^ask\s+doughy\b/i.test(cleanBody);
+
+        if (invokesDoughy) {
+          setTimeout(() => {
+            if (
+              Number(selectedThreadIdRef.current) ===
+              Number(threadId)
+            ) {
+              refreshOpenThreadMessages(threadId);
+            }
+          }, 3500);
+
+          setTimeout(() => {
+            if (
+              Number(selectedThreadIdRef.current) ===
+              Number(threadId)
+            ) {
+              refreshOpenThreadMessages(threadId);
+            }
+          }, 6500);
+        }
+
         return;
       } catch (error) {
         console.log("Could not send API thread message:", error.message);
