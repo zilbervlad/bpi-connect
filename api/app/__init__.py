@@ -5287,6 +5287,7 @@ def create_app():
             f"Thread type: {thread.thread_type}",
             f"Thread group key: {thread.group_key}",
             f"Requesting user: {requesting_user.name}",
+            f"Requesting username: {requesting_user.username}",
             f"Requesting Connect user ID: {requesting_user.id}",
             f"Requesting role: {requesting_user.role}",
         ]
@@ -5320,7 +5321,11 @@ def create_app():
         return "\n".join(context_parts)
 
 
-    def request_doughy_answer(question, extra_context):
+    def request_doughy_answer(
+        question,
+        extra_context,
+        agent="",
+    ):
         brain_url = (
             os.getenv(
                 "DOUGHY_BRAIN_API_URL",
@@ -5339,6 +5344,15 @@ def create_app():
                 "DOUGHY_BRAIN_API_KEY is not configured."
             )
 
+        request_payload = {
+            "question": question,
+            "extra_context": extra_context,
+            "source": "bpi_connect",
+        }
+
+        if agent:
+            request_payload["agent"] = agent
+
         response = requests.post(
             brain_url,
             headers={
@@ -5347,11 +5361,7 @@ def create_app():
                 "Accept": "application/json",
                 "X-Doughy-Source": "bpi_connect",
             },
-            json={
-                "question": question,
-                "extra_context": extra_context,
-                "source": "bpi_connect",
-            },
+            json=request_payload,
             timeout=120,
         )
 
@@ -5413,9 +5423,19 @@ def create_app():
                     source_message=source_message,
                 )
 
+                doughy_agent = (
+                    "maintenance_connect"
+                    if (
+                        (thread.group_key or "").strip().lower()
+                        == "role:maintenance"
+                    )
+                    else ""
+                )
+
                 answer = request_doughy_answer(
                     question=question,
                     extra_context=extra_context,
+                    agent=doughy_agent,
                 )
 
                 reply = ThreadMessage(
