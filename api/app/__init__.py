@@ -5522,6 +5522,17 @@ def create_app():
         if text.lower().startswith("/human"):
             return ""
 
+        # Do not launch Doughy for greeting-only messages.
+        # The user's actual request often arrives as the next message.
+        greeting_only = re.fullmatch(
+            r"(?i)\s*(?:hi|hello|hey|good morning|good afternoon|good evening)"
+            r"(?:\s+(?:there|doughy|@doughy))?[!.?,]*\s*",
+            text,
+        )
+
+        if greeting_only:
+            return ""
+
         # Preserve normal @doughy parsing when someone still uses it.
         explicitly_addressed = extract_doughy_question(text)
 
