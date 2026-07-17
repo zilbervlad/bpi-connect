@@ -697,13 +697,9 @@ export default function App() {
   useEffect(() => {
     if (!selectedThreadId || !usingApi || !currentUser?.id) return undefined;
 
-    const initialRefresh = setTimeout(() => {
-      refreshOpenThreadMessages(selectedThreadId);
-    }, 250);
+    refreshOpenThreadMessages(selectedThreadId);
 
-    return () => {
-      clearTimeout(initialRefresh);
-    };
+    return undefined;
   }, [selectedThreadId, usingApi, currentUser?.id]);
 
   useEffect(() => {
@@ -1242,8 +1238,11 @@ export default function App() {
     openThreadRefreshInFlightRef.current.add(refreshKey);
 
     try {
-      await markThreadReadAndClear(threadId);
-      const data = await fetchApiThreadMessages(threadId, currentUser.id);
+      const [, data] = await Promise.all([
+        markThreadReadAndClear(threadId),
+        fetchApiThreadMessages(threadId, currentUser.id),
+      ]);
+
       const mappedMessages = data.messages.map(mapApiThreadMessageToBubble);
 
       setThreads((currentThreads) =>

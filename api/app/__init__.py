@@ -4243,14 +4243,27 @@ def create_app():
         db.session.add(attachment)
         db.session.commit()
 
-        emit_thread_message_created(thread, message)
+        socketio.start_background_task(
+            emit_thread_message_created_background,
+            thread.id,
+            message.id,
+        )
 
-        push_result = notify_thread_members(thread, sender, message)
+        socketio.start_background_task(
+            notify_thread_members_background,
+            thread.id,
+            sender.id,
+            message.id,
+        )
 
         return jsonify({
             "success": True,
-            "message": serialize_thread_message(message, sender.id),
-            "push_result": push_result,
+            "message": serialize_thread_message(
+                message,
+                user_id=sender.id,
+                include_receipts=False,
+            ),
+            "push_queued": True,
         }), 201
 
 
@@ -4301,15 +4314,35 @@ def create_app():
 
 
     def emit_thread_message_created(thread, message):
-        memberships = ThreadMember.query.filter_by(thread_id=thread.id).all()
+        """
+        Broadcast a lightweight message delta.
 
-        for membership in memberships:
+        Do not serialize the entire thread separately for every member.
+        Clients already have the thread and can merge this message locally.
+        """
+        memberships = ThreadMember.query.filter_by(
+            thread_id=thread.id
+        ).all()
+
+        member_user_ids = [
+            membership.user_id
+            for membership in memberships
+        ]
+
+        for user_id in member_user_ids:
             payload = {
                 "thread_id": thread.id,
-                "thread": serialize_thread(thread, user_id=membership.user_id),
+                "thread": {
+                    "id": thread.id,
+                    "name": thread.name,
+                    "thread_type": thread.thread_type,
+                    "group_key": thread.group_key,
+                    "last_message": message.body or "Photo",
+                    "last_message_at": iso_utc(message.created_at),
+                },
                 "message": serialize_thread_message(
                     message,
-                    user_id=membership.user_id,
+                    user_id=user_id,
                     include_receipts=False,
                 ),
             }
@@ -4317,8 +4350,46 @@ def create_app():
             socketio.emit(
                 "thread_message_created",
                 payload,
-                room=f"user:{membership.user_id}",
+                room=f"user:{user_id}",
             )
+
+
+    def emit_thread_message_created_background(
+        thread_id,
+        message_id,
+    ):
+        """
+        Perform realtime fan-out after the message request has returned.
+        Reload ORM objects inside the background task's app context.
+        """
+        with app.app_context():
+            try:
+                thread = db.session.get(Thread, thread_id)
+                message = db.session.get(
+                    ThreadMessage,
+                    message_id,
+                )
+
+                if not thread or not message:
+                    app.logger.warning(
+                        "Realtime emit skipped: thread=%s message=%s",
+                        thread_id,
+                        message_id,
+                    )
+                    return
+
+                emit_thread_message_created(
+                    thread,
+                    message,
+                )
+            except Exception:
+                db.session.rollback()
+                app.logger.exception(
+                    "Background realtime emit failed: "
+                    "thread=%s message=%s",
+                    thread_id,
+                    message_id,
+                )
 
 
     def notify_thread_members_background(thread_id, sender_id, message_id):
@@ -5640,7 +5711,11 @@ def create_app():
         db.session.add(message)
         db.session.commit()
 
-        emit_thread_message_created(thread, message)
+        socketio.start_background_task(
+            emit_thread_message_created_background,
+            thread.id,
+            message.id,
+        )
 
         socketio.start_background_task(
             notify_thread_members_background,
