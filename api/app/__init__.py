@@ -4307,7 +4307,11 @@ def create_app():
             payload = {
                 "thread_id": thread.id,
                 "thread": serialize_thread(thread, user_id=membership.user_id),
-                "message": serialize_thread_message(message, user_id=membership.user_id),
+                "message": serialize_thread_message(
+                    message,
+                    user_id=membership.user_id,
+                    include_receipts=False,
+                ),
             }
 
             socketio.emit(
@@ -4315,6 +4319,43 @@ def create_app():
                 payload,
                 room=f"user:{membership.user_id}",
             )
+
+
+    def notify_thread_members_background(thread_id, sender_id, message_id):
+        """
+        Send push notifications without making the message POST wait
+        for Expo's network response.
+        """
+        with app.app_context():
+            try:
+                thread = db.session.get(Thread, thread_id)
+                sender = db.session.get(User, sender_id)
+                message = db.session.get(ThreadMessage, message_id)
+
+                if not thread or not sender or not message:
+                    app.logger.warning(
+                        "Background push skipped: thread=%s sender=%s message=%s",
+                        thread_id,
+                        sender_id,
+                        message_id,
+                    )
+                    return
+
+                result = notify_thread_members(thread, sender, message)
+
+                app.logger.info(
+                    "Background thread push complete: thread=%s message=%s result=%s",
+                    thread_id,
+                    message_id,
+                    result,
+                )
+            except Exception:
+                db.session.rollback()
+                app.logger.exception(
+                    "Background thread push failed: thread=%s message=%s",
+                    thread_id,
+                    message_id,
+                )
 
 
     def notify_thread_members(thread, sender, message):
@@ -5601,7 +5642,12 @@ def create_app():
 
         emit_thread_message_created(thread, message)
 
-        push_result = notify_thread_members(thread, sender, message)
+        socketio.start_background_task(
+            notify_thread_members_background,
+            thread.id,
+            sender.id,
+            message.id,
+        )
 
         doughy_question = ""
 
@@ -5635,8 +5681,12 @@ def create_app():
 
         return jsonify({
             "success": True,
-            "message": serialize_thread_message(message, user_id=sender.id),
-            "push_result": push_result,
+            "message": serialize_thread_message(
+                message,
+                user_id=sender.id,
+                include_receipts=False,
+            ),
+            "push_queued": True,
             "doughy_queued": bool(doughy_question),
         }), 201
 

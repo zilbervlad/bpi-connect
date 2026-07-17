@@ -637,8 +637,8 @@ export default function App() {
     }
 
     const socket = io(REALTIME_URL, {
-      transports: ["polling", "websocket"],
-      upgrade: false,
+      transports: ["websocket", "polling"],
+      upgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 600,
@@ -1628,8 +1628,11 @@ export default function App() {
           metadata
         );
 
+        const createdApiMessage =
+          apiMessageResponse?.message || apiMessageResponse;
+
         const bubbleMessage = {
-          ...mapApiThreadMessageToBubble(apiMessageResponse),
+          ...mapApiThreadMessageToBubble(createdApiMessage),
           status: "sent",
         };
 
