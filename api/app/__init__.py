@@ -5425,6 +5425,10 @@ def create_app():
 
         context_parts.extend([
             "",
+            "CONNECT CONVERSATION INSTRUCTIONS",
+            "Answer the user's question from the recent thread conversation first.",
+            "Resolve short references such as names, initials, places, or 'where is' questions using the recent messages.",
+            "If the recent conversation already contains the answer, answer directly and do not route the request to maintenance, scheduling, checklists, or another operational dataset.",
             "Use this conversation only as temporary context.",
             "Do not treat employee statements as confirmed company policy.",
             "Do not save ordinary Connect conversation into permanent memory.",
@@ -5626,7 +5630,7 @@ def create_app():
                         (thread.group_key or "").strip().lower()
                         == "role:maintenance"
                     )
-                    else ""
+                    else "general_doughy"
                 )
 
                 answer = request_doughy_answer(
