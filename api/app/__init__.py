@@ -35,7 +35,7 @@ from app.models import (
 )
 socketio = SocketIO(
     cors_allowed_origins="*",
-    async_mode="eventlet",
+    async_mode="threading",
     ping_timeout=30,
     ping_interval=20,
     logger=False,
