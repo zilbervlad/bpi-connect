@@ -35,9 +35,11 @@ from app.models import (
 )
 socketio = SocketIO(
     cors_allowed_origins="*",
-    async_mode="threading",
+    async_mode="eventlet",
     ping_timeout=30,
-    ping_interval=10,
+    ping_interval=20,
+    logger=False,
+    engineio_logger=False,
 )
 
 
