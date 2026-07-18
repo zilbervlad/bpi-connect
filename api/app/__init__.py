@@ -4692,10 +4692,29 @@ def create_app():
                 ),
             }
 
+            room_name = f"user:{user_id}"
+
+            connected_sids = list(
+                socketio.server.manager.get_participants(
+                    "/",
+                    room_name,
+                )
+            )
+
+            app.logger.warning(
+                "REALTIME emit message_id=%s thread_id=%s "
+                "user_id=%s room=%s connected_sids=%s",
+                message.id,
+                thread.id,
+                user_id,
+                room_name,
+                len(connected_sids),
+            )
+
             socketio.emit(
                 "thread_message_created",
                 payload,
-                room=f"user:{user_id}",
+                room=room_name,
             )
 
 
