@@ -3,7 +3,15 @@ import { styles } from "../styles/styles";
 import { HeaderBlock } from "../components/HeaderBlock";
 import { UserAvatar } from "../components/UserAvatar";
 
-export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenProfile, onLogout }) {
+export function MoreScreen({
+  user,
+  unreadCount,
+  ackCount,
+  onOpenAdmin,
+  onOpenDocuments,
+  onOpenProfile,
+  onLogout,
+}) {
   const canOpenAdmin = ["Admin", "HR"].includes(user.role);
 
   async function openExternalLink(url, fallbackTitle = "Unable to open link") {
@@ -66,11 +74,13 @@ export function MoreScreen({ user, unreadCount, ackCount, onOpenAdmin, onOpenPro
 
         <TouchableOpacity
           style={localStyles.row}
-          onPress={() => openExternalLink("https://ops.bostonpie.net/hr-documents/my", "Unable to open documents")}
+          onPress={onOpenDocuments}
         >
           <View>
-            <Text style={localStyles.rowTitle}>BPI Ops Documents</Text>
-            <Text style={localStyles.rowMeta}>Review assigned HR documents and acknowledgements</Text>
+            <Text style={localStyles.rowTitle}>BPI Documents</Text>
+            <Text style={localStyles.rowMeta}>
+              Review and sign assigned HR documents
+            </Text>
           </View>
           <Text style={localStyles.chevron}>›</Text>
         </TouchableOpacity>

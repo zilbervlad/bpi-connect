@@ -32,7 +32,10 @@ export async function loginApiUser(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
-  return data.user;
+  return {
+    user: data.user,
+    apiToken: data.api_token,
+  };
 }
 
 export async function requestApiPasswordReset(email) {
@@ -462,4 +465,40 @@ export async function findOrCreateDirectThread(senderUserId, recipientUserId) {
   });
 
   return data.thread;
+}
+
+// CONNECT_IN_APP_HR_DOCUMENT_CLIENT_20260718
+
+export async function fetchApiHrDocuments(apiToken) {
+  const data = await apiRequest("/api/hr-documents", {
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+    },
+  });
+
+  return data.documents || [];
+}
+
+export function getApiHrDocumentFileUrl(recipientId) {
+  return `${API_BASE_URL}/api/hr-documents/${recipientId}/file`;
+}
+
+export async function acknowledgeApiHrDocument(
+  recipientId,
+  apiToken,
+  acknowledgedName
+) {
+  return apiRequest(
+    `/api/hr-documents/${recipientId}/acknowledge`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+      },
+      body: JSON.stringify({
+        acknowledged_name: acknowledgedName,
+        confirmed: true,
+      }),
+    }
+  );
 }

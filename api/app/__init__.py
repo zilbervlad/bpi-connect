@@ -8,11 +8,12 @@ import requests
 from datetime import datetime, timedelta
 from secrets import token_urlsafe
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, join_room
 from sqlalchemy import inspect
 from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from app.extensions import db
 from app.admin_web import admin_web_bp
@@ -795,6 +796,132 @@ def create_app():
 
 
 
+    def api_token_serializer():
+        secret = (
+            os.getenv("CONNECT_API_TOKEN_SECRET", "").strip()
+            or os.getenv("SECRET_KEY", "").strip()
+            or str(app.config.get("SECRET_KEY") or "").strip()
+        )
+
+        if not secret:
+            return None
+
+        return URLSafeTimedSerializer(
+            secret,
+            salt="bpi-connect-mobile-api-v1",
+        )
+
+
+    def create_mobile_api_token(user):
+        serializer = api_token_serializer()
+
+        if not serializer:
+            return None
+
+        return serializer.dumps({
+            "user_id": user.id,
+            "purpose": "mobile_api",
+        })
+
+
+    def require_mobile_api_user():
+        authorization = (
+            request.headers.get("Authorization")
+            or ""
+        ).strip()
+
+        if not authorization.lower().startswith("bearer "):
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Authentication token is required.",
+                }),
+                401,
+            )
+
+        token = authorization.split(" ", 1)[1].strip()
+        serializer = api_token_serializer()
+
+        if not serializer:
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Mobile API authentication is not configured.",
+                }),
+                503,
+            )
+
+        try:
+            payload = serializer.loads(
+                token,
+                max_age=int(
+                    os.getenv(
+                        "CONNECT_API_TOKEN_MAX_AGE_SECONDS",
+                        str(60 * 60 * 24 * 30),
+                    )
+                ),
+            )
+        except SignatureExpired:
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Your session has expired. Please sign in again.",
+                }),
+                401,
+            )
+        except BadSignature:
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Invalid authentication token.",
+                }),
+                401,
+            )
+
+        if payload.get("purpose") != "mobile_api":
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Invalid authentication token.",
+                }),
+                401,
+            )
+
+        user = User.query.get(payload.get("user_id"))
+
+        if not user or not user.is_active:
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "User account not found or inactive.",
+                }),
+                401,
+            )
+
+        return user, None
+
+
+    def bpi_ops_connect_headers():
+        secret = os.getenv(
+            "BPI_OPS_INTEGRATION_SECRET",
+            "",
+        ).strip()
+
+        return {
+            "X-BPI-Connect-Secret": secret,
+            "X-Integration-Secret": secret,
+        }
+
+
+    def bpi_ops_hr_api_base():
+        base = (
+            os.getenv("BPI_OPS_API_BASE", "").strip()
+            or "https://ops.bostonpie.net"
+        )
+
+        return base.rstrip("/")
+
+
     def require_bpi_ops_integration_secret():
         expected_secret = os.getenv("BPI_OPS_INTEGRATION_SECRET", "").strip()
         provided_secret = (
@@ -1515,9 +1642,18 @@ def create_app():
         user.last_login_at = datetime.utcnow()
         db.session.commit()
 
+        api_token = create_mobile_api_token(user)
+
+        if not api_token:
+            return jsonify({
+                "success": False,
+                "error": "Mobile API authentication is not configured.",
+            }), 503
+
         return jsonify({
             "success": True,
             "user": serialize_user(user),
+            "api_token": api_token,
         })
 
 
@@ -2362,6 +2498,200 @@ def create_app():
             "token_count": len(tokens),
             "push_result": push_result,
         })
+
+
+    # CONNECT_IN_APP_HR_DOCUMENT_PROXY_20260718
+
+    @app.get("/api/hr-documents")
+    def mobile_hr_documents():
+        user, auth_error = require_mobile_api_user()
+        if auth_error:
+            return auth_error
+
+        if not user.bpi_ops_user_id:
+            return jsonify({
+                "success": False,
+                "error": "Your Connect account is not linked to BPI Ops.",
+            }), 409
+
+        try:
+            upstream = requests.get(
+                (
+                    f"{bpi_ops_hr_api_base()}"
+                    f"/hr-documents/api/connect/users/"
+                    f"{user.bpi_ops_user_id}/documents"
+                ),
+                headers=bpi_ops_connect_headers(),
+                timeout=20,
+            )
+        except requests.RequestException as exc:
+            return jsonify({
+                "success": False,
+                "error": f"BPI Ops could not be reached: {exc}",
+            }), 502
+
+        try:
+            payload = upstream.json()
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "BPI Ops returned an invalid response.",
+            }), 502
+
+        return jsonify(payload), upstream.status_code
+
+
+    @app.get(
+        "/api/hr-documents/<int:recipient_id>/file"
+    )
+    def mobile_hr_document_file(recipient_id):
+        user, auth_error = require_mobile_api_user()
+        if auth_error:
+            return auth_error
+
+        if not user.bpi_ops_user_id:
+            return jsonify({
+                "success": False,
+                "error": "Your Connect account is not linked to BPI Ops.",
+            }), 409
+
+        try:
+            upstream = requests.get(
+                (
+                    f"{bpi_ops_hr_api_base()}"
+                    f"/hr-documents/api/connect/recipients/"
+                    f"{recipient_id}/file"
+                ),
+                params={
+                    "bpi_ops_user_id": user.bpi_ops_user_id,
+                },
+                headers=bpi_ops_connect_headers(),
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            return jsonify({
+                "success": False,
+                "error": f"BPI Ops could not be reached: {exc}",
+            }), 502
+
+        if not upstream.ok:
+            try:
+                payload = upstream.json()
+            except ValueError:
+                payload = {
+                    "success": False,
+                    "error": "Document could not be loaded.",
+                }
+
+            return jsonify(payload), upstream.status_code
+
+        response = Response(
+            upstream.content,
+            status=upstream.status_code,
+            content_type=(
+                upstream.headers.get("Content-Type")
+                or "application/octet-stream"
+            ),
+        )
+
+        content_disposition = upstream.headers.get(
+            "Content-Disposition"
+        )
+
+        if content_disposition:
+            response.headers[
+                "Content-Disposition"
+            ] = content_disposition
+
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        return response
+
+
+    @app.post(
+        "/api/hr-documents/<int:recipient_id>/acknowledge"
+    )
+    def mobile_acknowledge_hr_document(recipient_id):
+        user, auth_error = require_mobile_api_user()
+        if auth_error:
+            return auth_error
+
+        if not user.bpi_ops_user_id:
+            return jsonify({
+                "success": False,
+                "error": "Your Connect account is not linked to BPI Ops.",
+            }), 409
+
+        data = request.get_json(silent=True) or {}
+
+        acknowledged_name = (
+            data.get("acknowledged_name")
+            or ""
+        ).strip()
+
+        confirmed = data.get("confirmed") is True
+
+        if not acknowledged_name:
+            return jsonify({
+                "success": False,
+                "error": "Please type your name.",
+            }), 400
+
+        if not confirmed:
+            return jsonify({
+                "success": False,
+                "error": "Please confirm the acknowledgement.",
+            }), 400
+
+        forwarded_for = (
+            request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+            or request.remote_addr
+            or ""
+        )
+
+        user_agent = (
+            request.headers.get("User-Agent")
+            or ""
+        ).strip()
+
+        headers = {
+            **bpi_ops_connect_headers(),
+            "Content-Type": "application/json",
+            "X-Connect-Client-IP": forwarded_for,
+            "X-Connect-User-Agent": user_agent,
+        }
+
+        try:
+            upstream = requests.post(
+                (
+                    f"{bpi_ops_hr_api_base()}"
+                    f"/hr-documents/api/connect/recipients/"
+                    f"{recipient_id}/acknowledge"
+                ),
+                headers=headers,
+                json={
+                    "bpi_ops_user_id": user.bpi_ops_user_id,
+                    "acknowledged_name": acknowledged_name,
+                    "confirmed": True,
+                },
+                timeout=20,
+            )
+        except requests.RequestException as exc:
+            return jsonify({
+                "success": False,
+                "error": f"BPI Ops could not be reached: {exc}",
+            }), 502
+
+        try:
+            payload = upstream.json()
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "BPI Ops returned an invalid response.",
+            }), 502
+
+        return jsonify(payload), upstream.status_code
 
 
     @app.post("/api/integrations/bpi-ops/hr-documents/notify")

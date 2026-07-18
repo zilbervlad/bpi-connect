@@ -49,6 +49,7 @@ import { AdminScreen } from "./src/screens/AdminScreen";
 import { MoreScreen } from "./src/screens/MoreScreen";
 import { GroupManageScreen } from "./src/screens/GroupManageScreen";
 import { PartnerPerksScreen } from "./src/screens/PartnerPerksScreen";
+import { BpiDocumentsScreen } from "./src/screens/BpiDocumentsScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -722,12 +723,13 @@ export default function App() {
     setLoginError("");
 
     try {
-      const apiUser = await loginApiUser(email, password);
-      const mappedUser = mapApiUserToDemoUser(apiUser);
+      const loginResult = await loginApiUser(email, password);
+      const mappedUser = mapApiUserToDemoUser(loginResult.user);
 
       const savedUser = {
         ...mappedUser,
         apiUser: true,
+        apiToken: loginResult.apiToken,
       };
 
       setCurrentUser(savedUser);
@@ -2136,6 +2138,14 @@ export default function App() {
           <PartnerPerksScreen onBack={() => changeTab("Home")} />
         )}
 
+        {activeTab === "Documents" && (
+          <BpiDocumentsScreen
+            user={currentUser}
+            apiToken={currentUser?.apiToken}
+            onBack={() => changeTab("More")}
+          />
+        )}
+
         {activeTab === "People" && (
           <PeopleScreen
             user={currentUser}
@@ -2159,6 +2169,7 @@ export default function App() {
             unreadCount={unreadCount}
             ackCount={ackCount}
             onOpenAdmin={() => changeTab("Admin")}
+            onOpenDocuments={() => changeTab("Documents")}
             onOpenProfile={() => changeTab("Profile")}
             onLogout={handleLogout}
           />
