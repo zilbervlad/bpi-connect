@@ -660,7 +660,13 @@ export default function App() {
         console.log("Realtime upgraded to:", transport.name);
       });
 
-      socket.emit("join_user", { user_id: currentUser.id });
+      socket.emit(
+        "join_user",
+        { user_id: currentUser.id },
+        (result) => {
+          console.log("Realtime join result:", result);
+        }
+      );
     });
 
     socket.on("thread_message_created", async (payload) => {
@@ -685,6 +691,10 @@ export default function App() {
 
     socket.on("connect_error", (error) => {
       console.log("Realtime connect error:", error.message);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("Realtime disconnected:", reason);
     });
 
     return () => {
