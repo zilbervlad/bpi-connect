@@ -624,7 +624,7 @@ def create_app():
 
     @socketio.on("connect")
     def socket_connect():
-        app.logger.info(
+        app.logger.warning(
             "REALTIME connected sid=%s transport=%s user_agent=%s",
             request.sid,
             request.args.get("transport"),
@@ -652,7 +652,7 @@ def create_app():
         for membership in memberships:
             join_room(f"thread:{membership.thread_id}")
 
-        app.logger.info(
+        app.logger.warning(
             "REALTIME joined sid=%s user_id=%s threads=%s",
             request.sid,
             user.id,
