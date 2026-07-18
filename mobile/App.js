@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, SafeAreaView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  SafeAreaView,
+  Text,
+  View,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -467,6 +473,7 @@ export default function App() {
   const [typingByThread, setTypingByThread] = useState({});
 
   const socketRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
   const apiUsersCacheRef = useRef([]);
   const apiUsersRequestRef = useRef(null);
   const selectedThreadIdRef = useRef(selectedThreadId);
@@ -703,6 +710,41 @@ export default function App() {
       socket.disconnect();
       socketRef.current = null;
     };
+  }, [isLoggedIn, usingApi, currentUser?.id]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !usingApi || !currentUser?.id) {
+      return undefined;
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextState;
+
+      const returningToForeground =
+        previousState.match(/inactive|background/) &&
+        nextState === "active";
+
+      if (!returningToForeground) return;
+
+      const socket = socketRef.current;
+
+      if (socket) {
+        if (socket.connected) {
+          socket.emit("join_user", { user_id: currentUser.id });
+        } else {
+          socket.connect();
+        }
+      }
+
+      refreshThreadList();
+
+      if (selectedThreadIdRef.current) {
+        refreshOpenThreadMessages(selectedThreadIdRef.current);
+      }
+    });
+
+    return () => subscription.remove();
   }, [isLoggedIn, usingApi, currentUser?.id]);
 
   useEffect(() => {
