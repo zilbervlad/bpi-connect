@@ -51,6 +51,7 @@ const roleLabels = {
 };
 
 export function AdminScreen({ user, onUsersChanged }) {
+  const normalizedUserRole = String(user?.role || "").trim().toLowerCase();
   const [activeSection, setActiveSection] = useState("people");
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
@@ -87,7 +88,32 @@ export function AdminScreen({ user, onUsersChanged }) {
   const [newGroupType, setNewGroupType] = useState("group");
   const [newGroupMemberIds, setNewGroupMemberIds] = useState([]);
 
-  const canManage = ["Admin", "HR"].includes(user.role);
+  const canManage = [
+    "admin",
+    "hr",
+    "coach",
+    "supervisor",
+    "general_manager",
+    "manager",
+  ].includes(normalizedUserRole);
+
+  const hasFullAdminAccess = ["admin", "hr"].includes(normalizedUserRole);
+  const isAreaLeader = ["coach", "supervisor"].includes(normalizedUserRole);
+
+  const selectedPrimaryAssignment =
+    selectedUser?.store_assignments?.find(
+      (assignment) => assignment.assignment_type === "primary"
+    ) || null;
+
+  const selectedSecondaryAssignments =
+    selectedUser?.store_assignments?.filter(
+      (assignment) => assignment.assignment_type === "secondary"
+    ) || [];
+
+  const selectedOversightAssignments =
+    selectedUser?.store_assignments?.filter(
+      (assignment) => assignment.assignment_type === "oversight"
+    ) || [];
 
   const filteredUsers = useMemo(() => {
     return users.filter((item) => {
@@ -142,7 +168,7 @@ export function AdminScreen({ user, onUsersChanged }) {
 
     try {
       const [loadedUsers, loadedStores, loadedAreas] = await Promise.all([
-        fetchApiUsers(),
+        fetchApiUsers(user.id),
         fetchApiStores(),
         fetchApiAreas(),
       ]);
@@ -170,7 +196,7 @@ export function AdminScreen({ user, onUsersChanged }) {
     setIsLoading(true);
 
     try {
-      const detail = await fetchApiUserDetail(userId);
+      const detail = await fetchApiUserDetail(userId, user.id);
       setSelectedUser(detail);
       setDetailStoreNumber(detail.store || detail.store_number || "");
       setDetailEmail(detail.email || "");
@@ -519,7 +545,9 @@ export function AdminScreen({ user, onUsersChanged }) {
       setStatusMessage(
         assignmentType === "primary"
           ? `Primary store set to ${storeNumber}.`
-          : `Oversight store ${storeNumber} added.`
+          : assignmentType === "secondary"
+            ? `Additional work store ${storeNumber} added.`
+            : `Oversight store ${storeNumber} added.`
       );
       await loadAdminData();
       await onUsersChanged?.();
@@ -1047,11 +1075,27 @@ export function AdminScreen({ user, onUsersChanged }) {
             </TouchableOpacity>
           </View>
 
-          <Text style={localStyles.label}>Role</Text>
-          <PillGrid options={roles} selectedValue={selectedUser.role} onSelect={handleChangeRole} />
+          {hasFullAdminAccess ? (
+            <>
+              <Text style={localStyles.label}>Role</Text>
+              <PillGrid
+                options={roles}
+                selectedValue={selectedUser.role}
+                onSelect={handleChangeRole}
+              />
+            </>
+          ) : null}
 
           <View style={localStyles.detailSection}>
             <Text style={localStyles.sectionMiniTitle}>Store Assignment</Text>
+
+            <Text style={localStyles.itemMeta}>
+              Primary store:{" "}
+              {selectedPrimaryAssignment?.store?.store_number ||
+                selectedUser.store ||
+                selectedUser.store_number ||
+                "None"}
+            </Text>
 
             <TextInput
               value={detailStoreNumber}
@@ -1063,23 +1107,48 @@ export function AdminScreen({ user, onUsersChanged }) {
             />
 
             <View style={localStyles.actionRow}>
-              {shouldShowPrimaryStoreControls(selectedUser.role) ? (
+              {shouldShowPrimaryStoreControls(selectedUser.role) &&
+              (hasFullAdminAccess || isAreaLeader) ? (
                 <TouchableOpacity
                   style={localStyles.compactPrimaryButton}
-                  onPress={() => handleAssignStore("primary", detailStoreNumber.trim())}
+                  onPress={() =>
+                    handleAssignStore("primary", detailStoreNumber.trim())
+                  }
                   disabled={!detailStoreNumber.trim() || isLoading}
                 >
-                  <Text style={localStyles.compactPrimaryText}>Set Primary</Text>
+                  <Text style={localStyles.compactPrimaryText}>
+                    Set Primary
+                  </Text>
                 </TouchableOpacity>
               ) : null}
 
-              {shouldShowOversightControls(selectedUser.role) ? (
+              {shouldShowPrimaryStoreControls(selectedUser.role) &&
+              (hasFullAdminAccess || isAreaLeader) ? (
                 <TouchableOpacity
                   style={localStyles.compactSecondaryButton}
-                  onPress={() => handleAssignStore("oversight", detailStoreNumber.trim())}
+                  onPress={() =>
+                    handleAssignStore("secondary", detailStoreNumber.trim())
+                  }
                   disabled={!detailStoreNumber.trim() || isLoading}
                 >
-                  <Text style={localStyles.compactSecondaryText}>Add Oversight</Text>
+                  <Text style={localStyles.compactSecondaryText}>
+                    Add Work Store
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {shouldShowOversightControls(selectedUser.role) &&
+              hasFullAdminAccess ? (
+                <TouchableOpacity
+                  style={localStyles.compactSecondaryButton}
+                  onPress={() =>
+                    handleAssignStore("oversight", detailStoreNumber.trim())
+                  }
+                  disabled={!detailStoreNumber.trim() || isLoading}
+                >
+                  <Text style={localStyles.compactSecondaryText}>
+                    Add Oversight
+                  </Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -1159,27 +1228,74 @@ export function AdminScreen({ user, onUsersChanged }) {
             )}
           </View>
 
-          <Text style={localStyles.label}>Store Access</Text>
+          <Text style={localStyles.label}>Primary Store</Text>
 
-          {selectedUser.store_assignments?.length ? (
-            selectedUser.store_assignments.map((assignment) => (
+          {selectedPrimaryAssignment ? (
+            <View style={localStyles.assignmentRow}>
+              <View>
+                <Text style={localStyles.itemTitle}>
+                  Store {selectedPrimaryAssignment.store.store_number}
+                </Text>
+                <Text style={localStyles.itemMeta}>Primary</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={localStyles.emptyText}>No primary store assigned.</Text>
+          )}
+
+          <Text style={localStyles.label}>Additional Work Stores</Text>
+
+          {selectedSecondaryAssignments.length ? (
+            selectedSecondaryAssignments.map((assignment) => (
               <View key={assignment.id} style={localStyles.assignmentRow}>
                 <View>
-                  <Text style={localStyles.itemTitle}>Store {assignment.store.store_number}</Text>
-                  <Text style={localStyles.itemMeta}>{assignment.assignment_type}</Text>
+                  <Text style={localStyles.itemTitle}>
+                    Store {assignment.store.store_number}
+                  </Text>
+                  <Text style={localStyles.itemMeta}>Additional work store</Text>
                 </View>
 
-                <TouchableOpacity
-                  style={localStyles.removeButton}
-                  onPress={() => handleRemoveAssignment(assignment.id)}
-                >
-                  <Text style={localStyles.removeButtonText}>Remove</Text>
-                </TouchableOpacity>
+                {(hasFullAdminAccess || isAreaLeader) ? (
+                  <TouchableOpacity
+                    style={localStyles.removeButton}
+                    onPress={() => handleRemoveAssignment(assignment.id)}
+                  >
+                    <Text style={localStyles.removeButtonText}>Remove</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ))
           ) : (
-            <Text style={localStyles.emptyText}>No store assigned.</Text>
+            <Text style={localStyles.emptyText}>
+              No additional work stores assigned.
+            </Text>
           )}
+
+          {selectedOversightAssignments.length ? (
+            <>
+              <Text style={localStyles.label}>Oversight Stores</Text>
+
+              {selectedOversightAssignments.map((assignment) => (
+                <View key={assignment.id} style={localStyles.assignmentRow}>
+                  <View>
+                    <Text style={localStyles.itemTitle}>
+                      Store {assignment.store.store_number}
+                    </Text>
+                    <Text style={localStyles.itemMeta}>Oversight</Text>
+                  </View>
+
+                  {hasFullAdminAccess ? (
+                    <TouchableOpacity
+                      style={localStyles.removeButton}
+                      onPress={() => handleRemoveAssignment(assignment.id)}
+                    >
+                      <Text style={localStyles.removeButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ))}
+            </>
+          ) : null}
 
           <TouchableOpacity
             style={[

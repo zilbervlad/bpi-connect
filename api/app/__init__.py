@@ -811,6 +811,86 @@ def create_app():
 
 
 
+    def require_people_manager_actor(data=None):
+        data = data or {}
+        actor_user_id = (
+            data.get("actor_user_id")
+            or data.get("admin_user_id")
+            or request.args.get("actor_user_id", type=int)
+            or request.args.get("admin_user_id", type=int)
+        )
+
+        if not actor_user_id:
+            return None, (jsonify({
+                "success": False,
+                "error": "Management actor is required.",
+            }), 403)
+
+        actor = User.query.get(actor_user_id)
+        actor_role = (actor.role or "").strip().lower() if actor else ""
+
+        allowed_roles = {
+            "admin",
+            "hr",
+            "coach",
+            "supervisor",
+            "general_manager",
+            "manager",
+        }
+
+        if not actor or not actor.is_active or actor_role not in allowed_roles:
+            return None, (jsonify({
+                "success": False,
+                "error": "People-management access is required.",
+            }), 403)
+
+        return actor, None
+
+
+    def actor_has_full_people_access(actor):
+        role = (actor.role or "").strip().lower() if actor else ""
+        return role in {"admin", "hr"}
+
+
+    def actor_people_store_ids(actor):
+        return user_store_ids(actor)
+
+
+    def can_actor_manage_user(actor, target_user):
+        if not actor or not target_user:
+            return False
+
+        if actor_has_full_people_access(actor):
+            return True
+
+        actor_role = (actor.role or "").strip().lower()
+        target_role = (target_user.role or "").strip().lower()
+
+        # Scoped managers cannot manage company-level accounts.
+        if target_role in {"admin", "hr", "coach", "supervisor"}:
+            return False
+
+        actor_stores = actor_people_store_ids(actor)
+        target_stores = user_store_ids(target_user)
+
+        if actor_stores and target_stores and actor_stores.intersection(target_stores):
+            return True
+
+        # Coaches and supervisors may also manage users in their area.
+        if actor_role in {"coach", "supervisor"}:
+            if actor.area_id and target_user.area_id:
+                return actor.area_id == target_user.area_id
+
+        return False
+
+
+    def people_management_scope_error():
+        return jsonify({
+            "success": False,
+            "error": "You can only manage users assigned to your stores.",
+        }), 403
+
+
     def api_token_serializer():
         secret = (
             os.getenv("CONNECT_API_TOKEN_SECRET", "").strip()
@@ -1449,7 +1529,7 @@ def create_app():
     @app.post("/api/users/<int:user_id>/send-password-reset")
     def send_user_password_reset(user_id):
         data = request.get_json(silent=True) or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
         if actor_error:
             return actor_error
 
@@ -1457,6 +1537,9 @@ def create_app():
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
+
+        if not can_actor_manage_user(actor, user):
+            return people_management_scope_error()
 
         token = secrets.token_urlsafe(32)
         user.password_reset_token = token
@@ -1675,7 +1758,7 @@ def create_app():
     @app.post("/api/users/<int:user_id>/resend-invite")
     def resend_user_invite(user_id):
         data = request.get_json(silent=True) or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
         if actor_error:
             return actor_error
 
@@ -1683,6 +1766,9 @@ def create_app():
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
+
+        if not can_actor_manage_user(actor, user):
+            return people_management_scope_error()
 
         if user.invite_accepted_at:
             return jsonify({
@@ -1714,7 +1800,7 @@ def create_app():
     @app.post("/api/invites")
     def create_invite():
         data = request.get_json() or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
         if actor_error:
             return actor_error
 
@@ -1736,6 +1822,47 @@ def create_app():
                 "success": False,
                 "error": "name, email, and role are required.",
             }), 400
+
+        if not actor_has_full_people_access(actor):
+            allowed_invite_roles = {
+                "tm",
+                "manager",
+                "general_manager",
+            }
+
+            if role not in allowed_invite_roles:
+                return jsonify({
+                    "success": False,
+                    "error": "You cannot create company-level accounts.",
+                }), 403
+
+            actor_store_ids = actor_people_store_ids(actor)
+
+            requested_store = (
+                Store.query.filter_by(store_number=store_number).first()
+                if store_number
+                else None
+            )
+
+            if not requested_store:
+                return jsonify({
+                    "success": False,
+                    "error": "A store assignment is required.",
+                }), 400
+
+            actor_role = (actor.role or "").strip().lower()
+            store_is_allowed = requested_store.id in actor_store_ids
+
+            if (
+                not store_is_allowed
+                and actor_role in {"coach", "supervisor"}
+                and actor.area_id
+                and requested_store.area_id == actor.area_id
+            ):
+                store_is_allowed = True
+
+            if not store_is_allowed:
+                return people_management_scope_error()
 
         if not is_valid_email_address(email):
             return jsonify({
@@ -3030,7 +3157,9 @@ def create_app():
         if viewer:
             viewer_role = (viewer.role or "").strip().lower()
 
-            if viewer_role not in ["admin", "hr", "coach"]:
+            if viewer_role not in ["admin", "hr"]:
+                viewer_store_ids = list(user_store_ids(viewer))
+
                 if viewer_role in ["coach", "supervisor"]:
                     oversight_store_ids = [
                         assignment.store_id
@@ -3040,35 +3169,61 @@ def create_app():
                         ).all()
                     ]
 
-                    if oversight_store_ids:
-                        query = query.filter(
-                            db.or_(
-                                User.area_id == viewer.area_id,
-                                User.store_id.in_(oversight_store_ids),
+                    visible_store_ids = list(
+                        set(viewer_store_ids + oversight_store_ids)
+                    )
+
+                    scope_filters = []
+
+                    if viewer.area_id:
+                        scope_filters.append(User.area_id == viewer.area_id)
+
+                    if visible_store_ids:
+                        scope_filters.extend([
+                            User.store_id.in_(visible_store_ids),
+                            UserStoreAssignment.store_id.in_(visible_store_ids),
+                        ])
+
+                    if scope_filters:
+                        query = (
+                            query
+                            .outerjoin(
+                                UserStoreAssignment,
+                                UserStoreAssignment.user_id == User.id,
                             )
+                            .filter(db.or_(*scope_filters))
                         )
-                    elif viewer.area_id:
-                        query = query.filter(User.area_id == viewer.area_id)
                     else:
                         query = query.filter(User.id == viewer.id)
                 else:
-                    viewer_store_ids = list(user_store_ids(viewer))
-
                     if viewer_store_ids:
                         query = (
                             query
-                            .outerjoin(UserStoreAssignment, UserStoreAssignment.user_id == User.id)
+                            .outerjoin(
+                                UserStoreAssignment,
+                                UserStoreAssignment.user_id == User.id,
+                            )
                             .filter(
                                 db.or_(
                                     User.store_id.in_(viewer_store_ids),
-                                    UserStoreAssignment.store_id.in_(viewer_store_ids),
+                                    UserStoreAssignment.store_id.in_(
+                                        viewer_store_ids
+                                    ),
                                 )
                             )
                         )
-                    elif viewer.area_id:
-                        query = query.filter(User.area_id == viewer.area_id)
                     else:
                         query = query.filter(User.id == viewer.id)
+
+        if viewer:
+            viewer_role = (viewer.role or "").strip().lower()
+
+            if viewer_role not in {"admin", "hr"}:
+                query = query.filter(
+                    db.func.lower(User.role).notin_(
+                        ["admin", "hr", "coach", "supervisor"]
+                    )
+                )
 
         if active in ["true", "false"]:
             query = query.filter(User.is_active == (active == "true"))
@@ -3314,10 +3469,15 @@ def create_app():
 
     @app.get("/api/users/<int:user_id>")
     def get_user(user_id):
+        viewer_user_id = request.args.get("viewer_user_id", type=int)
+        viewer = User.query.get(viewer_user_id) if viewer_user_id else None
         user = User.query.get(user_id)
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
+
+        if viewer and not can_actor_manage_user(viewer, user):
+            return people_management_scope_error()
 
         return jsonify({
             "success": True,
@@ -3400,11 +3560,11 @@ def create_app():
     @app.patch("/api/users/<int:user_id>")
     def update_user(user_id):
         data = request.get_json() or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
 
         # Legacy mobile fallback:
-        # Current App Store builds toggle active status without sending actor_user_id.
-        # Limit this fallback ONLY to activate/deactivate requests.
+        # Existing builds may toggle active status without actor_user_id.
+        # Keep this fallback limited to activation changes only.
         if actor_error and "is_active" in data and set(data.keys()).issubset({"is_active"}):
             actor = User.query.filter(
                 User.is_active.is_(True),
@@ -3419,6 +3579,15 @@ def create_app():
 
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
+
+        if not can_actor_manage_user(actor, user):
+            return people_management_scope_error()
+
+        if "role" in data and not actor_has_full_people_access(actor):
+            return jsonify({
+                "success": False,
+                "error": "Only Admin or HR can change account roles.",
+            }), 403
 
         if "name" in data:
             user.name = (data.get("name") or "").strip() or user.name
@@ -3554,7 +3723,7 @@ def create_app():
     @app.post("/api/users/<int:user_id>/store-assignments")
     def add_store_assignment(user_id):
         data = request.get_json() or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
         if actor_error:
             return actor_error
 
@@ -3563,13 +3732,16 @@ def create_app():
         if not user:
             return jsonify({"success": False, "error": "User not found."}), 404
 
+        if not can_actor_manage_user(actor, user):
+            return people_management_scope_error()
+
         store_number = (data.get("store_number") or "").strip()
         assignment_type = (data.get("assignment_type") or "primary").strip().lower()
 
-        if assignment_type not in ["primary", "oversight"]:
+        if assignment_type not in ["primary", "secondary", "oversight"]:
             return jsonify({
                 "success": False,
-                "error": "assignment_type must be primary or oversight.",
+                "error": "assignment_type must be primary, secondary, or oversight.",
             }), 400
 
         store = Store.query.filter_by(store_number=store_number).first()
@@ -3577,7 +3749,51 @@ def create_app():
         if not store:
             return jsonify({"success": False, "error": "Store not found."}), 404
 
-        # Enforce one primary store for GM / Manager / TM
+        if not actor_has_full_people_access(actor):
+            actor_role = (actor.role or "").strip().lower()
+
+            # Only area leaders may move users between stores.
+            if actor_role not in {"coach", "supervisor"}:
+                return jsonify({
+                    "success": False,
+                    "error": "Only Admin, HR, or an area Coach can move users.",
+                }), 403
+
+            if not actor.area_id or store.area_id != actor.area_id:
+                return jsonify({
+                    "success": False,
+                    "error": "You can only move users to stores in your area.",
+                }), 403
+
+            target_role = (user.role or "").strip().lower()
+            if target_role in {"admin", "hr", "coach", "supervisor"}:
+                return jsonify({
+                    "success": False,
+                    "error": "You cannot change store assignments for company-level accounts.",
+                }), 403
+
+        target_role = (user.role or "").strip().lower()
+
+        if assignment_type == "oversight" and target_role not in {
+            "coach",
+            "supervisor",
+        }:
+            return jsonify({
+                "success": False,
+                "error": "Oversight assignments are only for Coaches or Supervisors.",
+            }), 400
+
+        if assignment_type == "secondary" and target_role not in {
+            "tm",
+            "manager",
+            "general_manager",
+        }:
+            return jsonify({
+                "success": False,
+                "error": "Additional work stores are only for store-level users.",
+            }), 400
+
+        # A user may have only one primary store, but multiple secondary stores.
         if assignment_type == "primary":
             UserStoreAssignment.query.filter_by(
                 user_id=user.id,
@@ -3586,6 +3802,26 @@ def create_app():
 
             user.store_id = store.id
             user.area_id = store.area_id
+
+        if assignment_type == "primary":
+            UserStoreAssignment.query.filter_by(
+                user_id=user.id,
+                store_id=store.id,
+                assignment_type="secondary",
+            ).delete(synchronize_session=False)
+
+        if assignment_type == "secondary":
+            primary_at_store = UserStoreAssignment.query.filter_by(
+                user_id=user.id,
+                store_id=store.id,
+                assignment_type="primary",
+            ).first()
+
+            if user.store_id == store.id or primary_at_store:
+                return jsonify({
+                    "success": False,
+                    "error": "This is already the user's primary store.",
+                }), 400
 
         existing = UserStoreAssignment.query.filter_by(
             user_id=user.id,
@@ -3615,7 +3851,7 @@ def create_app():
     @app.delete("/api/users/<int:user_id>/store-assignments/<int:assignment_id>")
     def remove_store_assignment(user_id, assignment_id):
         data = request.get_json(silent=True) or {}
-        actor, actor_error = require_admin_actor(data)
+        actor, actor_error = require_people_manager_actor(data)
         if actor_error:
             return actor_error
 
@@ -3627,8 +3863,31 @@ def create_app():
         if not assignment:
             return jsonify({"success": False, "error": "Assignment not found."}), 404
 
-        was_primary = assignment.assignment_type == "primary"
         user = assignment.user
+
+        if not can_actor_manage_user(actor, user):
+            return people_management_scope_error()
+
+        if not actor_has_full_people_access(actor):
+            actor_role = (actor.role or "").strip().lower()
+
+            if actor_role not in {"coach", "supervisor"}:
+                return jsonify({
+                    "success": False,
+                    "error": "Only Admin, HR, or an area Coach can change store assignments.",
+                }), 403
+
+            if (
+                not actor.area_id
+                or not assignment.store
+                or assignment.store.area_id != actor.area_id
+            ):
+                return jsonify({
+                    "success": False,
+                    "error": "You can only change assignments inside your area.",
+                }), 403
+
+        was_primary = assignment.assignment_type == "primary"
 
         db.session.delete(assignment)
 

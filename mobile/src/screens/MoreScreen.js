@@ -12,7 +12,17 @@ export function MoreScreen({
   onOpenProfile,
   onLogout,
 }) {
-  const canOpenAdmin = ["Admin", "HR"].includes(user.role);
+  const normalizedUserRole = String(user?.role || "").trim().toLowerCase();
+  const canOpenAdmin = [
+    "admin",
+    "hr",
+    "coach",
+    "supervisor",
+    "general_manager",
+    "manager",
+  ].includes(normalizedUserRole);
+
+  const hasFullAdminAccess = ["admin", "hr"].includes(normalizedUserRole);
 
   async function openExternalLink(url, fallbackTitle = "Unable to open link") {
     try {
@@ -65,8 +75,14 @@ export function MoreScreen({
         {canOpenAdmin && (
           <TouchableOpacity style={localStyles.row} onPress={onOpenAdmin}>
             <View>
-              <Text style={localStyles.rowTitle}>Admin Command Center</Text>
-              <Text style={localStyles.rowMeta}>Manage people, stores, areas, and access</Text>
+              <Text style={localStyles.rowTitle}>
+                {hasFullAdminAccess ? "Admin Command Center" : "People Admin"}
+              </Text>
+              <Text style={localStyles.rowMeta}>
+                {hasFullAdminAccess
+                  ? "Manage people, stores, areas, and access"
+                  : "Manage people and store access"}
+              </Text>
             </View>
             <Text style={localStyles.chevron}>›</Text>
           </TouchableOpacity>

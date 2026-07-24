@@ -51,8 +51,11 @@ export async function fetchApiUsers(viewerUserId = null) {
   return data.users || [];
 }
 
-export async function fetchApiUserDetail(userId) {
-  const data = await apiRequest(`/api/users/${userId}`);
+export async function fetchApiUserDetail(userId, viewerUserId = null) {
+  const query = viewerUserId
+    ? `?viewer_user_id=${encodeURIComponent(viewerUserId)}`
+    : "";
+  const data = await apiRequest(`/api/users/${userId}${query}`);
   return data.user;
 }
 
@@ -115,7 +118,7 @@ export async function resendApiUserInvite(userId, actorUserId) {
 }
 
 export async function sendApiUserPasswordReset(userId, actorUserId) {
-  return apiRequest(`/api/users/${userId}/password-reset`, {
+  return apiRequest(`/api/users/${userId}/send-password-reset`, {
     method: "POST",
     body: JSON.stringify({
       actor_user_id: actorUserId,
