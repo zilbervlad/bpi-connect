@@ -239,6 +239,78 @@ class TimeOffRequest(db.Model):
     )
 
 
+class StoreScheduleImage(db.Model):
+    __tablename__ = "store_schedule_images"
+    __table_args__ = (
+        db.Index(
+            "ix_store_schedule_images_store_week",
+            "store_id",
+            "week_start",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    store_id = db.Column(
+        db.Integer,
+        db.ForeignKey("stores.id"),
+        nullable=False,
+    )
+
+    week_start = db.Column(
+        db.Date,
+        nullable=False,
+    )
+
+    image_url = db.Column(
+        db.Text,
+        nullable=False,
+    )
+    thumbnail_url = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    original_filename = db.Column(
+        db.String(255),
+        nullable=True,
+    )
+    mime_type = db.Column(
+        db.String(120),
+        nullable=True,
+    )
+    size_bytes = db.Column(
+        db.Integer,
+        nullable=True,
+    )
+
+    uploaded_by_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    notes = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    store = db.relationship(
+        "Store",
+        backref="schedule_images",
+    )
+    uploaded_by = db.relationship(
+        "User",
+        backref="schedule_images_uploaded",
+    )
+
+
 class Message(db.Model):
     __tablename__ = "messages"
 

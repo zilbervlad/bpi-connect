@@ -626,3 +626,67 @@ export async function cancelApiOpsRequest({
 
   return data.request;
 }
+
+// CONNECT_SCHEDULE_IMAGE_CLIENT_20260724
+
+export async function fetchApiScheduleImages(
+  userId,
+  storeId = null
+) {
+  const params = new URLSearchParams({
+    user_id: String(userId),
+  });
+
+  if (storeId) {
+    params.set("store_id", String(storeId));
+  }
+
+  const data = await apiRequest(
+    `/api/ops/schedule-images?${params.toString()}`
+  );
+
+  return data.schedule_images || [];
+}
+
+export async function uploadApiScheduleImage({
+  actorUserId,
+  storeId,
+  weekStart,
+  imageData,
+  mimeType = "image/jpeg",
+  fileName = "store-schedule.jpg",
+  notes = "",
+}) {
+  const data = await apiRequest(
+    "/api/ops/schedule-images",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        actor_user_id: actorUserId,
+        store_id: storeId,
+        week_start: weekStart,
+        image_data: imageData,
+        mime_type: mimeType,
+        original_filename: fileName,
+        notes,
+      }),
+    }
+  );
+
+  return data.schedule_image;
+}
+
+export async function deleteApiScheduleImage(
+  scheduleImageId,
+  actorUserId
+) {
+  return apiRequest(
+    `/api/ops/schedule-images/${scheduleImageId}`,
+    {
+      method: "DELETE",
+      body: JSON.stringify({
+        actor_user_id: actorUserId,
+      }),
+    }
+  );
+}

@@ -59,6 +59,7 @@ import { PartnerPerksScreen } from "./src/screens/PartnerPerksScreen";
 import { BpiDocumentsScreen } from "./src/screens/BpiDocumentsScreen";
 import { OpsScreen } from "./src/screens/OpsScreen";
 import { AvailabilityScreen } from "./src/screens/AvailabilityScreen";
+import { ScheduleScreen } from "./src/screens/ScheduleScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -552,6 +553,12 @@ export default function App() {
         setActiveTab("Availability");
         setSelectedThreadId(null);
         refreshOpsPendingCount();
+        return;
+      }
+
+      if (data?.screen === "Schedule") {
+        setActiveTab("Schedule");
+        setSelectedThreadId(null);
         return;
       }
 
@@ -2287,14 +2294,10 @@ export default function App() {
         )}
 
         {activeTab === "Schedule" && (
-          <View style={styles.screen}>
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Schedule</Text>
-              <Text style={styles.emptyText}>
-                Store schedule tools will live here.
-              </Text>
-            </View>
-          </View>
+          <ScheduleScreen
+            user={currentUser}
+            onBack={() => changeTab("Ops")}
+          />
         )}
 
         {activeTab === "Tasks" && (

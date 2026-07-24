@@ -34,6 +34,7 @@ from app.models import (
     PushToken,
     AvailabilityRequest,
     TimeOffRequest,
+    StoreScheduleImage,
 )
 socketio = SocketIO(
     cors_allowed_origins="*",
@@ -6897,6 +6898,344 @@ def create_app():
                     request_type,
                     request_id,
                 )
+
+
+
+    # CONNECT_SCHEDULE_IMAGES_20260724
+
+    def serialize_schedule_image(item):
+        return {
+            "id": item.id,
+            "store_id": item.store_id,
+            "store": serialize_ops_store(item.store),
+            "week_start": (
+                item.week_start.isoformat()
+                if item.week_start
+                else None
+            ),
+            "image_url": item.image_url,
+            "thumbnail_url": item.thumbnail_url or item.image_url,
+            "original_filename": item.original_filename,
+            "mime_type": item.mime_type,
+            "size_bytes": item.size_bytes,
+            "notes": item.notes,
+            "uploaded_by": serialize_ops_user(item.uploaded_by),
+            "created_at": (
+                item.created_at.isoformat()
+                if item.created_at
+                else None
+            ),
+        }
+
+    def can_upload_schedule_image(actor, store):
+        if not actor or not store:
+            return False
+
+        role = normalize_ops_role(actor)
+
+        if role in {"admin", "hr"}:
+            return True
+
+        if role in {"coach", "supervisor"}:
+            return (
+                actor.area_id
+                and store.area_id
+                and actor.area_id == store.area_id
+            ) or store.id in ops_user_store_ids(actor)
+
+        if role in {"general_manager", "manager"}:
+            return store.id in ops_user_store_ids(actor)
+
+        return False
+
+    @app.get("/api/ops/schedule-images")
+    def list_schedule_images():
+        actor, error_response = get_ops_actor_from_payload()
+
+        if error_response:
+            return error_response
+
+        try:
+            requested_store_id = int(
+                request.args.get("store_id")
+            )
+        except (TypeError, ValueError):
+            requested_store_id = None
+
+        allowed_store_ids = ops_user_store_ids(actor)
+        role = normalize_ops_role(actor)
+
+        query = StoreScheduleImage.query
+
+        if role in {"admin", "hr"}:
+            if requested_store_id:
+                query = query.filter_by(
+                    store_id=requested_store_id
+                )
+        elif role in {"coach", "supervisor"}:
+            area_store_ids = {
+                store.id
+                for store in Store.query.filter_by(
+                    is_active=True
+                ).all()
+                if (
+                    actor.area_id
+                    and store.area_id
+                    and actor.area_id == store.area_id
+                )
+            }
+
+            allowed_store_ids.update(area_store_ids)
+
+            if requested_store_id:
+                if requested_store_id not in allowed_store_ids:
+                    return jsonify({
+                        "success": False,
+                        "error": "You cannot view this store schedule.",
+                    }), 403
+
+                query = query.filter_by(
+                    store_id=requested_store_id
+                )
+            else:
+                query = query.filter(
+                    StoreScheduleImage.store_id.in_(
+                        allowed_store_ids or [-1]
+                    )
+                )
+        else:
+            if requested_store_id:
+                if requested_store_id not in allowed_store_ids:
+                    return jsonify({
+                        "success": False,
+                        "error": "You are not assigned to this store.",
+                    }), 403
+
+                query = query.filter_by(
+                    store_id=requested_store_id
+                )
+            else:
+                query = query.filter(
+                    StoreScheduleImage.store_id.in_(
+                        allowed_store_ids or [-1]
+                    )
+                )
+
+        items = query.order_by(
+            StoreScheduleImage.week_start.desc(),
+            StoreScheduleImage.created_at.desc(),
+        ).all()
+
+        return jsonify({
+            "success": True,
+            "schedule_images": [
+                serialize_schedule_image(item)
+                for item in items
+            ],
+        })
+
+    @app.post("/api/ops/schedule-images")
+    def upload_schedule_image():
+        data = request.get_json(silent=True) or {}
+
+        actor, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        try:
+            store_id = int(data.get("store_id"))
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "error": "A valid store_id is required.",
+            }), 400
+
+        store = db.session.get(Store, store_id)
+
+        if not store or not store.is_active:
+            return jsonify({
+                "success": False,
+                "error": "Active store not found.",
+            }), 404
+
+        if not can_upload_schedule_image(actor, store):
+            return jsonify({
+                "success": False,
+                "error": "You cannot upload schedules for this store.",
+            }), 403
+
+        image_data = data.get("image_data")
+        mime_type = (
+            str(data.get("mime_type") or "image/jpeg")
+            .strip()
+        )
+        original_filename = (
+            str(
+                data.get("original_filename")
+                or data.get("file_name")
+                or "store-schedule.jpg"
+            )
+            .strip()
+        )
+
+        if not image_data:
+            return jsonify({
+                "success": False,
+                "error": "image_data is required.",
+            }), 400
+
+        try:
+            week_start = parse_ops_date(
+                data.get("week_start"),
+                "week_start",
+            )
+        except ValueError as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 400
+
+        cloud_name = os.getenv(
+            "CLOUDINARY_CLOUD_NAME",
+            "",
+        ).strip()
+        api_key = os.getenv(
+            "CLOUDINARY_API_KEY",
+            "",
+        ).strip()
+        api_secret = os.getenv(
+            "CLOUDINARY_API_SECRET",
+            "",
+        ).strip()
+
+        if not cloud_name or not api_key or not api_secret:
+            return jsonify({
+                "success": False,
+                "error": "Image storage is not configured.",
+            }), 503
+
+        timestamp = int(time.time())
+
+        signature_source = (
+            f"folder=bpi-connect/schedules"
+            f"&timestamp={timestamp}"
+            f"{api_secret}"
+        )
+
+        signature = hashlib.sha1(
+            signature_source.encode("utf-8")
+        ).hexdigest()
+
+        upload_response = requests.post(
+            f"https://api.cloudinary.com/v1_1/"
+            f"{cloud_name}/image/upload",
+            data={
+                "file": image_data,
+                "api_key": api_key,
+                "timestamp": timestamp,
+                "folder": "bpi-connect/schedules",
+                "signature": signature,
+            },
+            timeout=45,
+        )
+
+        if upload_response.status_code >= 400:
+            return jsonify({
+                "success": False,
+                "error": "Schedule image upload failed.",
+                "details": upload_response.text,
+            }), 502
+
+        uploaded = upload_response.json()
+        image_url = uploaded.get("secure_url")
+
+        if not image_url:
+            return jsonify({
+                "success": False,
+                "error": "Image storage returned no URL.",
+            }), 502
+
+        item = StoreScheduleImage(
+            store_id=store.id,
+            week_start=week_start,
+            image_url=image_url,
+            thumbnail_url=image_url,
+            original_filename=original_filename,
+            mime_type=mime_type,
+            size_bytes=uploaded.get("bytes"),
+            uploaded_by_user_id=actor.id,
+            notes=(
+                str(data.get("notes") or "").strip()
+                or None
+            ),
+        )
+
+        db.session.add(item)
+        db.session.commit()
+
+        assigned_user_ids = {
+            user.id
+            for user in User.query.filter_by(
+                is_active=True
+            ).all()
+            if store.id in ops_user_store_ids(user)
+        }
+
+        socketio.start_background_task(
+            send_ops_push_to_users,
+            list(assigned_user_ids - {actor.id}),
+            f"New schedule posted — Store {store.store_number}",
+            f"Week of {week_start.isoformat()} is now available.",
+            {
+                "type": "schedule_image",
+                "screen": "Schedule",
+                "schedule_image_id": item.id,
+                "store_id": store.id,
+                "week_start": week_start.isoformat(),
+            },
+        )
+
+        return jsonify({
+            "success": True,
+            "schedule_image": serialize_schedule_image(item),
+        }), 201
+
+    @app.delete(
+        "/api/ops/schedule-images/<int:schedule_image_id>"
+    )
+    def delete_schedule_image(schedule_image_id):
+        data = request.get_json(silent=True) or {}
+
+        actor, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        item = db.session.get(
+            StoreScheduleImage,
+            schedule_image_id,
+        )
+
+        if not item:
+            return jsonify({
+                "success": False,
+                "error": "Schedule image not found.",
+            }), 404
+
+        if not can_upload_schedule_image(actor, item.store):
+            return jsonify({
+                "success": False,
+                "error": "You cannot remove this schedule.",
+            }), 403
+
+        db.session.delete(item)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "deleted": True,
+        })
 
 
     # CONNECT_OPS_REQUESTS_20260724
