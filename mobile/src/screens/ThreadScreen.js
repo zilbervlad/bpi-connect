@@ -25,6 +25,7 @@ import { UserAvatar } from "../components/UserAvatar";
 import { getThreadBadge } from "../data/threads";
 import { setActiveNotificationThreadId } from "../services/pushNotifications";
 import { getVisibleApiPeople } from "../api/peoplePermissions";
+import { ZoomableImageModal } from "../components/ZoomableImageModal";
 
 function getSeenStatusText(message) {
   const seenByCount = Number(message.seenByCount || 0);
@@ -934,36 +935,11 @@ export function ThreadScreen({
           </TouchableOpacity>
         </View>
 
-        <Modal
+        <ZoomableImageModal
           visible={Boolean(expandedImageUri)}
-          transparent
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={() => setExpandedImageUri(null)}
-        >
-          <View style={localStyles.imageViewerBackdrop}>
-            <TouchableOpacity
-              style={localStyles.imageViewerCloseButton}
-              onPress={() => setExpandedImageUri(null)}
-              activeOpacity={0.8}
-            >
-              <Text style={localStyles.imageViewerCloseText}>×</Text>
-            </TouchableOpacity>
-
-            <Pressable
-              style={localStyles.imageViewerContent}
-              onPress={() => setExpandedImageUri(null)}
-            >
-              {expandedImageUri ? (
-                <Image
-                  source={{ uri: expandedImageUri }}
-                  style={localStyles.expandedImage}
-                  resizeMode="contain"
-                />
-              ) : null}
-            </Pressable>
-          </View>
-        </Modal>
+          imageUri={expandedImageUri}
+          onClose={() => setExpandedImageUri(null)}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
