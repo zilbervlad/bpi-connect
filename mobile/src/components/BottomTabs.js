@@ -1,11 +1,21 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
-export function BottomTabs({ activeTab, onChangeTab, unreadCount }) {
+export function BottomTabs({
+  activeTab,
+  onChangeTab,
+  unreadCount,
+  opsPendingCount,
+}) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
     { key: "Chats", label: "Chats", icon: "●", badge: unreadCount },
     { key: "People", label: "People", icon: "○" },
-    { key: "Ops", label: "Ops", icon: "▦" },
+    {
+      key: "Ops",
+      label: "Ops",
+      icon: "▦",
+      badge: opsPendingCount,
+    },
     { key: "More", label: "More", icon: "•••" },
   ];
 

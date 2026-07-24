@@ -6685,6 +6685,220 @@ def create_app():
         return jsonify({"success": True})
 
 
+
+    # CONNECT_OPS_REQUEST_NOTIFICATIONS_20260724
+
+    def ops_request_manager_user_ids(store):
+        if not store:
+            return []
+
+        manager_ids = set()
+
+        for candidate in User.query.filter_by(is_active=True).all():
+            role = str(candidate.role or "").strip().lower()
+
+            if role in {"admin", "hr"}:
+                manager_ids.add(candidate.id)
+                continue
+
+            if role in {"coach", "supervisor"}:
+                if (
+                    candidate.area_id
+                    and store.area_id
+                    and candidate.area_id == store.area_id
+                ):
+                    manager_ids.add(candidate.id)
+                    continue
+
+            if role in {"general_manager", "manager"}:
+                assigned_store_ids = set()
+
+                if candidate.store_id:
+                    assigned_store_ids.add(candidate.store_id)
+
+                assigned_store_ids.update(
+                    assignment.store_id
+                    for assignment in candidate.store_assignments
+                    if assignment.store_id
+                )
+
+                if store.id in assigned_store_ids:
+                    manager_ids.add(candidate.id)
+
+        return sorted(manager_ids)
+
+    def send_ops_push_to_users(
+        user_ids,
+        title,
+        body,
+        data,
+    ):
+        clean_user_ids = sorted({
+            int(user_id)
+            for user_id in user_ids
+            if user_id
+        })
+
+        if not clean_user_ids:
+            return {"sent": 0, "skipped": True}
+
+        tokens = [
+            item.token
+            for item in PushToken.query.filter(
+                PushToken.user_id.in_(clean_user_ids),
+                PushToken.is_active == True,
+            ).all()
+            if item.token
+        ]
+
+        return send_expo_push_notifications(
+            tokens=tokens,
+            title=title,
+            body=body,
+            data=data,
+        )
+
+    def notify_ops_request_submitted(item, request_type):
+        request_label = (
+            "Availability change"
+            if request_type == "availability"
+            else "Time-off request"
+        )
+
+        manager_ids = [
+            user_id
+            for user_id in ops_request_manager_user_ids(item.store)
+            if user_id != item.user_id
+        ]
+
+        return send_ops_push_to_users(
+            manager_ids,
+            title=f"New {request_label}",
+            body=(
+                f"{item.user.name} submitted a request "
+                f"for Store {item.store.store_number}."
+            ),
+            data={
+                "type": "ops_request",
+                "screen": "Availability",
+                "request_type": request_type,
+                "request_id": item.id,
+                "store_id": item.store_id,
+            },
+        )
+
+    def notify_ops_request_reviewed(item, request_type):
+        request_label = (
+            "Availability request"
+            if request_type == "availability"
+            else "Time-off request"
+        )
+
+        decision = str(item.status or "").strip().lower()
+
+        title = (
+            f"{request_label} approved"
+            if decision == "approved"
+            else f"{request_label} denied"
+        )
+
+        body = f"Your request for Store {item.store.store_number} was {decision}."
+
+        if item.manager_note:
+            body = f"{body} {item.manager_note}"
+
+        return send_ops_push_to_users(
+            [item.user_id],
+            title=title,
+            body=body[:180],
+            data={
+                "type": "ops_request_review",
+                "screen": "Availability",
+                "request_type": request_type,
+                "request_id": item.id,
+                "status": item.status,
+            },
+        )
+
+
+
+    def notify_ops_request_submitted_background(
+        request_type,
+        request_id,
+    ):
+        with app.app_context():
+            try:
+                model = (
+                    AvailabilityRequest
+                    if request_type == "availability"
+                    else TimeOffRequest
+                )
+
+                item = db.session.get(model, request_id)
+
+                if not item:
+                    return
+
+                result = notify_ops_request_submitted(
+                    item,
+                    request_type,
+                )
+
+                app.logger.info(
+                    "Ops request submission push complete: "
+                    "type=%s request=%s result=%s",
+                    request_type,
+                    request_id,
+                    result,
+                )
+            except Exception:
+                db.session.rollback()
+                app.logger.exception(
+                    "Ops submission push failed: "
+                    "type=%s request=%s",
+                    request_type,
+                    request_id,
+                )
+
+    def notify_ops_request_reviewed_background(
+        request_type,
+        request_id,
+    ):
+        with app.app_context():
+            try:
+                model = (
+                    AvailabilityRequest
+                    if request_type == "availability"
+                    else TimeOffRequest
+                )
+
+                item = db.session.get(model, request_id)
+
+                if not item:
+                    return
+
+                result = notify_ops_request_reviewed(
+                    item,
+                    request_type,
+                )
+
+                app.logger.info(
+                    "Ops review push complete: "
+                    "type=%s request=%s result=%s",
+                    request_type,
+                    request_id,
+                    result,
+                )
+            except Exception:
+                db.session.rollback()
+                app.logger.exception(
+                    "Ops review push failed: "
+                    "type=%s request=%s",
+                    request_type,
+                    request_id,
+                )
+
+
     # CONNECT_OPS_REQUESTS_20260724
 
     def normalize_ops_role(user):
@@ -6975,6 +7189,12 @@ def create_app():
         db.session.add(item)
         db.session.commit()
 
+        socketio.start_background_task(
+            notify_ops_request_submitted_background,
+            "time_off",
+            item.id,
+        )
+
         return jsonify({
             "success": True,
             "request": serialize_time_off_request(item),
@@ -7062,6 +7282,12 @@ def create_app():
 
         db.session.add(item)
         db.session.commit()
+
+        socketio.start_background_task(
+            notify_ops_request_submitted_background,
+            "availability",
+            item.id,
+        )
 
         return jsonify({
             "success": True,
@@ -7188,7 +7414,11 @@ def create_app():
             ),
         })
 
-    def review_ops_request(item, serializer):
+    def review_ops_request(
+        item,
+        serializer,
+        request_type,
+    ):
         data = request.get_json(silent=True) or {}
 
         reviewer, error_response = get_ops_actor_from_payload(data)
@@ -7243,6 +7473,12 @@ def create_app():
 
         db.session.commit()
 
+        socketio.start_background_task(
+            notify_ops_request_reviewed_background,
+            request_type,
+            item.id,
+        )
+
         return jsonify({
             "success": True,
             "request": serializer(item),
@@ -7263,6 +7499,7 @@ def create_app():
         return review_ops_request(
             item,
             serialize_time_off_request,
+            "time_off",
         )
 
     @app.patch(
@@ -7283,6 +7520,7 @@ def create_app():
         return review_ops_request(
             item,
             serialize_availability_request,
+            "availability",
         )
 
     def cancel_ops_request(item, serializer):

@@ -12,6 +12,7 @@ import { canSendBroadcast } from "../data/recipientGroups";
 
 export function OpsScreen({
   user,
+  pendingCount = 0,
   onOpenAvailability,
   onOpenSchedule,
   onOpenTasks,
@@ -45,7 +46,14 @@ export function OpsScreen({
         <OpsTile
           icon="◷"
           title="Availability & Time Off"
-          subtitle="Submit and review requests"
+          subtitle={
+            pendingCount > 0
+              ? `${pendingCount} pending approval${
+                  pendingCount === 1 ? "" : "s"
+                }`
+              : "Submit and review requests"
+          }
+          badge={pendingCount}
           onPress={onOpenAvailability}
           active
         />
@@ -84,7 +92,14 @@ export function OpsScreen({
   );
 }
 
-function OpsTile({ icon, title, subtitle, onPress, active }) {
+function OpsTile({
+  icon,
+  title,
+  subtitle,
+  badge = 0,
+  onPress,
+  active,
+}) {
   return (
     <TouchableOpacity
       style={[
@@ -114,6 +129,14 @@ function OpsTile({ icon, title, subtitle, onPress, active }) {
         <Text style={localStyles.tileTitle}>{title}</Text>
         <Text style={localStyles.tileSubtitle}>{subtitle}</Text>
       </View>
+
+      {badge > 0 ? (
+        <View style={localStyles.tileBadge}>
+          <Text style={localStyles.tileBadgeText}>
+            {badge > 99 ? "99+" : badge}
+          </Text>
+        </View>
+      ) : null}
 
       <Text style={localStyles.chevron}>›</Text>
     </TouchableOpacity>
@@ -203,6 +226,21 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3,
+  },
+  tileBadge: {
+    minWidth: 25,
+    height: 25,
+    borderRadius: 13,
+    backgroundColor: "#e91f3f",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 7,
+    marginRight: 6,
+  },
+  tileBadgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900",
   },
   chevron: {
     color: "#91a0af",

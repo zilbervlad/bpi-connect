@@ -38,6 +38,7 @@ import {
   removeApiThreadMember,
   deleteApiThreadMessage,
   deleteApiAccount,
+  fetchApiOpsRequests,
 } from "./src/api/client";
 
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -62,6 +63,7 @@ import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
   getLastNotificationThreadIdAsync,
+  getLastNotificationDataAsync,
 } from "./src/services/pushNotifications";
 
 function normalizeApiRole(role) {
@@ -298,6 +300,7 @@ const REALTIME_URL = "https://bpi-connect.onrender.com";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("Home");
+  const [opsPendingCount, setOpsPendingCount] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [loginError, setLoginError] = useState("");
@@ -510,6 +513,20 @@ export default function App() {
 
   useEffect(() => {
     if (!isLoggedIn || !currentUser?.id || !currentUser?.apiUser) {
+      setOpsPendingCount(0);
+      return;
+    }
+
+    refreshOpsPendingCount();
+  }, [
+    isLoggedIn,
+    currentUser?.id,
+    currentUser?.apiUser,
+    activeTab,
+  ]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.id || !currentUser?.apiUser) {
       return undefined;
     }
 
@@ -530,18 +547,38 @@ export default function App() {
       }
     }
 
-    const subscription = addNotificationResponseListener(({ threadId }) => {
-      openThreadFromPush(threadId);
-    });
+    function openNotificationDestination({ threadId, data }) {
+      if (data?.screen === "Availability") {
+        setActiveTab("Availability");
+        setSelectedThreadId(null);
+        refreshOpsPendingCount();
+        return;
+      }
 
-    getLastNotificationThreadIdAsync()
-      .then((threadId) => {
-        if (threadId) {
-          openThreadFromPush(threadId);
-        }
+      if (threadId) {
+        openThreadFromPush(threadId);
+      }
+    }
+
+    const subscription = addNotificationResponseListener(
+      openNotificationDestination
+    );
+
+    Promise.all([
+      getLastNotificationThreadIdAsync(),
+      getLastNotificationDataAsync(),
+    ])
+      .then(([threadId, data]) => {
+        openNotificationDestination({
+          threadId,
+          data,
+        });
       })
       .catch((error) => {
-        console.log("Could not read last notification:", error.message);
+        console.log(
+          "Could not read last notification:",
+          error.message
+        );
       });
 
     return () => {
@@ -1989,6 +2026,48 @@ export default function App() {
     setActiveTab("Chats");
   }
 
+  async function refreshOpsPendingCount() {
+    if (!currentUser?.id || !currentUser?.apiUser) {
+      setOpsPendingCount(0);
+      return;
+    }
+
+    const normalizedRole = String(currentUser.role || "")
+      .trim()
+      .toLowerCase()
+      .replaceAll(" ", "_");
+
+    const canManageOpsRequests = [
+      "admin",
+      "hr",
+      "coach",
+      "supervisor",
+      "general_manager",
+      "manager",
+      "mit",
+    ].includes(normalizedRole);
+
+    if (!canManageOpsRequests) {
+      setOpsPendingCount(0);
+      return;
+    }
+
+    try {
+      const result = await fetchApiOpsRequests(
+        currentUser.id,
+        "manage",
+        "pending"
+      );
+
+      setOpsPendingCount(result.pendingCount || 0);
+    } catch (error) {
+      console.log(
+        "Could not refresh Ops pending count:",
+        error.message
+      );
+    }
+  }
+
   function changeTab(nextTab) {
     setActiveTab(nextTab);
     setSelectedMessageId(null);
@@ -2191,6 +2270,7 @@ export default function App() {
         {activeTab === "Ops" && (
           <OpsScreen
             user={currentUser}
+            pendingCount={opsPendingCount}
             onOpenAvailability={() => changeTab("Availability")}
             onOpenSchedule={() => changeTab("Schedule")}
             onOpenTasks={() => changeTab("Tasks")}
@@ -2303,6 +2383,7 @@ export default function App() {
         activeTab={activeTab}
         onChangeTab={changeTab}
         unreadCount={unreadCount}
+        opsPendingCount={opsPendingCount}
         user={currentUser}
       />
     </SafeAreaView>

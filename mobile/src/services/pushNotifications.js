@@ -121,19 +121,24 @@ async function openNotificationUrl(response) {
 }
 
 export function addNotificationResponseListener(callback) {
-  return Notifications.addNotificationResponseReceivedListener(async (response) => {
-    const openedUrl = await openNotificationUrl(response);
+  return Notifications.addNotificationResponseReceivedListener(
+    async (response) => {
+      const openedUrl = await openNotificationUrl(response);
 
-    if (openedUrl) {
-      return;
+      if (openedUrl) {
+        return;
+      }
+
+      const data = getNotificationData(response);
+      const threadId = getThreadIdFromNotificationResponse(response);
+
+      callback({
+        threadId,
+        data,
+        response,
+      });
     }
-
-    const threadId = getThreadIdFromNotificationResponse(response);
-
-    if (threadId) {
-      callback({ threadId, response });
-    }
-  });
+  );
 }
 
 export async function getLastNotificationThreadIdAsync() {
@@ -146,4 +151,20 @@ export async function getLastNotificationThreadIdAsync() {
   }
 
   return getThreadIdFromNotificationResponse(response);
+}
+
+export async function getLastNotificationDataAsync() {
+  const response = await Notifications.getLastNotificationResponseAsync();
+
+  if (!response) {
+    return null;
+  }
+
+  const openedUrl = await openNotificationUrl(response);
+
+  if (openedUrl) {
+    return null;
+  }
+
+  return getNotificationData(response);
 }
