@@ -32,6 +32,8 @@ from app.models import (
     ThreadMessageAttachment,
     ThreadMessageReaction,
     PushToken,
+    AvailabilityRequest,
+    TimeOffRequest,
 )
 socketio = SocketIO(
     cors_allowed_origins="*",
@@ -413,6 +415,7 @@ def create_app():
                     ))
 
     with app.app_context():
+        db.create_all()
         ensure_user_phone_number_column()
         ensure_thread_pinned_message_id_column()
         ensure_thread_hidden_at_column()
@@ -6680,6 +6683,688 @@ def create_app():
         db.session.commit()
 
         return jsonify({"success": True})
+
+
+    # CONNECT_OPS_REQUESTS_20260724
+
+    def normalize_ops_role(user):
+        return str(getattr(user, "role", "") or "").strip().lower()
+
+    def parse_ops_date(value, field_name):
+        raw_value = str(value or "").strip()
+
+        if not raw_value:
+            raise ValueError(f"{field_name} is required.")
+
+        try:
+            return datetime.strptime(raw_value, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError(
+                f"{field_name} must use YYYY-MM-DD format."
+            ) from exc
+
+    def ops_user_store_ids(user):
+        store_ids = set()
+
+        if getattr(user, "store_id", None):
+            store_ids.add(user.store_id)
+
+        try:
+            store_ids.update(user_store_ids(user))
+        except Exception:
+            for assignment in getattr(user, "store_assignments", []) or []:
+                if assignment.store_id:
+                    store_ids.add(assignment.store_id)
+
+        return store_ids
+
+    def ops_user_can_submit_for_store(user, store):
+        if not user or not store:
+            return False
+
+        role = normalize_ops_role(user)
+
+        if role in {"admin", "hr"}:
+            return True
+
+        return store.id in ops_user_store_ids(user)
+
+    def ops_user_can_manage_store(user, store):
+        if not user or not store:
+            return False
+
+        role = normalize_ops_role(user)
+
+        if role in {"admin", "hr"}:
+            return True
+
+        if role in {"coach", "supervisor"}:
+            if (
+                getattr(user, "area_id", None)
+                and getattr(store, "area_id", None)
+                and user.area_id == store.area_id
+            ):
+                return True
+
+            return store.id in ops_user_store_ids(user)
+
+        if role in {"general_manager", "manager"}:
+            return store.id in ops_user_store_ids(user)
+
+        return False
+
+    def serialize_ops_user(user):
+        if not user:
+            return None
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        }
+
+    def serialize_ops_store(store):
+        if not store:
+            return None
+
+        return {
+            "id": store.id,
+            "store_number": store.store_number,
+            "name": store.name,
+            "area_id": store.area_id,
+            "area": store.area.name if store.area else None,
+        }
+
+    def serialize_availability_request(item):
+        return {
+            "id": item.id,
+            "request_type": "availability",
+            "user_id": item.user_id,
+            "store_id": item.store_id,
+            "user": serialize_ops_user(item.user),
+            "store": serialize_ops_store(item.store),
+            "effective_date": (
+                item.effective_date.isoformat()
+                if item.effective_date
+                else None
+            ),
+            "availability": {
+                "monday": item.monday,
+                "tuesday": item.tuesday,
+                "wednesday": item.wednesday,
+                "thursday": item.thursday,
+                "friday": item.friday,
+                "saturday": item.saturday,
+                "sunday": item.sunday,
+            },
+            "employee_note": item.employee_note,
+            "status": item.status,
+            "manager_note": item.manager_note,
+            "reviewed_by": serialize_ops_user(item.reviewed_by),
+            "reviewed_at": (
+                item.reviewed_at.isoformat()
+                if item.reviewed_at
+                else None
+            ),
+            "created_at": (
+                item.created_at.isoformat()
+                if item.created_at
+                else None
+            ),
+            "updated_at": (
+                item.updated_at.isoformat()
+                if item.updated_at
+                else None
+            ),
+        }
+
+    def serialize_time_off_request(item):
+        return {
+            "id": item.id,
+            "request_type": "time_off",
+            "user_id": item.user_id,
+            "store_id": item.store_id,
+            "user": serialize_ops_user(item.user),
+            "store": serialize_ops_store(item.store),
+            "start_date": (
+                item.start_date.isoformat()
+                if item.start_date
+                else None
+            ),
+            "end_date": (
+                item.end_date.isoformat()
+                if item.end_date
+                else None
+            ),
+            "start_time": item.start_time,
+            "end_time": item.end_time,
+            "all_day": bool(item.all_day),
+            "reason": item.reason,
+            "status": item.status,
+            "manager_note": item.manager_note,
+            "reviewed_by": serialize_ops_user(item.reviewed_by),
+            "reviewed_at": (
+                item.reviewed_at.isoformat()
+                if item.reviewed_at
+                else None
+            ),
+            "created_at": (
+                item.created_at.isoformat()
+                if item.created_at
+                else None
+            ),
+            "updated_at": (
+                item.updated_at.isoformat()
+                if item.updated_at
+                else None
+            ),
+        }
+
+    def get_ops_actor_from_payload(data=None):
+        payload = data or {}
+
+        actor_id = (
+            payload.get("actor_user_id")
+            or payload.get("user_id")
+            or request.args.get("actor_user_id")
+            or request.args.get("user_id")
+        )
+
+        try:
+            actor_id = int(actor_id)
+        except (TypeError, ValueError):
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "A valid user_id is required.",
+                }),
+                400,
+            )
+
+        actor = db.session.get(User, actor_id)
+
+        if not actor or not actor.is_active:
+            return None, (
+                jsonify({
+                    "success": False,
+                    "error": "Active user not found.",
+                }),
+                404,
+            )
+
+        return actor, None
+
+    @app.post("/api/ops/time-off-requests")
+    def create_time_off_request():
+        data = request.get_json(silent=True) or {}
+
+        user, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        try:
+            store_id = int(data.get("store_id"))
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "error": "A valid store_id is required.",
+            }), 400
+
+        store = db.session.get(Store, store_id)
+
+        if not store or not store.is_active:
+            return jsonify({
+                "success": False,
+                "error": "Active store not found.",
+            }), 404
+
+        if not ops_user_can_submit_for_store(user, store):
+            return jsonify({
+                "success": False,
+                "error": "You are not assigned to this store.",
+            }), 403
+
+        try:
+            start_date = parse_ops_date(
+                data.get("start_date"),
+                "start_date",
+            )
+            end_date = parse_ops_date(
+                data.get("end_date") or data.get("start_date"),
+                "end_date",
+            )
+        except ValueError as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 400
+
+        if end_date < start_date:
+            return jsonify({
+                "success": False,
+                "error": "End date cannot be before start date.",
+            }), 400
+
+        all_day = bool(data.get("all_day", True))
+        start_time = str(data.get("start_time") or "").strip() or None
+        end_time = str(data.get("end_time") or "").strip() or None
+
+        if not all_day and (not start_time or not end_time):
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Start time and end time are required "
+                    "for a partial-day request."
+                ),
+            }), 400
+
+        item = TimeOffRequest(
+            user_id=user.id,
+            store_id=store.id,
+            start_date=start_date,
+            end_date=end_date,
+            start_time=None if all_day else start_time,
+            end_time=None if all_day else end_time,
+            all_day=all_day,
+            reason=str(data.get("reason") or "").strip() or None,
+            status="pending",
+        )
+
+        db.session.add(item)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "request": serialize_time_off_request(item),
+        }), 201
+
+    @app.post("/api/ops/availability-requests")
+    def create_availability_request():
+        data = request.get_json(silent=True) or {}
+
+        user, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        try:
+            store_id = int(data.get("store_id"))
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "error": "A valid store_id is required.",
+            }), 400
+
+        store = db.session.get(Store, store_id)
+
+        if not store or not store.is_active:
+            return jsonify({
+                "success": False,
+                "error": "Active store not found.",
+            }), 404
+
+        if not ops_user_can_submit_for_store(user, store):
+            return jsonify({
+                "success": False,
+                "error": "You are not assigned to this store.",
+            }), 403
+
+        try:
+            effective_date = parse_ops_date(
+                data.get("effective_date"),
+                "effective_date",
+            )
+        except ValueError as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 400
+
+        availability = data.get("availability") or {}
+        days = {
+            day: str(
+                availability.get(day)
+                if availability.get(day) is not None
+                else data.get(day) or ""
+            ).strip() or None
+            for day in [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            ]
+        }
+
+        if not any(days.values()):
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Enter availability for at least one day."
+                ),
+            }), 400
+
+        item = AvailabilityRequest(
+            user_id=user.id,
+            store_id=store.id,
+            effective_date=effective_date,
+            employee_note=(
+                str(data.get("employee_note") or "").strip()
+                or None
+            ),
+            status="pending",
+            **days,
+        )
+
+        db.session.add(item)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "request": serialize_availability_request(item),
+        }), 201
+
+    @app.get("/api/ops/requests")
+    def list_ops_requests():
+        actor, error_response = get_ops_actor_from_payload()
+
+        if error_response:
+            return error_response
+
+        scope = str(
+            request.args.get("scope") or "mine"
+        ).strip().lower()
+
+        status_filter = str(
+            request.args.get("status") or ""
+        ).strip().lower()
+
+        if status_filter and status_filter not in {
+            "pending",
+            "approved",
+            "denied",
+            "cancelled",
+        }:
+            return jsonify({
+                "success": False,
+                "error": "Invalid status filter.",
+            }), 400
+
+        availability_query = AvailabilityRequest.query
+        time_off_query = TimeOffRequest.query
+
+        if scope == "mine":
+            availability_query = availability_query.filter_by(
+                user_id=actor.id
+            )
+            time_off_query = time_off_query.filter_by(
+                user_id=actor.id
+            )
+
+        elif scope == "manage":
+            role = normalize_ops_role(actor)
+
+            if role not in {
+                "admin",
+                "hr",
+                "coach",
+                "supervisor",
+                "general_manager",
+                "manager",
+            }:
+                return jsonify({
+                    "success": False,
+                    "error": (
+                        "You do not have request approval access."
+                    ),
+                }), 403
+
+            if role not in {"admin", "hr"}:
+                manageable_store_ids = [
+                    store.id
+                    for store in Store.query.filter_by(
+                        is_active=True
+                    ).all()
+                    if ops_user_can_manage_store(actor, store)
+                ]
+
+                availability_query = availability_query.filter(
+                    AvailabilityRequest.store_id.in_(
+                        manageable_store_ids or [-1]
+                    )
+                )
+                time_off_query = time_off_query.filter(
+                    TimeOffRequest.store_id.in_(
+                        manageable_store_ids or [-1]
+                    )
+                )
+        else:
+            return jsonify({
+                "success": False,
+                "error": "scope must be mine or manage.",
+            }), 400
+
+        if status_filter:
+            availability_query = availability_query.filter_by(
+                status=status_filter
+            )
+            time_off_query = time_off_query.filter_by(
+                status=status_filter
+            )
+
+        availability_items = availability_query.order_by(
+            AvailabilityRequest.created_at.desc()
+        ).all()
+
+        time_off_items = time_off_query.order_by(
+            TimeOffRequest.created_at.desc()
+        ).all()
+
+        combined = [
+            serialize_availability_request(item)
+            for item in availability_items
+        ] + [
+            serialize_time_off_request(item)
+            for item in time_off_items
+        ]
+
+        combined.sort(
+            key=lambda item: item.get("created_at") or "",
+            reverse=True,
+        )
+
+        return jsonify({
+            "success": True,
+            "scope": scope,
+            "requests": combined,
+            "pending_count": sum(
+                1
+                for item in combined
+                if item.get("status") == "pending"
+            ),
+        })
+
+    def review_ops_request(item, serializer):
+        data = request.get_json(silent=True) or {}
+
+        reviewer, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        if not ops_user_can_manage_store(reviewer, item.store):
+            return jsonify({
+                "success": False,
+                "error": (
+                    "You cannot review requests for this store."
+                ),
+            }), 403
+
+        if (
+            reviewer.id == item.user_id
+            and normalize_ops_role(reviewer) not in {"admin", "hr"}
+        ):
+            return jsonify({
+                "success": False,
+                "error": "You cannot approve your own request.",
+            }), 403
+
+        if item.status != "pending":
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Only pending requests can be reviewed."
+                ),
+            }), 409
+
+        decision = str(
+            data.get("decision") or data.get("status") or ""
+        ).strip().lower()
+
+        if decision not in {"approved", "denied"}:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Decision must be approved or denied."
+                ),
+            }), 400
+
+        item.status = decision
+        item.manager_note = (
+            str(data.get("manager_note") or "").strip()
+            or None
+        )
+        item.reviewed_by_user_id = reviewer.id
+        item.reviewed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "request": serializer(item),
+        })
+
+    @app.patch(
+        "/api/ops/time-off-requests/<int:request_id>/review"
+    )
+    def review_time_off_request(request_id):
+        item = db.session.get(TimeOffRequest, request_id)
+
+        if not item:
+            return jsonify({
+                "success": False,
+                "error": "Time-off request not found.",
+            }), 404
+
+        return review_ops_request(
+            item,
+            serialize_time_off_request,
+        )
+
+    @app.patch(
+        "/api/ops/availability-requests/<int:request_id>/review"
+    )
+    def review_availability_request(request_id):
+        item = db.session.get(
+            AvailabilityRequest,
+            request_id,
+        )
+
+        if not item:
+            return jsonify({
+                "success": False,
+                "error": "Availability request not found.",
+            }), 404
+
+        return review_ops_request(
+            item,
+            serialize_availability_request,
+        )
+
+    def cancel_ops_request(item, serializer):
+        data = request.get_json(silent=True) or {}
+
+        actor, error_response = get_ops_actor_from_payload(data)
+
+        if error_response:
+            return error_response
+
+        role = normalize_ops_role(actor)
+        is_owner = actor.id == item.user_id
+        is_full_admin = role in {"admin", "hr"}
+
+        if not is_owner and not is_full_admin:
+            return jsonify({
+                "success": False,
+                "error": "You cannot cancel this request.",
+            }), 403
+
+        if item.status != "pending":
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Only pending requests can be cancelled."
+                ),
+            }), 409
+
+        item.status = "cancelled"
+        item.reviewed_at = datetime.utcnow()
+
+        if is_full_admin and not is_owner:
+            item.reviewed_by_user_id = actor.id
+            item.manager_note = (
+                str(data.get("manager_note") or "").strip()
+                or "Cancelled by administration."
+            )
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "request": serializer(item),
+        })
+
+    @app.post(
+        "/api/ops/time-off-requests/<int:request_id>/cancel"
+    )
+    def cancel_time_off_request(request_id):
+        item = db.session.get(TimeOffRequest, request_id)
+
+        if not item:
+            return jsonify({
+                "success": False,
+                "error": "Time-off request not found.",
+            }), 404
+
+        return cancel_ops_request(
+            item,
+            serialize_time_off_request,
+        )
+
+    @app.post(
+        "/api/ops/availability-requests/<int:request_id>/cancel"
+    )
+    def cancel_availability_request(request_id):
+        item = db.session.get(
+            AvailabilityRequest,
+            request_id,
+        )
+
+        if not item:
+            return jsonify({
+                "success": False,
+                "error": "Availability request not found.",
+            }), 404
+
+        return cancel_ops_request(
+            item,
+            serialize_availability_request,
+        )
+
 
     return app
 

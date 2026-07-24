@@ -505,3 +505,124 @@ export async function acknowledgeApiHrDocument(
     }
   );
 }
+
+// CONNECT_OPS_REQUEST_CLIENT_20260724
+
+export async function fetchApiOpsRequests(
+  userId,
+  scope = "mine",
+  status = ""
+) {
+  const params = new URLSearchParams({
+    user_id: String(userId),
+    scope,
+  });
+
+  if (status) {
+    params.set("status", status);
+  }
+
+  const data = await apiRequest(
+    `/api/ops/requests?${params.toString()}`
+  );
+
+  return {
+    requests: data.requests || [],
+    pendingCount: data.pending_count || 0,
+  };
+}
+
+export async function createApiTimeOffRequest({
+  userId,
+  storeId,
+  startDate,
+  endDate,
+  allDay = true,
+  startTime = "",
+  endTime = "",
+  reason = "",
+}) {
+  const data = await apiRequest("/api/ops/time-off-requests", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      store_id: storeId,
+      start_date: startDate,
+      end_date: endDate,
+      all_day: allDay,
+      start_time: startTime,
+      end_time: endTime,
+      reason,
+    }),
+  });
+
+  return data.request;
+}
+
+export async function createApiAvailabilityRequest({
+  userId,
+  storeId,
+  effectiveDate,
+  availability,
+  employeeNote = "",
+}) {
+  const data = await apiRequest(
+    "/api/ops/availability-requests",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        store_id: storeId,
+        effective_date: effectiveDate,
+        availability,
+        employee_note: employeeNote,
+      }),
+    }
+  );
+
+  return data.request;
+}
+
+export async function reviewApiOpsRequest({
+  requestType,
+  requestId,
+  actorUserId,
+  decision,
+  managerNote = "",
+}) {
+  const endpoint =
+    requestType === "availability"
+      ? `/api/ops/availability-requests/${requestId}/review`
+      : `/api/ops/time-off-requests/${requestId}/review`;
+
+  const data = await apiRequest(endpoint, {
+    method: "PATCH",
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      decision,
+      manager_note: managerNote,
+    }),
+  });
+
+  return data.request;
+}
+
+export async function cancelApiOpsRequest({
+  requestType,
+  requestId,
+  userId,
+}) {
+  const endpoint =
+    requestType === "availability"
+      ? `/api/ops/availability-requests/${requestId}/cancel`
+      : `/api/ops/time-off-requests/${requestId}/cancel`;
+
+  const data = await apiRequest(endpoint, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+    }),
+  });
+
+  return data.request;
+}

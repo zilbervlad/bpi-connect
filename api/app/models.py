@@ -59,11 +59,184 @@ class UserStoreAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     store_id = db.Column(db.Integer, db.ForeignKey("stores.id"), nullable=False)
-    assignment_type = db.Column(db.String(40), default="primary")  # primary, oversight
+    assignment_type = db.Column(
+        db.String(40),
+        default="primary",
+    )  # primary, secondary, oversight
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship("User", backref="store_assignments")
     store = db.relationship("Store", backref="user_assignments")
+
+
+class AvailabilityRequest(db.Model):
+    __tablename__ = "availability_requests"
+    __table_args__ = (
+        db.Index(
+            "ix_availability_requests_user_status",
+            "user_id",
+            "status",
+        ),
+        db.Index(
+            "ix_availability_requests_store_status",
+            "store_id",
+            "status",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False,
+    )
+    store_id = db.Column(
+        db.Integer,
+        db.ForeignKey("stores.id"),
+        nullable=False,
+    )
+
+    effective_date = db.Column(db.Date, nullable=False)
+
+    monday = db.Column(db.String(120), nullable=True)
+    tuesday = db.Column(db.String(120), nullable=True)
+    wednesday = db.Column(db.String(120), nullable=True)
+    thursday = db.Column(db.String(120), nullable=True)
+    friday = db.Column(db.String(120), nullable=True)
+    saturday = db.Column(db.String(120), nullable=True)
+    sunday = db.Column(db.String(120), nullable=True)
+
+    employee_note = db.Column(db.Text, nullable=True)
+
+    status = db.Column(
+        db.String(30),
+        nullable=False,
+        default="pending",
+    )
+
+    reviewed_by_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=True,
+    )
+    manager_note = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    user = db.relationship(
+        "User",
+        foreign_keys=[user_id],
+        backref="availability_requests",
+    )
+    store = db.relationship(
+        "Store",
+        backref="availability_requests",
+    )
+    reviewed_by = db.relationship(
+        "User",
+        foreign_keys=[reviewed_by_user_id],
+        backref="availability_requests_reviewed",
+    )
+
+
+class TimeOffRequest(db.Model):
+    __tablename__ = "time_off_requests"
+    __table_args__ = (
+        db.CheckConstraint(
+            "end_date >= start_date",
+            name="ck_time_off_end_after_start",
+        ),
+        db.Index(
+            "ix_time_off_requests_user_status",
+            "user_id",
+            "status",
+        ),
+        db.Index(
+            "ix_time_off_requests_store_status",
+            "store_id",
+            "status",
+        ),
+        db.Index(
+            "ix_time_off_requests_dates",
+            "start_date",
+            "end_date",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False,
+    )
+    store_id = db.Column(
+        db.Integer,
+        db.ForeignKey("stores.id"),
+        nullable=False,
+    )
+
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+
+    start_time = db.Column(db.String(20), nullable=True)
+    end_time = db.Column(db.String(20), nullable=True)
+    all_day = db.Column(db.Boolean, default=True, nullable=False)
+
+    reason = db.Column(db.Text, nullable=True)
+
+    status = db.Column(
+        db.String(30),
+        nullable=False,
+        default="pending",
+    )
+
+    reviewed_by_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=True,
+    )
+    manager_note = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    user = db.relationship(
+        "User",
+        foreign_keys=[user_id],
+        backref="time_off_requests",
+    )
+    store = db.relationship(
+        "Store",
+        backref="time_off_requests",
+    )
+    reviewed_by = db.relationship(
+        "User",
+        foreign_keys=[reviewed_by_user_id],
+        backref="time_off_requests_reviewed",
+    )
 
 
 class Message(db.Model):

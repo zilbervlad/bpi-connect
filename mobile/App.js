@@ -57,6 +57,7 @@ import { GroupManageScreen } from "./src/screens/GroupManageScreen";
 import { PartnerPerksScreen } from "./src/screens/PartnerPerksScreen";
 import { BpiDocumentsScreen } from "./src/screens/BpiDocumentsScreen";
 import { OpsScreen } from "./src/screens/OpsScreen";
+import { AvailabilityScreen } from "./src/screens/AvailabilityScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -2199,16 +2200,10 @@ export default function App() {
         )}
 
         {activeTab === "Availability" && (
-          <View style={styles.screen}>
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>
-                Availability & Time Off
-              </Text>
-              <Text style={styles.emptyText}>
-                Request and approval tools are being added next.
-              </Text>
-            </View>
-          </View>
+          <AvailabilityScreen
+            user={currentUser}
+            onBack={() => changeTab("Ops")}
+          />
         )}
 
         {activeTab === "Schedule" && (
