@@ -56,6 +56,7 @@ import { MoreScreen } from "./src/screens/MoreScreen";
 import { GroupManageScreen } from "./src/screens/GroupManageScreen";
 import { PartnerPerksScreen } from "./src/screens/PartnerPerksScreen";
 import { BpiDocumentsScreen } from "./src/screens/BpiDocumentsScreen";
+import { OpsScreen } from "./src/screens/OpsScreen";
 import {
   registerForPushNotificationsAsync,
   addNotificationResponseListener,
@@ -2184,6 +2185,63 @@ export default function App() {
             onDeleteThread={handleDeleteThread}
             onDeleteManagedThread={handleDeleteManagedThread}
           />
+        )}
+
+        {activeTab === "Ops" && (
+          <OpsScreen
+            user={currentUser}
+            onOpenAvailability={() => changeTab("Availability")}
+            onOpenSchedule={() => changeTab("Schedule")}
+            onOpenTasks={() => changeTab("Tasks")}
+            onOpenRewards={() => changeTab("Rewards")}
+            onOpenSend={() => changeTab("Broadcast")}
+          />
+        )}
+
+        {activeTab === "Availability" && (
+          <View style={styles.screen}>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>
+                Availability & Time Off
+              </Text>
+              <Text style={styles.emptyText}>
+                Request and approval tools are being added next.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {activeTab === "Schedule" && (
+          <View style={styles.screen}>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Schedule</Text>
+              <Text style={styles.emptyText}>
+                Store schedule tools will live here.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {activeTab === "Tasks" && (
+          <View style={styles.screen}>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Store Tasks</Text>
+              <Text style={styles.emptyText}>
+                Operational assignments and follow-up will live here.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {activeTab === "Rewards" && (
+          <View style={styles.screen}>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Recognition & Rewards</Text>
+              <Text style={styles.emptyText}>
+                Recognition and reward tools will live here.
+              </Text>
+            </View>
+          </View>
         )}
 
         {activeTab === "Perks" && (

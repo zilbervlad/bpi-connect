@@ -1,25 +1,30 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { canSendBroadcast } from "../data/recipientGroups";
 
-export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
+export function BottomTabs({ activeTab, onChangeTab, unreadCount }) {
   const tabs = [
     { key: "Home", label: "Home", icon: "⌂" },
     { key: "Chats", label: "Chats", icon: "●", badge: unreadCount },
     { key: "People", label: "People", icon: "○" },
+    { key: "Ops", label: "Ops", icon: "▦" },
+    { key: "More", label: "More", icon: "•••" },
   ];
-
-  if (canSendBroadcast(user)) {
-    tabs.push({ key: "Broadcast", label: "Send", icon: "➤" });
-  }
-
-  tabs.push({ key: "More", label: "More", icon: "•••" });
 
   return (
     <View style={localStyles.wrap}>
       {tabs.map((tab) => {
         const isActive =
           activeTab === tab.key ||
-          (tab.key === "More" && ["Admin", "Profile"].includes(activeTab));
+          (tab.key === "More" &&
+            ["Admin", "Profile", "Documents"].includes(activeTab)) ||
+          (tab.key === "Ops" &&
+            [
+              "Availability",
+              "Schedule",
+              "Tasks",
+              "Rewards",
+              "Broadcast",
+              "Update",
+            ].includes(activeTab));
 
         return (
           <TouchableOpacity
@@ -28,8 +33,18 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
             onPress={() => onChangeTab(tab.key)}
             activeOpacity={0.82}
           >
-            <View style={[localStyles.iconBubble, isActive && localStyles.iconBubbleActive]}>
-              <Text style={[localStyles.iconText, isActive && localStyles.iconTextActive]}>
+            <View
+              style={[
+                localStyles.iconBubble,
+                isActive && localStyles.iconBubbleActive,
+              ]}
+            >
+              <Text
+                style={[
+                  localStyles.iconText,
+                  isActive && localStyles.iconTextActive,
+                ]}
+              >
                 {tab.icon}
               </Text>
 
@@ -40,7 +55,12 @@ export function BottomTabs({ activeTab, onChangeTab, unreadCount, user }) {
               )}
             </View>
 
-            <Text style={[localStyles.label, isActive && localStyles.labelActive]}>
+            <Text
+              style={[
+                localStyles.label,
+                isActive && localStyles.labelActive,
+              ]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
