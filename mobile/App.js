@@ -20,6 +20,7 @@ import {
   markApiMessageRead,
   acknowledgeApiMessage,
   fetchApiThreads,
+  fetchApiThreadDetail,
   fetchApiThreadMessages,
   sendApiThreadMessage,
   sendApiThreadImageMessage,
@@ -2215,7 +2216,31 @@ export default function App() {
         onRefreshThread={refreshOpenThreadMessages}
         onReact={handleReactToThreadMessage}
         onAcknowledge={handleAcknowledgeThreadMessage}
-        onManageThread={() => setSelectedManageThreadId(selectedThread.id)}
+        onManageThread={async () => {
+              setSelectedManageThreadId(selectedThread.id);
+
+              if (
+                !usingApi ||
+                !currentUser?.id
+              ) {
+                return;
+              }
+
+              try {
+                const fullApiThread =
+                  await fetchApiThreadDetail(
+                    selectedThread.id,
+                    currentUser.id
+                  );
+
+                mergeUpdatedThread(fullApiThread);
+              } catch (error) {
+                console.log(
+                  "Could not load group members:",
+                  error.message
+                );
+              }
+            }}
       />
     );
   }

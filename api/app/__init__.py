@@ -4367,6 +4367,66 @@ def create_app():
             "threads": serialized_threads,
         })
 
+    @app.get("/api/threads/<int:thread_id>")
+    def get_thread_detail(thread_id):
+        user_id = request.args.get("user_id", type=int)
+
+        user = db.session.get(User, user_id) if user_id else None
+        thread = db.session.get(Thread, thread_id)
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Valid user_id is required.",
+            }), 400
+
+        if not thread:
+            return jsonify({
+                "success": False,
+                "error": "Thread not found.",
+            }), 404
+
+        role = str(user.role or "").strip().lower()
+
+        membership = ThreadMember.query.filter_by(
+            thread_id=thread.id,
+            user_id=user.id,
+        ).first()
+
+        can_manage_all_groups = role in {
+            "admin",
+            "hr",
+            "coach",
+        }
+
+        if (
+            thread.thread_type == "direct"
+            and not membership
+        ):
+            return jsonify({
+                "success": False,
+                "error": "You cannot view this conversation.",
+            }), 403
+
+        if (
+            thread.thread_type != "direct"
+            and not membership
+            and not can_manage_all_groups
+        ):
+            return jsonify({
+                "success": False,
+                "error": "You cannot view this group.",
+            }), 403
+
+        return jsonify({
+            "success": True,
+            "thread": serialize_thread(
+                thread,
+                user_id=user.id,
+            ),
+        })
+
+
     @app.post("/api/threads/direct")
     def find_or_create_direct_thread():
         data = request.get_json() or {}

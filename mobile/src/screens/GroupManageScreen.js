@@ -206,9 +206,11 @@ export function GroupManageScreen({
               );
             })
           ) : hasMemberCountButNoList ? (
-            <Text style={localStyles.emptyText}>
-              Member list is refreshing. This group has {memberCount} {memberCount === 1 ? "member" : "members"}.
-            </Text>
+            <View style={localStyles.loadingMembers}>
+              <Text style={localStyles.emptyText}>
+                Loading {memberCount} {memberCount === 1 ? "member" : "members"}...
+              </Text>
+            </View>
           ) : (
             <Text style={localStyles.emptyText}>No members found.</Text>
           )}
@@ -263,6 +265,9 @@ export function GroupManageScreen({
 }
 
 const localStyles = StyleSheet.create({
+  loadingMembers: {
+    paddingVertical: 10,
+  },
   safe: {
     flex: 1,
     backgroundColor: "#f6f7fb",

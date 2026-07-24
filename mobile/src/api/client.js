@@ -690,3 +690,20 @@ export async function deleteApiScheduleImage(
     }
   );
 }
+
+// CONNECT_THREAD_DETAIL_20260724
+
+export async function fetchApiThreadDetail(
+  threadId,
+  userId
+) {
+  const params = new URLSearchParams({
+    user_id: String(userId),
+  });
+
+  const data = await apiRequest(
+    `/api/threads/${threadId}?${params.toString()}`
+  );
+
+  return data.thread;
+}
