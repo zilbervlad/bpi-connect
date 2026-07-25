@@ -14,6 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { styles } from "../styles/styles";
+import { DateField } from "../components/DateField";
 import {
   deleteApiScheduleImage,
   fetchApiScheduleImages,
@@ -314,12 +315,10 @@ export function ScheduleScreen({ user, onBack }) {
             <Text style={localStyles.label}>
               Week starts
             </Text>
-            <TextInput
+            <DateField
               value={weekStart}
-              onChangeText={setWeekStart}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#8191a1"
-              style={localStyles.input}
+              onChange={setWeekStart}
+              placeholder="Select week start"
             />
 
             <Text style={localStyles.label}>Note</Text>

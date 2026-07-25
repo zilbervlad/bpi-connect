@@ -308,97 +308,113 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const sendUpdate = async ({ title, body, targetGroup, requiresAck }) => {
-    if (!currentUser?.id || !targetGroup || !body?.trim()) {
-      console.log("Cannot send update: missing current user, target, or body.");
-      return;
+  const sendUpdate = async ({
+    title,
+    body,
+    targetGroup,
+    requiresAck,
+  }) => {
+    if (!currentUser?.id) {
+      throw new Error("Your user session could not be found.");
+    }
+
+    if (!targetGroup) {
+      throw new Error("Choose where this update should be sent.");
+    }
+
+    const messageBody = String(body || "").trim();
+
+    if (!messageBody) {
+      throw new Error("Enter a message before sending.");
     }
 
     const selectedThread = threads.find(
-      (thread) => String(thread.id) === String(targetGroup)
+      (thread) =>
+        String(thread.id) === String(targetGroup)
     );
 
     if (!selectedThread) {
-      console.log("Cannot send update: target not found.");
-      return;
+      throw new Error("The selected target could not be found.");
     }
 
-    const messageTitle = title?.trim() || selectedThread.name || "Company Announcement";
-    const messageBody = body.trim();
+    const messageTitle =
+      String(title || "").trim() ||
+      selectedThread.name ||
+      "Company Announcement";
 
-    // Company announcements are official bulletin posts, not chat messages.
     if (selectedThread.type === "company") {
       if (!usingApi || !currentUser?.apiUser) {
-        return;
+        throw new Error(
+          "Company announcements require an active connection."
+        );
       }
 
-      const recipientUserIds = (apiUsers || [])
-        .map((user) => user.id)
-        .filter(Boolean);
+      const recipientUserIds = Array.from(
+        new Set(
+          (apiUsers || [])
+            .map((user) => Number(user.id))
+            .filter(Boolean)
+        )
+      );
 
       if (!recipientUserIds.length) {
-        console.log("Cannot send announcement: no recipients loaded.");
-        return;
+        throw new Error(
+          "No announcement recipients were loaded. Refresh the app and try again."
+        );
       }
 
-      try {
-        const apiMessage = await createApiMessage({
-          senderUserId: currentUser.id,
-          title: messageTitle,
-          body: messageBody,
-          recipientUserIds,
-          messageType: "announcement",
-          priority: requiresAck ? "ack" : "normal",
-          targetType: "company",
-          targetLabel: "Company-wide",
-          requiresAck: !!requiresAck,
-        });
-
-        const mappedMessage = mapApiMessageToAppMessage(apiMessage);
-        setMessages((currentMessages) => [mappedMessage, ...currentMessages]);
-        setActiveTab("Home");
-      } catch (error) {
-        console.log("Failed to send company announcement:", error.message);
-      }
-
-      return;
-    }
-
-    // Store / area / role updates remain chat posts for now.
-    const threadMessageBody = messageTitle
-      ? `${messageTitle}\n\n${messageBody}`
-      : messageBody;
-
-    try {
-      await sendApiThreadMessage({
-        threadId: targetGroup,
-        userId: currentUser.id,
-        body: threadMessageBody,
-        requiresAck: !!requiresAck,
+      const apiMessage = await createApiMessage({
+        senderUserId: currentUser.id,
+        title: messageTitle,
+        body: messageBody,
+        recipientUserIds,
+        messageType: "announcement",
+        priority: requiresAck ? "ack" : "normal",
+        targetType: "company",
+        targetLabel: "Company-wide",
+        requiresAck: Boolean(requiresAck),
       });
 
-      if (typeof refreshThreadList === "function") {
-        await refreshThreadList();
-      }
+      const mappedMessage =
+        mapApiMessageToAppMessage(apiMessage);
 
-      await openThread(targetGroup);
-    } catch (error) {
-      console.log("Failed object-style send update, trying positional send:", error);
+      setMessages((currentMessages) => [
+        mappedMessage,
+        ...currentMessages,
+      ]);
 
-      try {
-        await sendApiThreadMessage(targetGroup, currentUser.id, threadMessageBody, {
-          requiresAck: !!requiresAck,
-        });
+      setActiveTab("Home");
 
-        if (typeof refreshThreadList === "function") {
-          await refreshThreadList();
-        }
-
-        await openThread(targetGroup);
-      } catch (secondError) {
-        console.log("Failed to send update:", secondError);
-      }
+      return {
+        success: true,
+        type: "announcement",
+        message: mappedMessage,
+      };
     }
+
+    const threadMessageBody =
+      messageTitle && messageTitle !== selectedThread.name
+        ? `${messageTitle}\n\n${messageBody}`
+        : messageBody;
+
+    const response = await sendApiThreadMessage(
+      selectedThread.id,
+      currentUser.id,
+      threadMessageBody,
+      Boolean(requiresAck)
+    );
+
+    if (typeof refreshThreadList === "function") {
+      await refreshThreadList();
+    }
+
+    await openThread(selectedThread.id);
+
+    return {
+      success: true,
+      type: "thread",
+      response,
+    };
   };
 
   const startMessageToRecipient = async (recipient) => {

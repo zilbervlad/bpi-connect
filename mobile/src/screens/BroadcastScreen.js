@@ -6,6 +6,8 @@ import {
   ScrollView,
   TextInput,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 
 import { styles } from "../styles/styles";
@@ -47,24 +49,44 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [requiresAck, setRequiresAck] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const selectedTarget =
     availableTargets.find((thread) => String(thread.id) === String(targetThreadId)) ||
     availableTargets[0];
 
-  function handleSend() {
-    if (!selectedTarget || !body.trim()) return;
+  async function handleSend() {
+    if (!selectedTarget || !body.trim() || isSending) {
+      return;
+    }
 
-    onSendUpdate?.({
-      title: title.trim() || selectedTarget.name,
-      body: body.trim(),
-      targetGroup: selectedTarget.id,
-      requiresAck,
-    });
+    setIsSending(true);
 
-    setTitle("");
-    setBody("");
-    setRequiresAck(false);
+    try {
+      await onSendUpdate?.({
+        title: title.trim() || selectedTarget.name,
+        body: body.trim(),
+        targetGroup: selectedTarget.id,
+        requiresAck,
+      });
+
+      setTitle("");
+      setBody("");
+      setRequiresAck(false);
+
+      Alert.alert(
+        "Update sent",
+        `Your update was sent to ${selectedTarget.name}.`
+      );
+    } catch (error) {
+      Alert.alert(
+        "Update not sent",
+        error?.message ||
+          "Something went wrong. Your message has been kept so you can try again."
+      );
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
@@ -183,15 +205,25 @@ export function BroadcastScreen({ user, threads, onSendUpdate }) {
         <TouchableOpacity
           style={[
             localStyles.sendButton,
-            (!body.trim() || !selectedTarget) && localStyles.sendButtonDisabled,
+            (!body.trim() || !selectedTarget || isSending) &&
+              localStyles.sendButtonDisabled,
           ]}
           onPress={handleSend}
-          disabled={!body.trim() || !selectedTarget}
+          disabled={!body.trim() || !selectedTarget || isSending}
           activeOpacity={0.84}
         >
-          <Text style={localStyles.sendButtonText}>
-            Send to {selectedTarget?.name || "Group"}
-          </Text>
+          {isSending ? (
+            <View style={localStyles.sendingRow}>
+              <ActivityIndicator size="small" color="#ffffff" />
+              <Text style={localStyles.sendButtonText}>
+                Sending...
+              </Text>
+            </View>
+          ) : (
+            <Text style={localStyles.sendButtonText}>
+              Send to {selectedTarget?.name || "Group"}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -362,6 +394,11 @@ const localStyles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.45,
+  },
+  sendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   sendButtonText: {
     color: "#ffffff",

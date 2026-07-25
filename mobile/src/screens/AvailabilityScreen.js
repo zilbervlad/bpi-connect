@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { styles } from "../styles/styles";
+import { DateField } from "../components/DateField";
 import {
   cancelApiOpsRequest,
   createApiAvailabilityRequest,
@@ -485,21 +486,22 @@ export function AvailabilityScreen({ user, onBack }) {
               </Text>
 
               <FieldLabel text="Start date" />
-              <TextInput
+              <DateField
                 value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#8191a1"
-                style={localStyles.input}
+                onChange={setStartDate}
+                placeholder="Select start date"
               />
 
               <FieldLabel text="End date" />
-              <TextInput
+              <DateField
                 value={endDate}
-                onChangeText={setEndDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#8191a1"
-                style={localStyles.input}
+                onChange={setEndDate}
+                placeholder="Select end date"
+                minimumDate={
+                  startDate
+                    ? new Date(`${startDate}T12:00:00`)
+                    : undefined
+                }
               />
 
               <FieldLabel text="Reason or note" />
@@ -525,12 +527,10 @@ export function AvailabilityScreen({ user, onBack }) {
               </Text>
 
               <FieldLabel text="Effective date" />
-              <TextInput
+              <DateField
                 value={effectiveDate}
-                onChangeText={setEffectiveDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#8191a1"
-                style={localStyles.input}
+                onChange={setEffectiveDate}
+                placeholder="Select effective date"
               />
 
               {DAYS.map(([key, label]) => (
