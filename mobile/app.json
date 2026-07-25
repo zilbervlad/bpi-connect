@@ -27,7 +27,8 @@
         "backgroundColor": "#07111f"
       },
       "edgeToEdgeEnabled": true,
-      "versionCode": 42
+      "versionCode": 42,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
