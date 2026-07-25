@@ -49,6 +49,10 @@ export function AvailabilityScreen({ user, onBack }) {
   const [activeView, setActiveView] = useState("mine");
   const [requestType, setRequestType] = useState("time_off");
 
+  const [managerStatus, setManagerStatus] = useState("pending");
+  const [managerRequestType, setManagerRequestType] = useState("all");
+  const [managerStoreId, setManagerStoreId] = useState("all");
+
   const [requests, setRequests] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [userDetail, setUserDetail] = useState(null);
@@ -112,7 +116,7 @@ export function AvailabilityScreen({ user, onBack }) {
 
   useEffect(() => {
     loadRequests(activeView);
-  }, [activeView]);
+  }, [activeView, managerStatus]);
 
   useEffect(() => {
     if (!selectedStoreId && assignedStores.length) {
@@ -137,12 +141,26 @@ export function AvailabilityScreen({ user, onBack }) {
     }
   }
 
-  async function loadRequests(scope = activeView) {
+  async function loadRequests(
+    scope = activeView,
+    statusOverride = null
+  ) {
     try {
+      const requestedStatus =
+        scope === "manage"
+          ? (
+              statusOverride !== null
+                ? statusOverride
+                : managerStatus
+            )
+          : "";
+
       const result = await fetchApiOpsRequests(
         user.id,
         scope,
-        scope === "manage" ? "pending" : ""
+        requestedStatus === "all"
+          ? ""
+          : requestedStatus
       );
 
       setRequests(result.requests);
@@ -153,6 +171,69 @@ export function AvailabilityScreen({ user, onBack }) {
       );
     }
   }
+
+  const managerStores = useMemo(() => {
+    const storesById = new Map();
+
+    for (const item of requests || []) {
+      if (!item?.store?.id) continue;
+
+      storesById.set(String(item.store.id), item.store);
+    }
+
+    return Array.from(storesById.values()).sort((a, b) =>
+      String(a.store_number || "").localeCompare(
+        String(b.store_number || ""),
+        undefined,
+        { numeric: true }
+      )
+    );
+  }, [requests]);
+
+  const visibleRequests = useMemo(() => {
+    const rows = [...(requests || [])];
+
+    const filtered = rows.filter((item) => {
+      if (
+        managerRequestType !== "all" &&
+        item.request_type !== managerRequestType
+      ) {
+        return false;
+      }
+
+      if (
+        managerStoreId !== "all" &&
+        String(item.store_id) !== String(managerStoreId)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      if (
+        managerStatus === "approved" &&
+        a.request_type === "time_off" &&
+        b.request_type === "time_off"
+      ) {
+        return String(a.start_date || "").localeCompare(
+          String(b.start_date || "")
+        );
+      }
+
+      return String(b.created_at || "").localeCompare(
+        String(a.created_at || "")
+      );
+    });
+
+    return filtered;
+  }, [
+    requests,
+    managerRequestType,
+    managerStoreId,
+    managerStatus,
+  ]);
 
   async function submitTimeOff() {
     if (!selectedStoreId || !startDate.trim()) {
@@ -263,7 +344,7 @@ export function AvailabilityScreen({ user, onBack }) {
         managerNote: managerNotes[itemKey(item)] || "",
       });
 
-      await loadRequests("manage");
+      await loadRequests("manage", managerStatus);
 
       Alert.alert(
         decision === "approved" ? "Approved" : "Denied",
@@ -341,7 +422,7 @@ export function AvailabilityScreen({ user, onBack }) {
 
         {canReview ? (
           <TabButton
-            label={`Approvals${pendingCount ? ` (${pendingCount})` : ""}`}
+            label={`Manager View${pendingCount ? ` (${pendingCount})` : ""}`}
             active={activeView === "manage"}
             onPress={() => setActiveView("manage")}
           />
@@ -489,9 +570,97 @@ export function AvailabilityScreen({ user, onBack }) {
           )}
         </>
       ) : (
-        <View style={localStyles.list}>
-          {requests.length ? (
-            requests.map((item) => (
+        <>
+          {activeView === "manage" ? (
+            <View style={localStyles.filterCard}>
+              <Text style={localStyles.filterLabel}>Status</Text>
+
+              <View style={localStyles.filterRow}>
+                {[
+                  ["pending", "Pending"],
+                  ["approved", "Approved"],
+                  ["denied", "Denied"],
+                  ["all", "All"],
+                ].map(([value, label]) => (
+                  <FilterButton
+                    key={value}
+                    label={label}
+                    active={managerStatus === value}
+                    onPress={() => setManagerStatus(value)}
+                  />
+                ))}
+              </View>
+
+              <Text style={localStyles.filterLabel}>
+                Request type
+              </Text>
+
+              <View style={localStyles.filterRow}>
+                <FilterButton
+                  label="All"
+                  active={managerRequestType === "all"}
+                  onPress={() => setManagerRequestType("all")}
+                />
+                <FilterButton
+                  label="Time Off"
+                  active={managerRequestType === "time_off"}
+                  onPress={() =>
+                    setManagerRequestType("time_off")
+                  }
+                />
+                <FilterButton
+                  label="Availability"
+                  active={managerRequestType === "availability"}
+                  onPress={() =>
+                    setManagerRequestType("availability")
+                  }
+                />
+              </View>
+
+              {managerStores.length > 1 ? (
+                <>
+                  <Text style={localStyles.filterLabel}>Store</Text>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={localStyles.storeFilterRow}
+                  >
+                    <FilterButton
+                      label="All Stores"
+                      active={managerStoreId === "all"}
+                      onPress={() => setManagerStoreId("all")}
+                    />
+
+                    {managerStores.map((store) => (
+                      <FilterButton
+                        key={store.id}
+                        label={String(store.store_number || store.name)}
+                        active={
+                          String(managerStoreId) === String(store.id)
+                        }
+                        onPress={() =>
+                          setManagerStoreId(String(store.id))
+                        }
+                      />
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={localStyles.list}>
+          {(
+            activeView === "manage"
+              ? visibleRequests
+              : requests
+          ).length ? (
+            (
+              activeView === "manage"
+                ? visibleRequests
+                : requests
+            ).map((item) => (
               <RequestCard
                 key={itemKey(item)}
                 item={item}
@@ -502,7 +671,10 @@ export function AvailabilityScreen({ user, onBack }) {
                     [itemKey(item)]: value,
                   }))
                 }
-                canReview={activeView === "manage"}
+                canReview={
+                  activeView === "manage" &&
+                  item.status === "pending"
+                }
                 canCancel={
                   activeView === "mine" &&
                   item.status === "pending"
@@ -516,12 +688,15 @@ export function AvailabilityScreen({ user, onBack }) {
             <View style={localStyles.card}>
               <Text style={localStyles.empty}>
                 {activeView === "manage"
-                  ? "No pending requests."
+                  ? managerStatus === "all"
+                    ? "No requests match these filters."
+                    : `No ${managerStatus} requests match these filters.`
                   : "You have not submitted any requests yet."}
               </Text>
             </View>
           )}
-        </View>
+          </View>
+        </>
       )}
     </ScrollView>
   );
@@ -590,6 +765,27 @@ function RequestCard({
         </>
       )}
 
+      {item.reviewed_by || item.reviewed_at ? (
+        <View style={localStyles.reviewMetaCard}>
+          <Text style={localStyles.reviewMeta}>
+            {item.status === "approved"
+              ? "Approved"
+              : item.status === "denied"
+                ? "Denied"
+                : "Reviewed"}
+            {item.reviewed_by?.name
+              ? ` by ${item.reviewed_by.name}`
+              : ""}
+          </Text>
+
+          {item.reviewed_at ? (
+            <Text style={localStyles.reviewDate}>
+              {formatReviewDate(item.reviewed_at)}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {item.manager_note ? (
         <Text style={localStyles.managerNote}>
           Manager note: {item.manager_note}
@@ -636,6 +832,45 @@ function RequestCard({
       ) : null}
     </View>
   );
+}
+
+function FilterButton({ label, active, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[
+        localStyles.filterButton,
+        active && localStyles.filterButtonActive,
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          localStyles.filterButtonText,
+          active && localStyles.filterButtonTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function formatReviewDate(value) {
+  if (!value) return "";
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function TabButton({ label, active, onPress }) {
@@ -749,6 +984,53 @@ const localStyles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     fontWeight: "700",
+  },
+  filterCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#e4eaf0",
+  },
+  filterLabel: {
+    color: "#526476",
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 7,
+    marginTop: 4,
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 9,
+  },
+  storeFilterRow: {
+    gap: 6,
+    paddingRight: 12,
+    paddingBottom: 3,
+  },
+  filterButton: {
+    minHeight: 36,
+    borderRadius: 11,
+    backgroundColor: "#e8eef3",
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterButtonActive: {
+    backgroundColor: "#101d2d",
+  },
+  filterButtonText: {
+    color: "#526476",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  filterButtonTextActive: {
+    color: "#ffffff",
   },
   tabs: {
     flexDirection: "row",
@@ -894,6 +1176,23 @@ const localStyles = StyleSheet.create({
     color: "#526476",
     lineHeight: 19,
     marginTop: 4,
+  },
+  reviewMetaCard: {
+    backgroundColor: "#f3f6f8",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  reviewMeta: {
+    color: "#10212b",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  reviewDate: {
+    color: "#8191a1",
+    fontWeight: "700",
+    fontSize: 11,
+    marginTop: 3,
   },
   managerNote: {
     backgroundColor: "#f3f6f8",
