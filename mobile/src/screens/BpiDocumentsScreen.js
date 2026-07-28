@@ -23,102 +23,56 @@ import {
 
 function formatDate(value, includeTime = false) {
   if (!value) return "—";
-
   const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
+  if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString([], {
     month: "short",
     day: "numeric",
     year: "numeric",
-    ...(includeTime
-      ? {
-          hour: "numeric",
-          minute: "2-digit",
-        }
-      : {}),
+    ...(includeTime ? { hour: "numeric", minute: "2-digit" } : {}),
   });
+}
+
+function kindLabel(document) {
+  if (document.document_kind === "dwp") return "DWP";
+  if (document.document_kind === "hr_form") return "HR FORM";
+  return "HR DOCUMENT";
 }
 
 function DocumentRow({ document, onOpen }) {
   const acknowledged = document.status === "acknowledged";
-
   return (
     <TouchableOpacity
-      style={localStyles.documentRow}
+      style={styles.documentRow}
       onPress={() => onOpen(document)}
       activeOpacity={0.82}
     >
-      <View style={localStyles.documentMain}>
-        <View style={localStyles.documentHeader}>
-          <Text style={localStyles.documentTitle}>
-            {document.title}
-          </Text>
-
-          <View
-            style={[
-              localStyles.statusPill,
-              acknowledged
-                ? localStyles.statusComplete
-                : localStyles.statusPending,
-            ]}
-          >
-            <Text
-              style={[
-                localStyles.statusText,
-                acknowledged
-                  ? localStyles.statusCompleteText
-                  : localStyles.statusPendingText,
-              ]}
-            >
-              {acknowledged ? "SIGNED" : "ACTION REQUIRED"}
+      <View style={styles.documentMain}>
+        <View style={styles.topLine}>
+          <Text style={styles.kind}>{kindLabel(document)}</Text>
+          <View style={[styles.pill, acknowledged ? styles.completePill : styles.pendingPill]}>
+            <Text style={[styles.pillText, acknowledged ? styles.completeText : styles.pendingText]}>
+              {acknowledged ? "COMPLETED" : "ACTION REQUIRED"}
             </Text>
           </View>
         </View>
-
-        {document.description ? (
-          <Text style={localStyles.documentDescription}>
-            {document.description}
-          </Text>
-        ) : null}
-
-        <View style={localStyles.metaRow}>
-          <Text style={localStyles.metaText}>
-            Assigned {formatDate(document.assigned_at)}
-          </Text>
-
-          {document.due_date && !acknowledged ? (
-            <Text style={localStyles.dueText}>
-              Due {formatDate(document.due_date)}
-            </Text>
-          ) : null}
-
-          {acknowledged ? (
-            <Text style={localStyles.signedText}>
-              Signed {formatDate(document.acknowledged_at)}
-            </Text>
-          ) : null}
-        </View>
+        <Text style={styles.documentTitle}>{document.title}</Text>
+        {document.description ? <Text style={styles.description}>{document.description}</Text> : null}
+        <Text style={styles.meta}>
+          {acknowledged
+            ? `Completed ${formatDate(document.acknowledged_at || document.assigned_at)}`
+            : `Received ${formatDate(document.assigned_at)}`}
+        </Text>
       </View>
-
-      <Text style={localStyles.chevron}>›</Text>
+      <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
   );
 }
 
-export function BpiDocumentsScreen({
-  user,
-  apiToken,
-  onBack,
-}) {
+export function BpiDocumentsScreen({ user, apiToken, onBack }) {
   const [documents, setDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [acknowledgedName, setAcknowledgedName] = useState(
-    user?.name || ""
-  );
+  const [acknowledgedName, setAcknowledgedName] = useState(user?.name || "");
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,44 +80,27 @@ export function BpiDocumentsScreen({
   const [errorMessage, setErrorMessage] = useState("");
 
   const pendingDocuments = useMemo(
-    () =>
-      documents.filter(
-        (document) => document.status !== "acknowledged"
-      ),
+    () => documents.filter((document) => document.status !== "acknowledged"),
     [documents]
   );
-
   const completedDocuments = useMemo(
-    () =>
-      documents.filter(
-        (document) => document.status === "acknowledged"
-      ),
+    () => documents.filter((document) => document.status === "acknowledged"),
     [documents]
   );
 
   async function loadDocuments({ quiet = false } = {}) {
     if (!apiToken) {
-      setErrorMessage(
-        "Your saved session is from an older version of Connect. Please sign out and sign back in."
-      );
+      setErrorMessage("Please sign out and sign back in to refresh your Connect session.");
       setLoading(false);
       setRefreshing(false);
       return;
     }
-
-    if (!quiet) {
-      setLoading(true);
-    }
-
+    if (!quiet) setLoading(true);
     setErrorMessage("");
-
     try {
-      const nextDocuments = await fetchApiHrDocuments(apiToken);
-      setDocuments(nextDocuments);
+      setDocuments(await fetchApiHrDocuments(apiToken));
     } catch (error) {
-      setErrorMessage(
-        error.message || "Documents could not be loaded."
-      );
+      setErrorMessage(error.message || "HR documents could not be loaded.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -182,115 +119,71 @@ export function BpiDocumentsScreen({
 
   function closeDocument() {
     if (submitting) return;
-
     setSelectedDocument(null);
     setConfirmed(false);
   }
 
   async function submitAcknowledgement() {
     const cleanName = acknowledgedName.trim();
-
     if (!cleanName) {
-      Alert.alert(
-        "Name required",
-        "Please type your full name."
-      );
+      Alert.alert("Name required", "Please type your full name.");
       return;
     }
-
     if (!confirmed) {
-      Alert.alert(
-        "Confirmation required",
-        "Please check the acknowledgement box."
-      );
+      Alert.alert("Confirmation required", "Please check the acknowledgement box.");
       return;
     }
 
     setSubmitting(true);
-
     try {
       const result = await acknowledgeApiHrDocument(
         selectedDocument.recipient_id,
         apiToken,
         cleanName
       );
-
       const recipient = result.recipient || {};
-
-      setDocuments((currentDocuments) =>
-        currentDocuments.map((document) =>
-          document.recipient_id ===
-          selectedDocument.recipient_id
-            ? {
-                ...document,
-                status: "acknowledged",
-                acknowledged_name:
-                  recipient.acknowledged_name || cleanName,
-                acknowledged_at:
-                  recipient.acknowledged_at ||
-                  new Date().toISOString(),
-              }
-            : document
+      const completed = {
+        ...selectedDocument,
+        status: "acknowledged",
+        acknowledged_name: recipient.acknowledged_name || cleanName,
+        acknowledged_at: recipient.acknowledged_at || new Date().toISOString(),
+      };
+      setDocuments((current) =>
+        current.map((item) =>
+          item.recipient_id === selectedDocument.recipient_id ? completed : item
         )
       );
-
-      setSelectedDocument((currentDocument) => ({
-        ...currentDocument,
-        status: "acknowledged",
-        acknowledged_name:
-          recipient.acknowledged_name || cleanName,
-        acknowledged_at:
-          recipient.acknowledged_at ||
-          new Date().toISOString(),
-      }));
-
+      setSelectedDocument(completed);
       setConfirmed(false);
-
-      Alert.alert(
-        "Document signed",
-        "Your acknowledgement was recorded successfully."
-      );
+      Alert.alert("Completed", "Your acknowledgement was recorded in BPI Ops.");
     } catch (error) {
-      Alert.alert(
-        "Could not sign document",
-        error.message || "Please try again."
-      );
+      Alert.alert("Could not acknowledge", error.message || "Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <SafeAreaView style={localStyles.screen}>
-      <View style={localStyles.header}>
-        <TouchableOpacity
-          style={localStyles.backButton}
-          onPress={onBack}
-        >
-          <Text style={localStyles.backButtonText}>‹</Text>
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-
-        <View style={localStyles.headerMain}>
-          <Text style={localStyles.eyebrow}>BPI DOCUMENTS</Text>
-          <Text style={localStyles.headerTitle}>
-            My documents
-          </Text>
-          <Text style={localStyles.headerSubtitle}>
-            Review and sign assigned HR documents
-          </Text>
+        <View style={styles.headerMain}>
+          <Text style={styles.eyebrow}>BPI OPS</Text>
+          <Text style={styles.headerTitle}>HR Documents</Text>
+          <Text style={styles.headerSubtitle}>HR documents, forms, and DWP records</Text>
         </View>
       </View>
 
       {loading ? (
-        <View style={localStyles.centerState}>
+        <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#e91f3f" />
-          <Text style={localStyles.centerTitle}>
-            Loading documents
-          </Text>
+          <Text style={styles.centerTitle}>Loading HR records</Text>
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={localStyles.content}
+          contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -301,83 +194,54 @@ export function BpiDocumentsScreen({
             />
           }
         >
-          <View style={localStyles.summaryRow}>
-            <View style={localStyles.summaryCard}>
-              <Text style={localStyles.summaryValue}>
-                {pendingDocuments.length}
-              </Text>
-              <Text style={localStyles.summaryLabel}>
-                Action required
-              </Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{pendingDocuments.length}</Text>
+              <Text style={styles.summaryLabel}>Action required</Text>
             </View>
-
-            <View style={localStyles.summaryCard}>
-              <Text style={localStyles.summaryValue}>
-                {completedDocuments.length}
-              </Text>
-              <Text style={localStyles.summaryLabel}>
-                Completed
-              </Text>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryValue}>{completedDocuments.length}</Text>
+              <Text style={styles.summaryLabel}>Completed</Text>
             </View>
           </View>
 
           {errorMessage ? (
-            <View style={localStyles.errorBox}>
-              <Text style={localStyles.errorTitle}>
-                Documents unavailable
-              </Text>
-              <Text style={localStyles.errorText}>
-                {errorMessage}
-              </Text>
-
-              <TouchableOpacity
-                style={localStyles.retryButton}
-                onPress={() => loadDocuments()}
-              >
-                <Text style={localStyles.retryText}>
-                  Try Again
-                </Text>
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>HR documents unavailable</Text>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => loadDocuments()}>
+                <Text style={styles.retryText}>Try Again</Text>
               </TouchableOpacity>
             </View>
           ) : null}
 
-          <View style={localStyles.sectionCard}>
-            <Text style={localStyles.sectionTitle}>
-              Action required
-            </Text>
-
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Action required</Text>
             {pendingDocuments.length ? (
               pendingDocuments.map((document) => (
                 <DocumentRow
-                  key={document.recipient_id}
+                  key={String(document.recipient_id)}
                   document={document}
                   onOpen={openDocument}
                 />
               ))
             ) : (
-              <Text style={localStyles.emptyText}>
-                You have no documents waiting for your signature.
-              </Text>
+              <Text style={styles.emptyText}>Nothing is waiting for your acknowledgement.</Text>
             )}
           </View>
 
-          <View style={localStyles.sectionCard}>
-            <Text style={localStyles.sectionTitle}>
-              Completed
-            </Text>
-
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Completed & records</Text>
             {completedDocuments.length ? (
               completedDocuments.map((document) => (
                 <DocumentRow
-                  key={document.recipient_id}
+                  key={String(document.recipient_id)}
                   document={document}
                   onOpen={openDocument}
                 />
               ))
             ) : (
-              <Text style={localStyles.emptyText}>
-                Signed documents will appear here.
-              </Text>
+              <Text style={styles.emptyText}>Completed records will appear here.</Text>
             )}
           </View>
         </ScrollView>
@@ -390,139 +254,71 @@ export function BpiDocumentsScreen({
         onRequestClose={closeDocument}
       >
         {selectedDocument ? (
-          <SafeAreaView style={localStyles.viewerScreen}>
-            <View style={localStyles.viewerHeader}>
-              <TouchableOpacity
-                style={localStyles.viewerClose}
-                onPress={closeDocument}
-              >
-                <Text style={localStyles.viewerCloseText}>
-                  Close
-                </Text>
+          <SafeAreaView style={styles.viewerScreen}>
+            <View style={styles.viewerHeader}>
+              <TouchableOpacity style={styles.closeButton} onPress={closeDocument}>
+                <Text style={styles.closeText}>Close</Text>
               </TouchableOpacity>
-
-              <View style={localStyles.viewerHeaderMain}>
-                <Text
-                  style={localStyles.viewerTitle}
-                  numberOfLines={1}
-                >
+              <View style={styles.viewerHeaderMain}>
+                <Text style={styles.viewerKind}>{kindLabel(selectedDocument)}</Text>
+                <Text style={styles.viewerTitle} numberOfLines={1}>
                   {selectedDocument.title}
-                </Text>
-
-                <Text style={localStyles.viewerMeta}>
-                  {selectedDocument.original_filename}
                 </Text>
               </View>
             </View>
 
-            <View style={localStyles.webViewWrap}>
+            <View style={styles.webViewWrap}>
               <WebView
                 source={{
-                  uri: getApiHrDocumentFileUrl(
-                    selectedDocument.recipient_id
-                  ),
-                  headers: {
-                    Authorization: `Bearer ${apiToken}`,
-                  },
+                  uri: getApiHrDocumentFileUrl(selectedDocument.recipient_id),
+                  headers: { Authorization: `Bearer ${apiToken}` },
                 }}
-                style={localStyles.webView}
+                style={styles.webView}
                 startInLoadingState
                 renderLoading={() => (
-                  <View style={localStyles.webViewLoading}>
-                    <ActivityIndicator
-                      size="large"
-                      color="#e91f3f"
-                    />
-                    <Text style={localStyles.loadingText}>
-                      Opening document...
-                    </Text>
+                  <View style={styles.webLoading}>
+                    <ActivityIndicator size="large" color="#e91f3f" />
+                    <Text style={styles.loadingText}>Opening record...</Text>
                   </View>
                 )}
-                onHttpError={(event) => {
-                  console.warn(
-                    "Document viewer HTTP error",
-                    event.nativeEvent.statusCode
-                  );
-                }}
               />
             </View>
 
             {selectedDocument.status === "acknowledged" ? (
-              <View style={localStyles.completedPanel}>
-                <Text style={localStyles.completedTitle}>
-                  ✓ Acknowledged
-                </Text>
-                <Text style={localStyles.completedText}>
-                  Signed by{" "}
-                  {selectedDocument.acknowledged_name || user.name}
-                  {" on "}
-                  {formatDate(
-                    selectedDocument.acknowledged_at,
-                    true
-                  )}
+              <View style={styles.completedPanel}>
+                <Text style={styles.completedTitle}>✓ Completed</Text>
+                <Text style={styles.completedBody}>
+                  {selectedDocument.acknowledged_name
+                    ? `Acknowledged by ${selectedDocument.acknowledged_name} on ${formatDate(selectedDocument.acknowledged_at, true)}`
+                    : "This record does not require additional action."}
                 </Text>
               </View>
             ) : (
-              <ScrollView
-                style={localStyles.signPanel}
-                contentContainerStyle={
-                  localStyles.signPanelContent
-                }
-                keyboardShouldPersistTaps="handled"
-              >
-                <Pressable
-                  style={localStyles.confirmRow}
-                  onPress={() =>
-                    setConfirmed((current) => !current)
-                  }
-                >
-                  <View
-                    style={[
-                      localStyles.checkbox,
-                      confirmed && localStyles.checkboxChecked,
-                    ]}
-                  >
-                    {confirmed ? (
-                      <Text style={localStyles.checkboxMark}>
-                        ✓
-                      </Text>
-                    ) : null}
+              <ScrollView style={styles.signPanel} keyboardShouldPersistTaps="handled">
+                <Pressable style={styles.confirmRow} onPress={() => setConfirmed((value) => !value)}>
+                  <View style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
+                    <Text style={styles.checkmark}>{confirmed ? "✓" : ""}</Text>
                   </View>
-
-                  <Text style={localStyles.confirmText}>
-                    I acknowledge that I have received,
-                    reviewed, and understand this document.
+                  <Text style={styles.confirmText}>
+                    I have reviewed this record and acknowledge its contents and any notices shown in the attached PDF.
                   </Text>
                 </Pressable>
-
-                <Text style={localStyles.inputLabel}>
-                  Full name
-                </Text>
-
                 <TextInput
-                  style={localStyles.nameInput}
+                  style={styles.nameInput}
                   value={acknowledgedName}
                   onChangeText={setAcknowledgedName}
                   placeholder="Type your full name"
-                  placeholderTextColor="#8797a8"
                   autoCapitalize="words"
                 />
-
                 <TouchableOpacity
-                  style={[
-                    localStyles.signButton,
-                    submitting &&
-                      localStyles.signButtonDisabled,
-                  ]}
+                  style={[styles.submitButton, submitting && styles.disabledButton]}
                   onPress={submitAcknowledgement}
                   disabled={submitting}
                 >
                   {submitting ? (
-                    <ActivityIndicator color="#ffffff" />
+                    <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={localStyles.signButtonText}>
-                      Acknowledge & Sign
-                    </Text>
+                    <Text style={styles.submitText}>Acknowledge in BPI Ops</Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
@@ -534,370 +330,66 @@ export function BpiDocumentsScreen({
   );
 }
 
-const localStyles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#07111d",
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#132235",
-  },
-  backButtonText: {
-    color: "#ffffff",
-    fontSize: 34,
-    lineHeight: 36,
-    fontWeight: "500",
-  },
-  headerMain: {
-    flex: 1,
-  },
-  eyebrow: {
-    color: "#e91f3f",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  headerTitle: {
-    color: "#ffffff",
-    fontSize: 25,
-    fontWeight: "900",
-    letterSpacing: -0.8,
-    marginTop: 2,
-  },
-  headerSubtitle: {
-    color: "#9cadbf",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  content: {
-    paddingHorizontal: 14,
-    paddingBottom: 120,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: "#101d2d",
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  summaryValue: {
-    color: "#ffffff",
-    fontSize: 31,
-    fontWeight: "900",
-  },
-  summaryLabel: {
-    color: "#9cadbf",
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    marginTop: 4,
-  },
-  sectionCard: {
-    backgroundColor: "#101d2d",
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  sectionTitle: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-  documentRow: {
-    backgroundColor: "rgba(255,255,255,0.055)",
-    borderRadius: 16,
-    padding: 12,
-    marginTop: 7,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  documentMain: {
-    flex: 1,
-  },
-  documentHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  documentTitle: {
-    flex: 1,
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  documentDescription: {
-    color: "#a8b6c5",
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 17,
-    marginTop: 6,
-  },
-  metaRow: {
-    marginTop: 8,
-    gap: 2,
-  },
-  metaText: {
-    color: "#8495a7",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  dueText: {
-    color: "#ffb4bf",
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  signedText: {
-    color: "#87d9ab",
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusPending: {
-    backgroundColor: "#ffe4e8",
-  },
-  statusComplete: {
-    backgroundColor: "#dff7e9",
-  },
-  statusText: {
-    fontSize: 9,
-    fontWeight: "900",
-  },
-  statusPendingText: {
-    color: "#991b2f",
-  },
-  statusCompleteText: {
-    color: "#166534",
-  },
-  chevron: {
-    color: "#9cadbf",
-    fontSize: 24,
-    marginLeft: 8,
-  },
-  emptyText: {
-    color: "#9cadbf",
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 19,
-    paddingVertical: 12,
-  },
-  errorBox: {
-    backgroundColor: "#3b1620",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#7f1d31",
-  },
-  errorTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  errorText: {
-    color: "#ffc5cd",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 5,
-  },
-  retryButton: {
-    alignSelf: "flex-start",
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    marginTop: 10,
-  },
-  retryText: {
-    color: "#991b2f",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  centerState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  centerTitle: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "900",
-    marginTop: 14,
-  },
-  viewerScreen: {
-    flex: 1,
-    backgroundColor: "#07111d",
-  },
-  viewerHeader: {
-    minHeight: 62,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#101d2d",
-  },
-  viewerClose: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  viewerCloseText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  viewerHeaderMain: {
-    flex: 1,
-  },
-  viewerTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  viewerMeta: {
-    color: "#9cadbf",
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  webViewWrap: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  webView: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  webViewLoading: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#ffffff",
-  },
-  loadingText: {
-    color: "#526273",
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 10,
-  },
-  signPanel: {
-    maxHeight: 280,
-    backgroundColor: "#101d2d",
-  },
-  signPanelContent: {
-    padding: 14,
-    paddingBottom: 24,
-  },
-  confirmRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  checkbox: {
-    width: 25,
-    height: 25,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: "#728397",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: "#e91f3f",
-    borderColor: "#e91f3f",
-  },
-  checkboxMark: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  confirmText: {
-    flex: 1,
-    color: "#d8e0e8",
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 19,
-  },
-  inputLabel: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "900",
-    marginTop: 14,
-    marginBottom: 6,
-  },
-  nameInput: {
-    backgroundColor: "#ffffff",
-    color: "#10212b",
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  signButton: {
-    backgroundColor: "#e91f3f",
-    borderRadius: 14,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-  },
-  signButtonDisabled: {
-    opacity: 0.55,
-  },
-  signButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  completedPanel: {
-    backgroundColor: "#123326",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#24583f",
-  },
-  completedTitle: {
-    color: "#9af0bd",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  completedText: {
-    color: "#d2f5df",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 18,
-    marginTop: 4,
-  },
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#f4f6fa" },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
+  backButton: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#f1f5f9", marginRight: 12 },
+  backText: { fontSize: 34, lineHeight: 36, color: "#111827" },
+  headerMain: { flex: 1 },
+  eyebrow: { fontSize: 10, letterSpacing: 1.5, fontWeight: "900", color: "#e91f3f" },
+  headerTitle: { fontSize: 26, fontWeight: "900", color: "#111827", marginTop: 2 },
+  headerSubtitle: { fontSize: 13, color: "#64748b", marginTop: 2 },
+  content: { padding: 16, paddingBottom: 50 },
+  summaryRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  summaryCard: { flex: 1, backgroundColor: "#fff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#e5e7eb" },
+  summaryValue: { fontSize: 30, fontWeight: "900", color: "#111827" },
+  summaryLabel: { fontSize: 12, color: "#64748b", fontWeight: "800", marginTop: 3 },
+  sectionCard: { backgroundColor: "#fff", borderRadius: 20, padding: 15, borderWidth: 1, borderColor: "#e5e7eb", marginBottom: 14 },
+  sectionTitle: { fontSize: 17, fontWeight: "900", color: "#111827", marginBottom: 8 },
+  documentRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderTopWidth: 1, borderTopColor: "#eef2f7" },
+  documentMain: { flex: 1 },
+  topLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  kind: { fontSize: 10, letterSpacing: 1.2, fontWeight: "900", color: "#64748b" },
+  pill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  pendingPill: { backgroundColor: "#fff1f2" },
+  completePill: { backgroundColor: "#ecfdf5" },
+  pillText: { fontSize: 9, fontWeight: "900" },
+  pendingText: { color: "#be123c" },
+  completeText: { color: "#047857" },
+  documentTitle: { fontSize: 16, fontWeight: "900", color: "#111827", marginTop: 6 },
+  description: { fontSize: 13, color: "#475569", marginTop: 4, lineHeight: 18 },
+  meta: { fontSize: 11, color: "#94a3b8", marginTop: 6, fontWeight: "700" },
+  chevron: { fontSize: 30, color: "#94a3b8", marginLeft: 10 },
+  emptyText: { color: "#64748b", paddingVertical: 18, textAlign: "center" },
+  errorBox: { backgroundColor: "#fff1f2", borderWidth: 1, borderColor: "#fecdd3", borderRadius: 16, padding: 15, marginBottom: 14 },
+  errorTitle: { fontWeight: "900", color: "#9f1239", fontSize: 15 },
+  errorText: { color: "#9f1239", marginTop: 5 },
+  retryButton: { alignSelf: "flex-start", backgroundColor: "#9f1239", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginTop: 10 },
+  retryText: { color: "#fff", fontWeight: "900" },
+  centerState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  centerTitle: { color: "#475569", fontWeight: "800" },
+  viewerScreen: { flex: 1, backgroundColor: "#fff" },
+  viewerHeader: { flexDirection: "row", alignItems: "center", padding: 14, borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
+  closeButton: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, backgroundColor: "#f1f5f9", marginRight: 12 },
+  closeText: { fontWeight: "900", color: "#111827" },
+  viewerHeaderMain: { flex: 1 },
+  viewerKind: { fontSize: 9, letterSpacing: 1.2, fontWeight: "900", color: "#e91f3f" },
+  viewerTitle: { fontSize: 17, fontWeight: "900", color: "#111827", marginTop: 2 },
+  webViewWrap: { flex: 1, backgroundColor: "#e5e7eb" },
+  webView: { flex: 1 },
+  webLoading: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
+  loadingText: { marginTop: 10, color: "#64748b", fontWeight: "800" },
+  completedPanel: { padding: 18, borderTopWidth: 1, borderTopColor: "#e5e7eb", backgroundColor: "#ecfdf5" },
+  completedTitle: { fontSize: 17, fontWeight: "900", color: "#047857" },
+  completedBody: { color: "#065f46", marginTop: 5, lineHeight: 19 },
+  signPanel: { maxHeight: 260, borderTopWidth: 1, borderTopColor: "#e5e7eb", padding: 17 },
+  confirmRow: { flexDirection: "row", alignItems: "flex-start" },
+  checkbox: { width: 25, height: 25, borderRadius: 7, borderWidth: 2, borderColor: "#94a3b8", marginRight: 11, alignItems: "center", justifyContent: "center" },
+  checkboxChecked: { backgroundColor: "#e91f3f", borderColor: "#e91f3f" },
+  checkmark: { color: "#fff", fontWeight: "900" },
+  confirmText: { flex: 1, color: "#334155", lineHeight: 20 },
+  nameInput: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, paddingHorizontal: 13, paddingVertical: 12, fontSize: 16, color: "#111827", marginTop: 14 },
+  submitButton: { backgroundColor: "#e91f3f", borderRadius: 999, paddingVertical: 14, alignItems: "center", marginTop: 13, marginBottom: 12 },
+  disabledButton: { opacity: 0.55 },
+  submitText: { color: "#fff", fontWeight: "900", fontSize: 15 },
 });
