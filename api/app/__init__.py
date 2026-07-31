@@ -3446,6 +3446,7 @@ def create_app():
 
         if "area" in data:
             area_name = (data.get("area") or "").strip()
+            previous_area_id = store.area_id
 
             if area_name:
                 area = Area.query.filter(db.func.lower(Area.name) == area_name.lower()).first()
@@ -3459,6 +3460,18 @@ def create_app():
                 store.area_id = area.id
             else:
                 store.area_id = None
+
+            # Keep users assigned to this store synchronized with its area.
+            # Only update users who still carry the store's previous area,
+            # avoiding overwriting an intentionally different area assignment.
+            if previous_area_id != store.area_id:
+                User.query.filter(
+                    User.store_id == store.id,
+                    User.area_id == previous_area_id,
+                ).update(
+                    {User.area_id: store.area_id},
+                    synchronize_session=False,
+                )
 
         if "is_active" in data:
             store.is_active = bool(data.get("is_active"))
